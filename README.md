@@ -30,6 +30,16 @@ npm run dev
 npm run build
 ```
 
+## Cursor Cloud Agent Environment
+
+This repository includes a cloud environment config at `.cursor/environment.json`.
+
+- Base image: `ghcr.io/cursor-images/node-22:latest`
+- Install step: `bash scripts/cloud-agent-install.sh`
+- Startup step: `bash scripts/cloud-agent-startup.sh`
+
+With this setup, cloud agents come up with a Node/npm toolchain and project dependencies so `npm run lint` and `npm run build` can run out of the box.
+
 ## Environment Variables
 
 Create `.env` file:

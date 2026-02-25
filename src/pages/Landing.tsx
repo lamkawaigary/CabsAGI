@@ -87,6 +87,14 @@ export default function Landing() {
 
   const selectedLoginRegionLabel =
     loginRegionOptions.find((option) => option.value === loginRegionCode)?.label || '+852'
+  const loginPhoneExample = useMemo(
+    () => (loginRegionCode === '86' ? '13800138000' : '61234567'),
+    [loginRegionCode],
+  )
+  const loginInputPlaceholder = useMemo(
+    () => `手機號碼（例如 ${loginPhoneExample}）/ 電郵 / admin`,
+    [loginPhoneExample],
+  )
   const canLogin = useMemo(() => !!loginInput && !!loginPassword && !loading, [loginInput, loginPassword, loading])
   const canSendOtp = useMemo(() => !!otpPhone && !loading, [otpPhone, loading])
   const canVerifyOtp = useMemo(() => !!otpCode && otpSent && !loading, [otpCode, otpSent, loading])
@@ -273,12 +281,12 @@ export default function Landing() {
                     <input
                       value={loginInput}
                       onChange={(e) => setLoginInput(e.target.value)}
-                      placeholder="手機號碼 / 電郵 / admin"
+                      placeholder={loginInputPlaceholder}
                       style={inputStyle}
                     />
                   </div>
                   <div style={{ fontSize: 12, color: '#5d6e65' }}>
-                    手機登入可只輸入本地號碼，系統會自動套用所選區碼。
+                    手機登入可只輸入本地號碼。當前區碼 {selectedLoginRegionLabel}，例如 {loginPhoneExample}。
                   </div>
                   {loginAutoHint && (
                     <div

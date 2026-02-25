@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useMessage } from '../context/MessageContext'
 import type { OrderRecord } from '../services/orderService'
@@ -21,9 +21,32 @@ const SUPPORT_ID = 'SYSTEM_ADMIN'
 
 export default function Messages({ orders = [] }: MessagesProps) {
   const { currentUser } = useAuth()
-  const { messages, loading, error, activePartnerId, activeOrderId, openConversation, sendMessage } = useMessage()
+  const {
+    messages,
+    loading,
+    error,
+    activePartnerId,
+    activeOrderId,
+    openConversation,
+    closeConversation,
+    sendMessage,
+  } = useMessage()
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 900px)').matches : false,
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const media = window.matchMedia('(max-width: 900px)')
+    const onChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches)
+    }
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
 
   const conversations = useMemo<ConversationItem[]>(() => {
     if (!currentUser?.id) return []
@@ -101,6 +124,16 @@ export default function Messages({ orders = [] }: MessagesProps) {
     }
   }
 
+  const showConversationPanel = !isMobile || !activePartnerId
+  const showChatPanel = !isMobile || !!activePartnerId
+  const activeConversationTitle = useMemo(() => {
+    if (!activePartnerId) return '訊息內容'
+    const match = conversations.find(
+      (item) => item.partnerId === activePartnerId && (item.orderId || null) === (activeOrderId || null),
+    )
+    return match?.title || (activePartnerId === SUPPORT_ID ? '客服中心' : `對話 ${activePartnerId.slice(0, 8)}`)
+  }, [activePartnerId, activeOrderId, conversations])
+
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', display: 'grid', gap: 10 }}>
       <h2 style={{ margin: 0, color: '#1e4038' }}>訊息中心</h2>
@@ -111,8 +144,17 @@ export default function Messages({ orders = [] }: MessagesProps) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 10 }}>
-        <section style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 14, padding: 12, minHeight: 420 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.3fr', gap: 10, alignItems: 'start' }}>
+        {showConversationPanel && (
+          <section
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: 12,
+              minHeight: isMobile ? 'auto' : 420,
+            }}
+          >
           <button
             onClick={() => void openConversation(SUPPORT_ID, null)}
             style={{ width: '100%', border: '1px solid #d4e2d8', background: '#f3faf6', borderRadius: 10, padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#244a3f', cursor: 'pointer' }}
@@ -149,9 +191,41 @@ export default function Messages({ orders = [] }: MessagesProps) {
               })
             )}
           </div>
-        </section>
+          </section>
+        )}
 
-        <section style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 14, padding: 12, minHeight: 420, display: 'grid', gridTemplateRows: '1fr auto', gap: 10 }}>
+        {showChatPanel && (
+          <section
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: 12,
+              minHeight: isMobile ? 360 : 420,
+              display: 'grid',
+              gridTemplateRows: isMobile ? 'auto 1fr auto' : '1fr auto',
+              gap: 10,
+            }}
+          >
+          {isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={closeConversation}
+                style={{
+                  border: '1px solid #d5e2d8',
+                  background: '#fff',
+                  color: '#244a3f',
+                  borderRadius: 10,
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                }}
+              >
+                返回
+              </button>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#27483f' }}>{activeConversationTitle}</div>
+            </div>
+          )}
           <div style={{ overflow: 'auto', display: 'grid', gap: 8 }}>
             {!activePartnerId ? (
               <div style={{ color: '#6f847d', fontSize: 13 }}>選擇左側對話，或直接「聯絡客服」。</div>
@@ -197,7 +271,8 @@ export default function Messages({ orders = [] }: MessagesProps) {
               發送
             </button>
           </div>
-        </section>
+          </section>
+        )}
       </div>
     </div>
   )

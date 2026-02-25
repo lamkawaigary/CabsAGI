@@ -11,7 +11,8 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore'
-import { db } from '../firebaseConfig'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { db, storage } from '../firebaseConfig'
 
 export type MessageType = 'TEXT' | 'IMAGE' | 'SYSTEM'
 
@@ -123,6 +124,71 @@ export const sendTextMessage = async (params: {
     createdAtServer: serverTimestamp(),
     metadata: {
       status: 'sent',
+    },
+  })
+}
+
+const sanitizeFileName = (fileName: string) =>
+  fileName
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]/g, '')
+    .slice(0, 60) || 'image'
+
+const getFileExt = (fileName: string, mimeType: string) => {
+  const matched = fileName.match(/\.([a-zA-Z0-9]+)$/)
+  if (matched) return matched[1].toLowerCase()
+  if (mimeType === 'image/jpeg') return 'jpg'
+  if (mimeType === 'image/png') return 'png'
+  if (mimeType === 'image/webp') return 'webp'
+  if (mimeType === 'image/gif') return 'gif'
+  return 'img'
+}
+
+export const sendImageMessage = async (params: {
+  senderId: string
+  senderName?: string
+  receiverId: string
+  file: File
+  orderId?: string
+}) => {
+  const { file } = params
+  if (!file.type.startsWith('image/')) {
+    throw new Error('僅支援圖片檔案格式')
+  }
+  const maxSizeBytes = 10 * 1024 * 1024
+  if (file.size > maxSizeBytes) {
+    throw new Error('圖片大小不可超過 10MB')
+  }
+
+  const nowISO = new Date().toISOString()
+  const ext = getFileExt(file.name, file.type)
+  const safeName = sanitizeFileName(file.name)
+  const objectPath = `messages/${params.senderId}/${Date.now()}-${safeName}.${ext}`
+  const storageRef = ref(storage, objectPath)
+
+  await uploadBytes(storageRef, file, {
+    contentType: file.type || 'application/octet-stream',
+  })
+  const downloadURL = await getDownloadURL(storageRef)
+
+  return addDoc(collection(db, 'messages'), {
+    senderId: params.senderId,
+    realSenderId: params.senderId,
+    senderName: params.senderName || '',
+    receiverId: params.receiverId,
+    content: downloadURL,
+    orderId: params.orderId || null,
+    type: 'IMAGE',
+    isRead: false,
+    timestamp: nowISO,
+    createdAtServer: serverTimestamp(),
+    metadata: {
+      status: 'sent',
+      fileName: file.name || safeName,
+      fileType: file.type || 'image/*',
+      fileSize: file.size,
+      storagePath: objectPath,
     },
   })
 }

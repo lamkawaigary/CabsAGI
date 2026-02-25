@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useAuth } from './AuthContext'
 import {
   markConversationAsRead,
+  sendImageMessage,
   sendTextMessage,
   subscribeMessagesByReceiver,
   subscribeMessagesBySender,
@@ -19,6 +20,7 @@ interface MessageContextValue {
   openConversation: (partnerId: string, orderId?: string | null) => Promise<void>
   closeConversation: () => void
   sendMessage: (receiverId: string, content: string, orderId?: string) => Promise<void>
+  sendImage: (receiverId: string, file: File, orderId?: string) => Promise<void>
   markAsRead: (partnerId: string, orderId?: string | null) => Promise<void>
 }
 
@@ -121,6 +123,17 @@ export function MessageProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  const sendImage: MessageContextValue['sendImage'] = async (receiverId, file, orderId) => {
+    if (!currentUser?.id) throw new Error('尚未登入')
+    await sendImageMessage({
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      receiverId,
+      file,
+      orderId,
+    })
+  }
+
   const value: MessageContextValue = {
     messages,
     loading,
@@ -130,6 +143,7 @@ export function MessageProvider({ children }: { children: ReactNode }) {
     openConversation,
     closeConversation,
     sendMessage,
+    sendImage,
     markAsRead,
   }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useMessage } from '../context/MessageContext'
 import type { OrderRecord } from '../services/orderService'
@@ -30,9 +30,18 @@ export default function Messages({ orders = [] }: MessagesProps) {
     openConversation,
     closeConversation,
     sendMessage,
+    sendImage,
   } = useMessage()
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
+
+  const toConversationSubtitle = (type: 'TEXT' | 'IMAGE' | 'SYSTEM', content: string) => {
+    if (type === 'IMAGE') return '📷 圖片'
+    return content || '(無內容)'
+  }
 
   const conversations = useMemo<ConversationItem[]>(() => {
     if (!currentUser?.id) return []
@@ -57,7 +66,8 @@ export default function Messages({ orders = [] }: MessagesProps) {
 
       const orderTitle = orderId ? orders.find((o) => o.id === orderId)?.id || `訂單 ${orderId.slice(0, 8)}` : ''
       const title = partnerId === SUPPORT_ID || partnerId === 'SYSTEM' ? '客服中心' : `對話 ${partnerId.slice(0, 8)}`
-      const subtitle = orderTitle ? `${orderTitle} · ${m.content || '(無內容)'}` : m.content || '(無內容)'
+      const preview = toConversationSubtitle(m.type, m.content)
+      const subtitle = orderTitle ? `${orderTitle} · ${preview}` : preview
       const time = m.timestamp
 
       if (!existing) {
@@ -110,6 +120,28 @@ export default function Messages({ orders = [] }: MessagesProps) {
     }
   }
 
+  const handlePickImage = () => {
+    setUploadError(null)
+    imageInputRef.current?.click()
+  }
+
+  const handleImageSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !activePartnerId) return
+
+    setUploadError(null)
+    setUploadingImage(true)
+    try {
+      await sendImage(activePartnerId, file, activeOrderId || undefined)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '圖片發送失敗'
+      setUploadError(message)
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
   const activeConversationTitle = useMemo(() => {
     if (!activePartnerId) return '訊息內容'
     const match = conversations.find(
@@ -125,6 +157,11 @@ export default function Messages({ orders = [] }: MessagesProps) {
       {error && (
         <div style={{ background: '#fff2ef', border: '1px solid #edc2bb', borderRadius: 12, padding: 12, color: '#9c3d31' }}>
           Firebase 訊息讀取失敗: {error}
+        </div>
+      )}
+      {uploadError && (
+        <div style={{ background: '#fff2ef', border: '1px solid #edc2bb', borderRadius: 12, padding: 12, color: '#9c3d31' }}>
+          圖片上傳失敗: {uploadError}
         </div>
       )}
 
@@ -213,6 +250,8 @@ export default function Messages({ orders = [] }: MessagesProps) {
             ) : (
               activeMessages.map((m) => {
                 const mine = m.senderId === currentUser?.id
+                const fileName =
+                  m.metadata && typeof m.metadata.fileName === 'string' ? m.metadata.fileName : '圖片'
                 return (
                   <div
                     key={m.id}
@@ -226,7 +265,25 @@ export default function Messages({ orders = [] }: MessagesProps) {
                       fontSize: 13,
                     }}
                   >
-                    <div>{m.content || '(空訊息)'}</div>
+                    {m.type === 'IMAGE' ? (
+                      <a href={m.content} target="_blank" rel="noreferrer" style={{ display: 'grid', gap: 6, color: 'inherit', textDecoration: 'none' }}>
+                        <img
+                          src={m.content}
+                          alt={fileName}
+                          loading="lazy"
+                          style={{
+                            width: '100%',
+                            maxWidth: 230,
+                            borderRadius: 10,
+                            border: mine ? '1px solid rgba(239,255,247,0.35)' : '1px solid #dbe5e0',
+                            objectFit: 'cover',
+                          }}
+                        />
+                        <span style={{ fontSize: 11, opacity: 0.8 }}>{fileName}</span>
+                      </a>
+                    ) : (
+                      <div>{m.content || '(空訊息)'}</div>
+                    )}
                     <div style={{ marginTop: 4, opacity: 0.7, fontSize: 11 }}>{new Date(m.timestamp).toLocaleString()}</div>
                   </div>
                 )
@@ -234,18 +291,41 @@ export default function Messages({ orders = [] }: MessagesProps) {
             )}
           </div>
 
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            onChange={(event) => void handleImageSelected(event)}
+            style={{ display: 'none' }}
+          />
           <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handlePickImage}
+              disabled={uploadingImage || sending}
+              style={{
+                border: '1px solid #d6dfd6',
+                borderRadius: 10,
+                padding: '10px 12px',
+                background: uploadingImage || sending ? '#eef1ee' : '#fff',
+                color: uploadingImage || sending ? '#8d8a80' : '#1f4f43',
+                fontWeight: 700,
+                cursor: uploadingImage || sending ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {uploadingImage ? '上傳中...' : '圖片'}
+            </button>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              disabled={sending}
+              disabled={sending || uploadingImage}
               placeholder="輸入訊息..."
               style={{ flex: 1, border: '1px solid #d6dfd6', borderRadius: 10, padding: '10px 12px', outline: 'none', fontSize: 13 }}
             />
             <button
               onClick={() => void handleSend()}
-              disabled={!input.trim() || sending}
-              style={{ border: 0, borderRadius: 10, padding: '10px 14px', background: !input.trim() || sending ? '#e8e8e4' : '#1f4f43', color: !input.trim() || sending ? '#8d8a80' : '#effff7', fontWeight: 700, cursor: !input.trim() || sending ? 'not-allowed' : 'pointer' }}
+              disabled={!input.trim() || sending || uploadingImage}
+              style={{ border: 0, borderRadius: 10, padding: '10px 14px', background: !input.trim() || sending || uploadingImage ? '#e8e8e4' : '#1f4f43', color: !input.trim() || sending || uploadingImage ? '#8d8a80' : '#effff7', fontWeight: 700, cursor: !input.trim() || sending || uploadingImage ? 'not-allowed' : 'pointer' }}
             >
               發送
             </button>

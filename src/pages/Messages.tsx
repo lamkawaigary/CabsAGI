@@ -19,6 +19,15 @@ type ConversationItem = {
 
 const SUPPORT_ID = 'SYSTEM_ADMIN'
 
+const isCompactMessageLayout = () => {
+  if (typeof window === 'undefined') return false
+  return (
+    window.matchMedia('(max-width: 1100px)').matches ||
+    window.matchMedia('(pointer: coarse)').matches ||
+    window.matchMedia('(hover: none)').matches
+  )
+}
+
 export default function Messages({ orders = [] }: MessagesProps) {
   const { currentUser } = useAuth()
   const {
@@ -33,19 +42,28 @@ export default function Messages({ orders = [] }: MessagesProps) {
   } = useMessage()
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(max-width: 900px)').matches : false,
-  )
+  const [isMobile, setIsMobile] = useState(isCompactMessageLayout)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const media = window.matchMedia('(max-width: 900px)')
-    const onChange = (event: MediaQueryListEvent) => {
-      setIsMobile(event.matches)
+    const widthMedia = window.matchMedia('(max-width: 1100px)')
+    const coarseMedia = window.matchMedia('(pointer: coarse)')
+    const hoverMedia = window.matchMedia('(hover: none)')
+
+    const updateLayoutMode = () => {
+      setIsMobile(isCompactMessageLayout())
     }
-    media.addEventListener('change', onChange)
-    return () => media.removeEventListener('change', onChange)
+
+    widthMedia.addEventListener('change', updateLayoutMode)
+    coarseMedia.addEventListener('change', updateLayoutMode)
+    hoverMedia.addEventListener('change', updateLayoutMode)
+
+    return () => {
+      widthMedia.removeEventListener('change', updateLayoutMode)
+      coarseMedia.removeEventListener('change', updateLayoutMode)
+      hoverMedia.removeEventListener('change', updateLayoutMode)
+    }
   }, [])
 
   const conversations = useMemo<ConversationItem[]>(() => {

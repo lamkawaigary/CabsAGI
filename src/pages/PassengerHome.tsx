@@ -26,14 +26,10 @@ function LocationInput({
   value: LocationRecord | null
   onPick: (v: LocationRecord | null) => void
 }) {
-  const [query, setQuery] = useState(value?.name || '')
+  const [query, setQuery] = useState(() => value?.name || '')
   const [items, setItems] = useState<LocationRecord[]>([])
   const [open, setOpen] = useState(false)
   const [searched, setSearched] = useState(false)
-
-  useEffect(() => {
-    setQuery(value?.name || '')
-  }, [value?.id, value?.name])
 
   const runSearch = async (q: string) => {
     setQuery(q)
@@ -199,8 +195,9 @@ export default function PassengerHome() {
       }
 
       await placeOrderNow(nextQuote)
-    } catch (err: any) {
-      setNotice({ text: `建立訂單失敗: ${err?.message || '未知錯誤'}`, tone: 'error' })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '未知錯誤'
+      setNotice({ text: `建立訂單失敗: ${message}`, tone: 'error' })
     } finally {
       setPlacingOrder(false)
     }
@@ -273,6 +270,7 @@ export default function PassengerHome() {
 
             <div style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 16, padding: 14, display: 'grid', gap: 10 }}>
               <LocationInput
+                key={pickup?.id ?? 'pickup-empty'}
                 label="上車地點"
                 accent="#2e8b6d"
                 value={pickup}
@@ -283,6 +281,7 @@ export default function PassengerHome() {
                 }}
               />
               <LocationInput
+                key={dropoff?.id ?? 'dropoff-empty'}
                 label="目的地"
                 accent="#df5f4a"
                 value={dropoff}

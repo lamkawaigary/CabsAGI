@@ -1,10 +1,12 @@
 import {
   addDoc,
   collection,
+  type DocumentData,
   getDocs,
   limit,
   onSnapshot,
   query,
+  type QueryDocumentSnapshot,
   serverTimestamp,
   where,
   writeBatch,
@@ -24,15 +26,21 @@ export interface MessageRecord {
   orderId?: string | null
   timestamp: string
   isRead: boolean
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
-const sanitizeValue = (val: any): any => {
+const isRecord = (val: unknown): val is Record<string, unknown> =>
+  typeof val === 'object' && val !== null
+
+const isTimestampLike = (val: unknown): val is { toDate: () => Date } =>
+  isRecord(val) && typeof val.toDate === 'function'
+
+const sanitizeValue = (val: unknown): unknown => {
   if (val === null || val === undefined) return val
-  if (val && typeof val.toDate === 'function') return val.toDate().toISOString()
+  if (isTimestampLike(val)) return val.toDate().toISOString()
   if (Array.isArray(val)) return val.map(sanitizeValue)
-  if (typeof val === 'object') {
-    const cleaned: Record<string, any> = {}
+  if (isRecord(val)) {
+    const cleaned: Record<string, unknown> = {}
     Object.keys(val).forEach((key) => {
       cleaned[key] = sanitizeValue(val[key])
     })
@@ -41,22 +49,31 @@ const sanitizeValue = (val: any): any => {
   return val
 }
 
-const sanitizeDoc = (docSnap: any): MessageRecord => {
+const sanitizeDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): MessageRecord => {
   const data = docSnap.data() || {}
-  const clean: any = { id: docSnap.id }
+  const clean: Record<string, unknown> = { id: docSnap.id }
   Object.keys(data).forEach((k) => {
     clean[k] = sanitizeValue(data[k])
   })
 
-  clean.senderId = String(clean.senderId || '')
-  clean.receiverId = String(clean.receiverId || '')
-  clean.content = String(clean.content || '')
-  clean.type = (clean.type || 'TEXT') as MessageType
-  clean.timestamp = clean.timestamp || new Date(0).toISOString()
-  clean.isRead = Boolean(clean.isRead)
-  clean.orderId = clean.orderId || null
+  const type: MessageType =
+    clean.type === 'IMAGE' || clean.type === 'SYSTEM' || clean.type === 'TEXT' ? clean.type : 'TEXT'
+  const timestamp = typeof clean.timestamp === 'string' ? clean.timestamp : new Date(0).toISOString()
+  const orderId = typeof clean.orderId === 'string' && clean.orderId.trim() ? clean.orderId : null
 
-  return clean as MessageRecord
+  return {
+    id: docSnap.id,
+    senderId: typeof clean.senderId === 'string' ? clean.senderId : '',
+    receiverId: typeof clean.receiverId === 'string' ? clean.receiverId : '',
+    realSenderId: typeof clean.realSenderId === 'string' ? clean.realSenderId : undefined,
+    senderName: typeof clean.senderName === 'string' ? clean.senderName : undefined,
+    content: typeof clean.content === 'string' ? clean.content : '',
+    type,
+    orderId,
+    timestamp,
+    isRead: Boolean(clean.isRead),
+    metadata: isRecord(clean.metadata) ? clean.metadata : undefined,
+  }
 }
 
 export const subscribeMessagesBySender = (

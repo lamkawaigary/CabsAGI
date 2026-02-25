@@ -1,8 +1,66 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+interface TMapMap {
+  destroy: () => void
+  fitBounds: (bounds: unknown, options?: { padding: number }) => void
+  setCenter: (latLng: unknown) => void
+  setZoom: (zoom: number) => void
+}
+
+interface TMapMultiMarker {
+  setGeometries: (geometries: MarkerGeometry[]) => void
+}
+
+interface TMapMultiPolyline {
+  setGeometries: (geometries: PolylineGeometry[]) => void
+}
+
+interface TMapLatLngBounds {
+  extend: (latLng: unknown) => void
+}
+
+interface MarkerGeometry {
+  id: 'pickup' | 'dropoff'
+  styleId: 'pickup' | 'dropoff'
+  position: unknown
+  properties: { title: string }
+}
+
+interface PolylineGeometry {
+  id: string
+  styleId: 'route'
+  paths: unknown[]
+}
+
+interface TMapSDK {
+  Map: new (
+    container: HTMLDivElement,
+    options: {
+      center: unknown
+      zoom: number
+      pitch: number
+      rotation: number
+    },
+  ) => TMapMap
+  LatLng: new (lat: number, lng: number) => unknown
+  MultiMarker: new (options: {
+    map: TMapMap
+    styles: Record<string, unknown>
+    geometries: MarkerGeometry[]
+  }) => TMapMultiMarker
+  MarkerStyle: new (options: Record<string, unknown>) => unknown
+  MultiPolyline: new (options: {
+    map: TMapMap
+    styles: Record<string, unknown>
+    geometries: PolylineGeometry[]
+  }) => TMapMultiPolyline
+  PolylineStyle: new (options: Record<string, unknown>) => unknown
+  LatLngBounds: new () => TMapLatLngBounds
+}
 
 declare global {
   interface Window {
-    TMap: any
+    TMap?: TMapSDK
   }
 }
 
@@ -21,28 +79,33 @@ interface TencentMapProps {
 
 export default function TencentMap({ pickup, dropoff, routePath, height = '400px' }: TencentMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstance = useRef<any>(null)
-  const markersRef = useRef<any>(null)
-  const routeRef = useRef<any>(null)
+  const mapInstance = useRef<TMapMap | null>(null)
+  const markersRef = useRef<TMapMultiMarker | null>(null)
+  const routeRef = useRef<TMapMultiPolyline | null>(null)
   const initFailedRef = useRef(false)
   const [mapUnavailable, setMapUnavailable] = useState(false)
 
+  const markUnavailable = useCallback(() => {
+    queueMicrotask(() => setMapUnavailable(true))
+  }, [])
+
   useEffect(() => {
-    if (!mapRef.current || !window.TMap || initFailedRef.current) return
+    const tmap = window.TMap
+    if (!mapRef.current || !tmap || initFailedRef.current) return
 
     try {
-      const center = pickup ? [pickup.lng, pickup.lat] : [114.0579, 22.5431]
-      mapInstance.current = new window.TMap.Map(mapRef.current, {
-        center: new window.TMap.LatLng(center[1], center[0]),
+      const defaultCenter = [114.0579, 22.5431] as const
+      mapInstance.current = new tmap.Map(mapRef.current, {
+        center: new tmap.LatLng(defaultCenter[1], defaultCenter[0]),
         zoom: 12,
         pitch: 0,
         rotation: 0,
       })
 
-      markersRef.current = new window.TMap.MultiMarker({
+      markersRef.current = new tmap.MultiMarker({
         map: mapInstance.current,
         styles: {
-          pickup: new window.TMap.MarkerStyle({
+          pickup: new tmap.MarkerStyle({
             width: 25,
             height: 35,
             anchor: { x: 16, y: 32 },
@@ -54,7 +117,7 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
             </svg>
           `),
           }),
-          dropoff: new window.TMap.MarkerStyle({
+          dropoff: new tmap.MarkerStyle({
             width: 25,
             height: 35,
             anchor: { x: 16, y: 32 },
@@ -70,10 +133,10 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
         geometries: [],
       })
 
-      routeRef.current = new window.TMap.MultiPolyline({
+      routeRef.current = new tmap.MultiPolyline({
         map: mapInstance.current,
         styles: {
-          route: new window.TMap.PolylineStyle({
+          route: new tmap.PolylineStyle({
             color: '#1e4f43',
             width: 6,
             borderWidth: 2,
@@ -83,34 +146,36 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
         },
         geometries: [],
       })
-
-      setMapUnavailable(false)
     } catch (err) {
       initFailedRef.current = true
-      setMapUnavailable(true)
+      markUnavailable()
       console.warn('TencentMap init failed:', err)
     }
 
     return () => {
       try {
         if (mapInstance.current) mapInstance.current.destroy()
+        mapInstance.current = null
+        markersRef.current = null
+        routeRef.current = null
       } catch (err) {
         console.warn('TencentMap destroy failed:', err)
       }
     }
-  }, [])
+  }, [markUnavailable])
 
   useEffect(() => {
-    if (!mapInstance.current || !markersRef.current || initFailedRef.current) return
+    const tmap = window.TMap
+    if (!mapInstance.current || !markersRef.current || !tmap || initFailedRef.current) return
 
     try {
-      const geometries: any[] = []
+      const geometries: MarkerGeometry[] = []
 
       if (pickup) {
         geometries.push({
           id: 'pickup',
           styleId: 'pickup',
-          position: new window.TMap.LatLng(pickup.lat, pickup.lng),
+          position: new tmap.LatLng(pickup.lat, pickup.lng),
           properties: { title: pickup.name },
         })
       }
@@ -119,7 +184,7 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
         geometries.push({
           id: 'dropoff',
           styleId: 'dropoff',
-          position: new window.TMap.LatLng(dropoff.lat, dropoff.lng),
+          position: new tmap.LatLng(dropoff.lat, dropoff.lng),
           properties: { title: dropoff.name },
         })
       }
@@ -127,15 +192,15 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
       markersRef.current.setGeometries(geometries)
 
       if (pickup && dropoff) {
-        const bounds = new window.TMap.LatLngBounds()
-        bounds.extend(new window.TMap.LatLng(pickup.lat, pickup.lng))
-        bounds.extend(new window.TMap.LatLng(dropoff.lat, dropoff.lng))
+        const bounds = new tmap.LatLngBounds()
+        bounds.extend(new tmap.LatLng(pickup.lat, pickup.lng))
+        bounds.extend(new tmap.LatLng(dropoff.lat, dropoff.lng))
         mapInstance.current.fitBounds(bounds, { padding: 50 })
       } else if (pickup) {
-        mapInstance.current.setCenter(new window.TMap.LatLng(pickup.lat, pickup.lng))
+        mapInstance.current.setCenter(new tmap.LatLng(pickup.lat, pickup.lng))
         mapInstance.current.setZoom(15)
       } else if (dropoff) {
-        mapInstance.current.setCenter(new window.TMap.LatLng(dropoff.lat, dropoff.lng))
+        mapInstance.current.setCenter(new tmap.LatLng(dropoff.lat, dropoff.lng))
         mapInstance.current.setZoom(15)
       }
 
@@ -145,7 +210,7 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
             {
               id: 'route-main',
               styleId: 'route',
-              paths: routePath.map((p) => new window.TMap.LatLng(p.lat, p.lng)),
+              paths: routePath.map((p) => new tmap.LatLng(p.lat, p.lng)),
             },
           ])
         } else {
@@ -154,9 +219,9 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
       }
     } catch (err) {
       console.warn('TencentMap update failed:', err)
-      setMapUnavailable(true)
+      markUnavailable()
     }
-  }, [pickup, dropoff, routePath])
+  }, [pickup, dropoff, routePath, markUnavailable])
 
   if (mapUnavailable) {
     return (

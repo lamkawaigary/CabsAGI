@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from './AuthContext'
 import {
@@ -41,16 +43,20 @@ export function MessageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!currentUser?.id) {
-      setSent([])
-      setRecv([])
-      setBroadcast([])
-      setLoading(false)
-      setError(null)
+      queueMicrotask(() => {
+        setSent([])
+        setRecv([])
+        setBroadcast([])
+        setLoading(false)
+        setError(null)
+      })
       return
     }
 
-    setLoading(true)
-    setError(null)
+    queueMicrotask(() => {
+      setLoading(true)
+      setError(null)
+    })
 
     const onSubError = (e: Error) => {
       setError(e.message || '讀取訊息失敗')

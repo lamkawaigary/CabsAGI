@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import {
   createContext,
   useContext,
@@ -5,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import type { FirebaseError } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -56,6 +59,13 @@ declare global {
 
 const MASTER_EMAIL = 'lamgary@p7s.app'
 const MASTER_PHONE = '+85269277488'
+
+const getErrorCode = (err: unknown) =>
+  err && typeof err === 'object' && 'code' in err && typeof (err as FirebaseError).code === 'string'
+    ? (err as FirebaseError).code
+    : ''
+
+const getErrorMessage = (err: unknown) => (err instanceof Error ? err.message : 'Unknown error')
 
 const normalizePhone = (regionCode: string, phone: string) => {
   let cleanPhone = phone.replace(/\D/g, '')
@@ -144,15 +154,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const email = getEmailFromInput(input)
       await signInWithEmailAndPassword(auth, email, password)
       return { ok: true, message: '登入成功' }
-    } catch (err: any) {
-      const code = err?.code || ''
+    } catch (err: unknown) {
+      const code = getErrorCode(err)
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
         return { ok: false, message: '密碼錯誤或帳號不存在' }
       }
       if (code === 'auth/too-many-requests') {
         return { ok: false, message: '嘗試次數過多，請稍後再試' }
       }
-      return { ok: false, message: `登入失敗: ${err?.message || 'Unknown error'}` }
+      return { ok: false, message: `登入失敗: ${getErrorMessage(err)}` }
     }
   }
 
@@ -172,8 +182,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const confirmation = await signInWithPhoneNumber(auth, fullPhone, verifier)
       setOtpSession({ verificationId: confirmation.verificationId, phone: fullPhone })
       return { ok: true, message: '驗證碼已發送' }
-    } catch (err: any) {
-      return { ok: false, message: `發送失敗: ${err?.message || 'Unknown error'}` }
+    } catch (err: unknown) {
+      return { ok: false, message: `發送失敗: ${getErrorMessage(err)}` }
     }
   }
 
@@ -200,8 +210,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setOtpSession(null)
       return { ok: true, message: 'OTP 登入成功' }
-    } catch (err: any) {
-      return { ok: false, message: `驗證失敗: ${err?.message || 'Unknown error'}` }
+    } catch (err: unknown) {
+      return { ok: false, message: `驗證失敗: ${getErrorMessage(err)}` }
     }
   }
 
@@ -232,11 +242,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       return { ok: true, message: '註冊成功' }
-    } catch (err: any) {
-      if (err?.code === 'auth/email-already-in-use') {
+    } catch (err: unknown) {
+      if (getErrorCode(err) === 'auth/email-already-in-use') {
         return { ok: false, message: '此手機號碼已註冊' }
       }
-      return { ok: false, message: `註冊失敗: ${err?.message || 'Unknown error'}` }
+      return { ok: false, message: `註冊失敗: ${getErrorMessage(err)}` }
     }
   }
 
@@ -247,11 +257,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const email = formatEmailFromPhone(fullPhone)
       await sendPasswordResetEmail(auth, email)
       return { ok: true, message: `重設密碼郵件已發送到 ${email}` }
-    } catch (err: any) {
-      if (err?.code === 'auth/user-not-found') {
+    } catch (err: unknown) {
+      if (getErrorCode(err) === 'auth/user-not-found') {
         return { ok: false, message: '此手機帳號未註冊' }
       }
-      return { ok: false, message: `重設失敗: ${err?.message || 'Unknown error'}` }
+      return { ok: false, message: `重設失敗: ${getErrorMessage(err)}` }
     }
   }
 

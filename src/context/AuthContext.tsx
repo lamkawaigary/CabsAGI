@@ -36,7 +36,7 @@ export interface AuthUser {
 interface AuthContextValue {
   currentUser: AuthUser | null
   loading: boolean
-  loginWithPassword: (input: string, password: string) => Promise<{ ok: boolean; message: string }>
+  loginWithPassword: (input: string, password: string, regionCode?: string) => Promise<{ ok: boolean; message: string }>
   sendOtp: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
   verifyOtp: (otpCode: string) => Promise<{ ok: boolean; message: string }>
   registerUser: (params: {
@@ -78,14 +78,25 @@ const normalizePhone = (regionCode: string, phone: string) => {
 
 const formatEmailFromPhone = (fullPhone: string) => `${fullPhone.replace(/\D/g, '')}@p7s.app`
 
-const getEmailFromInput = (input: string) => {
+const getEmailFromInput = (input: string, regionCode = '852') => {
   const trimmed = input.trim().toLowerCase()
   if (['glam', 'gary', 'lamgary', 'admin'].includes(trimmed)) return MASTER_EMAIL
   if (trimmed.includes('@')) return trimmed
 
-  let digits = trimmed.replace(/\D/g, '')
-  if (!trimmed.startsWith('+') && digits.length === 8) digits = `852${digits}`
-  return `${digits}@p7s.app`
+  const digits = trimmed.replace(/\D/g, '')
+  if (!digits) return `${trimmed}@p7s.app`
+
+  if (trimmed.startsWith('+')) {
+    return `${digits}@p7s.app`
+  }
+
+  const knownRegionCodes = ['852', '86', '853']
+  if (knownRegionCodes.some((code) => digits.startsWith(code))) {
+    return `${digits}@p7s.app`
+  }
+
+  const cleanRegion = regionCode.replace(/\D/g, '') || '852'
+  return `${cleanRegion}${digits}@p7s.app`
 }
 
 const defaultProfile = (uid: string, email: string): AuthUser => ({
@@ -148,10 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsub()
   }, [])
 
-  const loginWithPassword: AuthContextValue['loginWithPassword'] = async (input, password) => {
+  const loginWithPassword: AuthContextValue['loginWithPassword'] = async (input, password, regionCode = '852') => {
     if (!input || !password) return { ok: false, message: '請填寫帳號和密碼' }
     try {
-      const email = getEmailFromInput(input)
+      const email = getEmailFromInput(input, regionCode)
       await signInWithEmailAndPassword(auth, email, password)
       return { ok: true, message: '登入成功' }
     } catch (err: unknown) {

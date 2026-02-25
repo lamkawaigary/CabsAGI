@@ -11,6 +11,11 @@ const regionOptions = [
   { label: '+853', value: '853' },
 ]
 
+const loginRegionOptions = [
+  { label: '+852', value: '852' },
+  { label: '+86', value: '86' },
+]
+
 const shell: CSSProperties = {
   minHeight: '100vh',
   background:
@@ -64,6 +69,7 @@ export default function Landing() {
 
   const [loginInput, setLoginInput] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
+  const [loginRegionCode, setLoginRegionCode] = useState('852')
 
   const [otpRegionCode, setOtpRegionCode] = useState('852')
   const [otpPhone, setOtpPhone] = useState('')
@@ -95,7 +101,7 @@ export default function Landing() {
   const handleLogin = async () => {
     setLoading(true)
     setMessage('')
-    const result = await loginWithPassword(loginInput, loginPassword)
+    const result = await loginWithPassword(loginInput, loginPassword, loginRegionCode)
     setResult(result.ok, result.message)
     setLoading(false)
   }
@@ -231,12 +237,24 @@ export default function Landing() {
 
               {loginMethod === 'password' ? (
                 <div style={{ display: 'grid', gap: 10 }}>
-                  <input
-                    value={loginInput}
-                    onChange={(e) => setLoginInput(e.target.value)}
-                    placeholder="帳號（電郵 / 手機 / admin）"
-                    style={inputStyle}
-                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: 8 }}>
+                    <select value={loginRegionCode} onChange={(e) => setLoginRegionCode(e.target.value)} style={inputStyle}>
+                      {loginRegionOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={loginInput}
+                      onChange={(e) => setLoginInput(e.target.value)}
+                      placeholder="手機號碼 / 電郵 / admin"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ fontSize: 12, color: '#5d6e65' }}>
+                    手機登入可只輸入本地號碼，系統會自動套用所選區碼。
+                  </div>
                   <input
                     type="password"
                     value={loginPassword}

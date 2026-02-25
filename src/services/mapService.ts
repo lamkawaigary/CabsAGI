@@ -64,8 +64,6 @@ const BORDER_CHECKPOINTS = [
 
 const normalize = (v: string) => v.trim().toLowerCase()
 
-type JsonpWindow = Window & Record<string, unknown>
-
 interface TencentSuggestionItem {
   id?: string | number
   title?: string
@@ -114,7 +112,7 @@ const fetchTencentSuggestions = async (query: string): Promise<LocationRecord[]>
   try {
     const data = await new Promise<TencentSuggestionResponse>((resolve, reject) => {
       const callbackName = `tmapJsonp_${Date.now()}_${Math.floor(Math.random() * 10000)}`
-      const scopedWindow = window as JsonpWindow
+      const scopedWindow = window as unknown as Record<string, unknown>
       const script = document.createElement('script')
       const timer = window.setTimeout(() => {
         cleanup()
@@ -143,30 +141,30 @@ const fetchTencentSuggestions = async (query: string): Promise<LocationRecord[]>
 
     if (!data?.data || !Array.isArray(data.data)) return []
 
-    return data.data
-      .map((item, idx) => {
-        const lat = Number(item.location?.lat)
-        const lng = Number(item.location?.lng)
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    const suggestions: LocationRecord[] = []
+    for (let idx = 0; idx < data.data.length && suggestions.length < 8; idx += 1) {
+      const item = data.data[idx]
+      const lat = Number(item.location?.lat)
+      const lng = Number(item.location?.lng)
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
 
-        const title = item.title || item.address || q
-        const address = item.address || item.title || '未知地址'
-        const keywords = [item.title, item.address]
-          .filter((keyword): keyword is string => typeof keyword === 'string' && keyword.length > 0)
-          .map((keyword) => keyword.toLowerCase())
+      const title = item.title || item.address || q
+      const address = item.address || item.title || '未知地址'
+      const keywords = [item.title, item.address]
+        .filter((keyword): keyword is string => typeof keyword === 'string' && keyword.length > 0)
+        .map((keyword) => keyword.toLowerCase())
 
-        return {
-          id: `tx-${item.id || idx}`,
-          name: title,
-          address,
-          lat,
-          lng,
-          keywords,
-          source: 'ai' as const,
-        }
+      suggestions.push({
+        id: `tx-${item.id || idx}`,
+        name: title,
+        address,
+        lat,
+        lng,
+        keywords,
+        source: 'ai',
       })
-      .filter((item): item is LocationRecord => item !== null)
-      .slice(0, 8)
+    }
+    return suggestions
   } catch {
     return []
   }

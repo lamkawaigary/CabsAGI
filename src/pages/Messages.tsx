@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useMessage } from '../context/MessageContext'
 import type { OrderRecord } from '../services/orderService'
@@ -19,15 +19,6 @@ type ConversationItem = {
 
 const SUPPORT_ID = 'SYSTEM_ADMIN'
 
-const isCompactMessageLayout = () => {
-  if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(max-width: 1100px)').matches ||
-    window.matchMedia('(pointer: coarse)').matches ||
-    window.matchMedia('(hover: none)').matches
-  )
-}
-
 export default function Messages({ orders = [] }: MessagesProps) {
   const { currentUser } = useAuth()
   const {
@@ -42,29 +33,6 @@ export default function Messages({ orders = [] }: MessagesProps) {
   } = useMessage()
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [isMobile, setIsMobile] = useState(isCompactMessageLayout)
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const widthMedia = window.matchMedia('(max-width: 1100px)')
-    const coarseMedia = window.matchMedia('(pointer: coarse)')
-    const hoverMedia = window.matchMedia('(hover: none)')
-
-    const updateLayoutMode = () => {
-      setIsMobile(isCompactMessageLayout())
-    }
-
-    widthMedia.addEventListener('change', updateLayoutMode)
-    coarseMedia.addEventListener('change', updateLayoutMode)
-    hoverMedia.addEventListener('change', updateLayoutMode)
-
-    return () => {
-      widthMedia.removeEventListener('change', updateLayoutMode)
-      coarseMedia.removeEventListener('change', updateLayoutMode)
-      hoverMedia.removeEventListener('change', updateLayoutMode)
-    }
-  }, [])
 
   const conversations = useMemo<ConversationItem[]>(() => {
     if (!currentUser?.id) return []
@@ -142,8 +110,6 @@ export default function Messages({ orders = [] }: MessagesProps) {
     }
   }
 
-  const showConversationPanel = !isMobile || !activePartnerId
-  const showChatPanel = !isMobile || !!activePartnerId
   const activeConversationTitle = useMemo(() => {
     if (!activePartnerId) return '訊息內容'
     const match = conversations.find(
@@ -162,17 +128,15 @@ export default function Messages({ orders = [] }: MessagesProps) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.3fr', gap: 10, alignItems: 'start' }}>
-        {showConversationPanel && (
-          <section
-            style={{
-              background: '#fff',
-              border: '1px solid #dce6dd',
-              borderRadius: 14,
-              padding: 12,
-              minHeight: isMobile ? 'auto' : 420,
-            }}
-          >
+      {!activePartnerId ? (
+        <section
+          style={{
+            background: '#fff',
+            border: '1px solid #dce6dd',
+            borderRadius: 14,
+            padding: 12,
+          }}
+        >
           <button
             onClick={() => void openConversation(SUPPORT_ID, null)}
             style={{ width: '100%', border: '1px solid #d4e2d8', background: '#f3faf6', borderRadius: 10, padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#244a3f', cursor: 'pointer' }}
@@ -187,12 +151,11 @@ export default function Messages({ orders = [] }: MessagesProps) {
               <div style={{ color: '#6f847d', fontSize: 13 }}>暫時無對話</div>
             ) : (
               conversations.map((conv) => {
-                const active = conv.partnerId === activePartnerId && (conv.orderId || null) === (activeOrderId || null)
                 return (
                   <button
                     key={conv.key}
                     onClick={() => void openConversation(conv.partnerId, conv.orderId)}
-                    style={{ border: '1px solid #dce6dd', background: active ? '#eaf4ef' : '#fff', borderRadius: 10, padding: 10, textAlign: 'left', cursor: 'pointer' }}
+                    style={{ border: '1px solid #dce6dd', background: '#fff', borderRadius: 10, padding: 10, textAlign: 'left', cursor: 'pointer' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <strong style={{ color: '#214239', fontSize: 13 }}>{conv.title}</strong>
@@ -209,26 +172,26 @@ export default function Messages({ orders = [] }: MessagesProps) {
               })
             )}
           </div>
-          </section>
-        )}
-
-        {showChatPanel && (
-          <section
-            style={{
-              background: '#fff',
-              border: '1px solid #dce6dd',
-              borderRadius: 14,
-              padding: 12,
-              minHeight: isMobile ? 360 : 420,
-              display: 'grid',
-              gridTemplateRows: isMobile ? 'auto 1fr auto' : '1fr auto',
-              gap: 10,
-            }}
-          >
-          {isMobile && (
+        </section>
+      ) : (
+        <section
+          style={{
+            background: '#fff',
+            border: '1px solid #dce6dd',
+            borderRadius: 14,
+            padding: 12,
+            minHeight: 420,
+            display: 'grid',
+            gridTemplateRows: 'auto 1fr auto',
+            gap: 10,
+          }}
+        >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
-                onClick={closeConversation}
+                onClick={() => {
+                  closeConversation()
+                  setInput('')
+                }}
                 style={{
                   border: '1px solid #d5e2d8',
                   background: '#fff',
@@ -243,11 +206,9 @@ export default function Messages({ orders = [] }: MessagesProps) {
               </button>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#27483f' }}>{activeConversationTitle}</div>
             </div>
-          )}
+
           <div style={{ overflow: 'auto', display: 'grid', gap: 8 }}>
-            {!activePartnerId ? (
-              <div style={{ color: '#6f847d', fontSize: 13 }}>選擇左側對話，或直接「聯絡客服」。</div>
-            ) : activeMessages.length === 0 ? (
+            {activeMessages.length === 0 ? (
               <div style={{ color: '#6f847d', fontSize: 13 }}>尚未有訊息，開始發送第一句。</div>
             ) : (
               activeMessages.map((m) => {
@@ -277,21 +238,20 @@ export default function Messages({ orders = [] }: MessagesProps) {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              disabled={!activePartnerId || sending}
-              placeholder={activePartnerId ? '輸入訊息...' : '先選擇對話'}
+              disabled={sending}
+              placeholder="輸入訊息..."
               style={{ flex: 1, border: '1px solid #d6dfd6', borderRadius: 10, padding: '10px 12px', outline: 'none', fontSize: 13 }}
             />
             <button
               onClick={() => void handleSend()}
-              disabled={!activePartnerId || !input.trim() || sending}
-              style={{ border: 0, borderRadius: 10, padding: '10px 14px', background: !activePartnerId || !input.trim() || sending ? '#e8e8e4' : '#1f4f43', color: !activePartnerId || !input.trim() || sending ? '#8d8a80' : '#effff7', fontWeight: 700, cursor: !activePartnerId || !input.trim() || sending ? 'not-allowed' : 'pointer' }}
+              disabled={!input.trim() || sending}
+              style={{ border: 0, borderRadius: 10, padding: '10px 14px', background: !input.trim() || sending ? '#e8e8e4' : '#1f4f43', color: !input.trim() || sending ? '#8d8a80' : '#effff7', fontWeight: 700, cursor: !input.trim() || sending ? 'not-allowed' : 'pointer' }}
             >
               發送
             </button>
           </div>
-          </section>
-        )}
-      </div>
+        </section>
+      )}
     </div>
   )
 }

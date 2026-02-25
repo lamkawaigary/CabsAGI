@@ -85,6 +85,8 @@ export default function Landing() {
   const [resetRegionCode, setResetRegionCode] = useState('852')
   const [resetPhone, setResetPhone] = useState('')
 
+  const selectedLoginRegionLabel =
+    loginRegionOptions.find((option) => option.value === loginRegionCode)?.label || '+852'
   const canLogin = useMemo(() => !!loginInput && !!loginPassword && !loading, [loginInput, loginPassword, loading])
   const canSendOtp = useMemo(() => !!otpPhone && !loading, [otpPhone, loading])
   const canVerifyOtp = useMemo(() => !!otpCode && otpSent && !loading, [otpCode, otpSent, loading])
@@ -92,6 +94,29 @@ export default function Landing() {
     () => !!name && !!phone && !!regPassword && regPassword === confirmPassword && !loading,
     [name, phone, regPassword, confirmPassword, loading],
   )
+  const loginAutoHint = useMemo(() => {
+    if (loginMethod !== 'password') return ''
+    const trimmed = loginInput.trim()
+    if (!trimmed) return ''
+
+    const lower = trimmed.toLowerCase()
+    if (['glam', 'gary', 'lamgary', 'admin'].includes(lower)) {
+      return '已偵測管理員別名，將使用 admin 帳號登入。'
+    }
+
+    if (trimmed.includes('@')) {
+      return '已偵測電郵格式，將使用電郵登入。'
+    }
+
+    const digits = trimmed.replace(/\D/g, '')
+    if (!digits) return ''
+
+    if (trimmed.startsWith('+')) {
+      return `已偵測完整國碼手機：+${digits}`
+    }
+
+    return `將自動套用區碼 ${selectedLoginRegionLabel}，登入手機帳號：${selectedLoginRegionLabel}${digits}`
+  }, [loginMethod, loginInput, selectedLoginRegionLabel])
 
   const setResult = (ok: boolean, text: string) => {
     setMessage(text)
@@ -255,6 +280,20 @@ export default function Landing() {
                   <div style={{ fontSize: 12, color: '#5d6e65' }}>
                     手機登入可只輸入本地號碼，系統會自動套用所選區碼。
                   </div>
+                  {loginAutoHint && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: '#2b5d53',
+                        background: '#edf8f2',
+                        border: '1px solid #cfe7dc',
+                        borderRadius: 10,
+                        padding: '8px 10px',
+                      }}
+                    >
+                      {loginAutoHint}
+                    </div>
+                  )}
                   <input
                     type="password"
                     value={loginPassword}

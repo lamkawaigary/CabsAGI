@@ -12,6 +12,13 @@ interface OrdersRouteState {
   notice?: PageNotice
 }
 
+const formatDateTime = (raw: string | undefined) => {
+  if (!raw) return ''
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return raw
+  return parsed.toLocaleString()
+}
+
 export default function OrdersPage() {
   const location = useLocation()
   const { orders, loading, error } = usePassengerOrders()
@@ -98,20 +105,35 @@ export default function OrdersPage() {
               gap: 6,
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong>{order.id}</strong>
-              <span
-                style={{
-                  background: '#f5f8f6',
-                  border: '1px solid #d9e5dc',
-                  color: '#2f5c4f',
-                  borderRadius: 999,
-                  padding: '2px 9px',
-                  fontSize: 12,
-                }}
-              >
-                {order.status}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  style={{
+                    background: '#f2f7f4',
+                    border: '1px solid #d6e3da',
+                    color: '#2f5c4f',
+                    borderRadius: 999,
+                    padding: '2px 9px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {order.orderType === 'official_route' || order.isOfficial ? '官方班次' : '包車點對點'}
+                </span>
+                <span
+                  style={{
+                    background: '#f5f8f6',
+                    border: '1px solid #d9e5dc',
+                    color: '#2f5c4f',
+                    borderRadius: 999,
+                    padding: '2px 9px',
+                    fontSize: 12,
+                  }}
+                >
+                  {order.status}
+                </span>
+              </div>
             </div>
             <div style={{ fontSize: 14, color: '#304f47' }}>
               {order.pickup}
@@ -121,6 +143,17 @@ export default function OrdersPage() {
             <div style={{ fontSize: 13, color: '#5f746d' }}>
               {new Date(order.createdAtISO || order.createdAt || 0).toLocaleString()}
             </div>
+            {order.bookingDateTime && (
+              <div style={{ fontSize: 12, color: '#60756d' }}>
+                用車時間: {formatDateTime(order.bookingDateTime)}
+              </div>
+            )}
+            {(order.passengersCount || order.officialRouteId) && (
+              <div style={{ fontSize: 12, color: '#60756d', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {order.passengersCount && <span>乘客: {order.passengersCount} 人</span>}
+                {order.officialRouteId && <span>班次: {order.officialRouteId}</span>}
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#24463e', fontWeight: 700 }}>
               <span>
                 {Number(order.distance || 0).toFixed(1)} km / {order.duration} 分鐘

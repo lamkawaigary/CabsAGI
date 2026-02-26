@@ -2,16 +2,27 @@ import {
   addDoc,
   collection,
   type DocumentData,
+  doc,
+  increment,
   limit,
   onSnapshot,
   query,
   type QueryDocumentSnapshot,
+  runTransaction,
   serverTimestamp,
   where,
 } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
 
 export type OrderStatus = 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled'
+export type OrderType = 'charter' | 'official_route'
+export type OfficialRouteStatus =
+  | 'collecting'
+  | 'confirmed'
+  | 'dispatching'
+  | 'active'
+  | 'completed'
+  | 'cancelled'
 
 export interface OrderRecord {
   id?: string
@@ -28,6 +39,12 @@ export interface OrderRecord {
   status: OrderStatus
   passengerId: string
   passengerName: string
+  orderType?: OrderType
+  passengersCount?: number
+  vehicleType?: string
+  bookingDateTime?: string
+  officialRouteId?: string
+  isOfficial?: boolean
   createdAt: string
   createdAtISO?: string
   updatedAt?: string
@@ -46,9 +63,41 @@ export interface CreateOrderInput {
   tollFee: number
   passengerId: string
   passengerName: string
+  orderType?: OrderType
+  passengersCount?: number
+  vehicleType?: string
+  bookingDateTime?: string
+  officialRouteId?: string
+  isOfficial?: boolean
+}
+
+export interface OfficialRouteRecord {
+  id: string
+  pickup: string
+  pickupLat: number
+  pickupLng: number
+  dropoff: string
+  dropoffLat: number
+  dropoffLng: number
+  date: string
+  status: OfficialRouteStatus
+  totalSeats: number
+  occupiedSeats: number
+  pricePerSeat: number
+  charterPrice: number
+  createdAt: string
 }
 
 const ORDER_STATUS_VALUES: OrderStatus[] = ['pending', 'accepted', 'in_progress', 'completed', 'cancelled']
+const ORDER_TYPE_VALUES: OrderType[] = ['charter', 'official_route']
+const OFFICIAL_ROUTE_STATUS_VALUES: OfficialRouteStatus[] = [
+  'collecting',
+  'confirmed',
+  'dispatching',
+  'active',
+  'completed',
+  'cancelled',
+]
 
 const isRecord = (val: unknown): val is Record<string, unknown> =>
   typeof val === 'object' && val !== null
@@ -83,6 +132,31 @@ const firstString = (...values: unknown[]) => {
   return ''
 }
 
+const toLocationText = (value: unknown): string => {
+  if (typeof value === 'string') return value
+  if (!isRecord(value)) return ''
+  return firstString(value.placeName, value.address, value.name)
+}
+
+const normalizeOrderType = (value: unknown, fallbackToOfficial = false): OrderType => {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === 'carpool') return 'official_route'
+    if (normalized === 'charter') return 'charter'
+    if (ORDER_TYPE_VALUES.includes(normalized as OrderType)) return normalized as OrderType
+  }
+  return fallbackToOfficial ? 'official_route' : 'charter'
+}
+
+const normalizeOfficialRouteStatus = (value: unknown): OfficialRouteStatus => {
+  if (typeof value !== 'string') return 'collecting'
+  const normalized = value.trim().toLowerCase()
+  if (OFFICIAL_ROUTE_STATUS_VALUES.includes(normalized as OfficialRouteStatus)) {
+    return normalized as OfficialRouteStatus
+  }
+  return 'collecting'
+}
+
 const sanitizeValue = (val: unknown): unknown => {
   if (val === null || val === undefined) return val
   if (isTimestampLike(val)) return val.toDate().toISOString()
@@ -105,12 +179,6 @@ const sanitizeDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): OrderRecord 
     clean[key] = sanitizeValue(data[key])
   })
 
-  const toLocationText = (value: unknown): string => {
-    if (typeof value === 'string') return value
-    if (!isRecord(value)) return ''
-    return firstString(value.placeName, value.address, value.name)
-  }
-
   const rawPickup = clean.pickup
   const rawDropoff = clean.dropoff
   const pickupObj = isRecord(rawPickup) ? rawPickup : undefined
@@ -130,6 +198,12 @@ const sanitizeDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): OrderRecord 
   const status = ORDER_STATUS_VALUES.includes(clean.status as OrderStatus)
     ? (clean.status as OrderStatus)
     : 'pending'
+  const isOfficial = Boolean(clean.isOfficial) || typeof clean.officialRouteId === 'string'
+  const orderType = normalizeOrderType(clean.orderType ?? clean.type, isOfficial)
+  const passengersCount = Math.max(1, Math.round(pickNumber(clean.passengersCount, clean.passengers)))
+  const vehicleType = firstString(clean.vehicleType, clean.carType)
+  const bookingDateTime = firstString(clean.bookingDateTime, clean.date, clean.bookingTime)
+  const officialRouteId = typeof clean.officialRouteId === 'string' ? clean.officialRouteId : undefined
   const createdAt =
     typeof clean.createdAt === 'string'
       ? clean.createdAt
@@ -154,17 +228,60 @@ const sanitizeDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): OrderRecord 
     status,
     passengerId: typeof clean.passengerId === 'string' ? clean.passengerId : '',
     passengerName: typeof clean.passengerName === 'string' ? clean.passengerName : '',
+    orderType,
+    passengersCount,
+    vehicleType: vehicleType || undefined,
+    bookingDateTime: bookingDateTime || undefined,
+    officialRouteId,
+    isOfficial: isOfficial || orderType === 'official_route',
     createdAt,
     createdAtISO,
     updatedAt,
   }
 }
 
+const sanitizeOfficialRouteDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): OfficialRouteRecord => {
+  const data = docSnap.data() || {}
+  const clean: Record<string, unknown> = { id: docSnap.id }
+  Object.keys(data).forEach((key) => {
+    clean[key] = sanitizeValue(data[key])
+  })
+
+  const pickupObj = isRecord(clean.pickup) ? clean.pickup : undefined
+  const dropoffObj = isRecord(clean.dropoff) ? clean.dropoff : undefined
+
+  return {
+    id: docSnap.id,
+    pickup: toLocationText(clean.pickup),
+    pickupLat: pickNumber(clean.pickupLat, pickupObj?.latitude, pickupObj?.lat),
+    pickupLng: pickNumber(clean.pickupLng, pickupObj?.longitude, pickupObj?.lng),
+    dropoff: toLocationText(clean.dropoff),
+    dropoffLat: pickNumber(clean.dropoffLat, dropoffObj?.latitude, dropoffObj?.lat),
+    dropoffLng: pickNumber(clean.dropoffLng, dropoffObj?.longitude, dropoffObj?.lng),
+    date: firstString(clean.date, clean.bookingDateTime, clean.createdAt, new Date().toISOString()),
+    status: normalizeOfficialRouteStatus(clean.status),
+    totalSeats: Math.max(1, Math.round(pickNumber(clean.totalSeats, clean.seats, 6))),
+    occupiedSeats: Math.max(0, Math.round(pickNumber(clean.occupiedSeats, clean.bookedSeats))),
+    pricePerSeat: Math.max(0, pickNumber(clean.pricePerSeat, clean.price)),
+    charterPrice: Math.max(0, pickNumber(clean.charterPrice, clean.price)),
+    createdAt: firstString(clean.createdAt, clean.date, new Date().toISOString()),
+  }
+}
+
 export const createOrder = async (order: CreateOrderInput) => {
   const nowISO = new Date().toISOString()
+  const orderType = order.orderType || 'charter'
+  const passengersCount = Math.max(1, Math.round(order.passengersCount || 1))
+  const bookingDateTime = firstString(order.bookingDateTime, nowISO)
+
   return addDoc(collection(db, 'orders'), {
     ...order,
     status: 'pending',
+    orderType,
+    passengersCount,
+    vehicleType: firstString(order.vehicleType, 'standard'),
+    bookingDateTime,
+    isOfficial: orderType === 'official_route' || Boolean(order.isOfficial),
     createdAt: nowISO,
     createdAtISO: nowISO,
     updatedAt: nowISO,
@@ -191,4 +308,93 @@ export const subscribePassengerOrders = (
       if (onError) onError(error as Error)
     },
   )
+}
+
+export const subscribeOfficialRoutes = (
+  callback: (routes: OfficialRouteRecord[]) => void,
+  onError?: (error: Error) => void,
+) => {
+  const q = query(collection(db, 'official_routes'), limit(200))
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const routes = snapshot.docs
+        .map((docSnap) => sanitizeOfficialRouteDoc(docSnap))
+        .filter((route) => route.status !== 'completed' && route.status !== 'cancelled')
+        .sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime())
+      callback(routes)
+    },
+    (error) => {
+      if (onError) onError(error as Error)
+    },
+  )
+}
+
+export const joinOfficialRoute = async (params: {
+  routeId: string
+  seats: number
+  passengerId: string
+  passengerName: string
+}) => {
+  const seats = Math.max(1, Math.round(params.seats || 1))
+  const nowISO = new Date().toISOString()
+
+  await runTransaction(db, async (tx) => {
+    const routeRef = doc(db, 'official_routes', params.routeId)
+    const routeSnap = await tx.get(routeRef)
+    if (!routeSnap.exists()) {
+      throw new Error('官方班次不存在')
+    }
+
+    const routeData = routeSnap.data() || {}
+    const routeStatus = normalizeOfficialRouteStatus(routeData.status)
+    if (routeStatus === 'completed' || routeStatus === 'cancelled') {
+      throw new Error('該班次已不可預訂')
+    }
+
+    const totalSeats = Math.max(1, Math.round(pickNumber(routeData.totalSeats, routeData.seats, 6)))
+    const occupiedSeats = Math.max(0, Math.round(pickNumber(routeData.occupiedSeats, routeData.bookedSeats)))
+    const availableSeats = Math.max(0, totalSeats - occupiedSeats)
+    if (seats > availableSeats) {
+      throw new Error(`可用座位不足，剩餘 ${availableSeats} 位`)
+    }
+
+    const pickupObj = isRecord(routeData.pickup) ? routeData.pickup : undefined
+    const dropoffObj = isRecord(routeData.dropoff) ? routeData.dropoff : undefined
+    const pricePerSeat = Math.max(0, pickNumber(routeData.pricePerSeat, routeData.price))
+    const orderRef = doc(collection(db, 'orders'))
+
+    tx.update(routeRef, {
+      occupiedSeats: increment(seats),
+      updatedAt: nowISO,
+      updatedAtServer: serverTimestamp(),
+    })
+
+    tx.set(orderRef, {
+      pickup: toLocationText(routeData.pickup),
+      pickupLat: pickNumber(routeData.pickupLat, pickupObj?.latitude, pickupObj?.lat),
+      pickupLng: pickNumber(routeData.pickupLng, pickupObj?.longitude, pickupObj?.lng),
+      dropoff: toLocationText(routeData.dropoff),
+      dropoffLat: pickNumber(routeData.dropoffLat, dropoffObj?.latitude, dropoffObj?.lat),
+      dropoffLng: pickNumber(routeData.dropoffLng, dropoffObj?.longitude, dropoffObj?.lng),
+      price: Math.max(0, Math.round(pricePerSeat * seats)),
+      distance: pickNumber(routeData.distance),
+      duration: pickNumber(routeData.duration),
+      tollFee: pickNumber(routeData.tollFee),
+      passengerId: params.passengerId,
+      passengerName: params.passengerName,
+      status: 'pending',
+      orderType: 'official_route',
+      passengersCount: seats,
+      vehicleType: 'official_shared',
+      bookingDateTime: firstString(routeData.date, nowISO),
+      officialRouteId: params.routeId,
+      isOfficial: true,
+      createdAt: nowISO,
+      createdAtISO: nowISO,
+      updatedAt: nowISO,
+      createdAtServer: serverTimestamp(),
+      updatedAtServer: serverTimestamp(),
+    })
+  })
 }

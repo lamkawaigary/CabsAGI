@@ -134,6 +134,26 @@ export default function PassengerLayout() {
                   </button>
                 )
               })}
+              {currentUser?.role === 'admin' && (
+                <button
+                  onClick={() => {
+                    navigate('/admin')
+                    setMenuOpen(false)
+                  }}
+                  style={{
+                    border: '1px solid #cadfd2',
+                    background: '#eef6f1',
+                    color: '#21443b',
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    textAlign: 'left',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  管理後台
+                </button>
+              )}
             </div>
             <button
               onClick={() => void handleLogout()}

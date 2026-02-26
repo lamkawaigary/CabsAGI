@@ -35,6 +35,25 @@ export default function ProfilePage() {
         <div style={{ fontSize: 14, color: '#355149' }}>電話: {currentUser?.phone || '未提供'}</div>
         <div style={{ fontSize: 14, color: '#355149' }}>帳號: {currentUser?.email}</div>
         <div style={{ fontSize: 14, color: '#355149' }}>積分: {currentUser?.points ?? 0}</div>
+        <div style={{ fontSize: 14, color: '#355149' }}>角色: {currentUser?.role || '-'}</div>
+
+        {currentUser?.role === 'admin' && (
+          <button
+            onClick={() => navigate('/admin')}
+            style={{
+              border: '1px solid #cadfd2',
+              borderRadius: 10,
+              background: '#eef6f1',
+              color: '#24473f',
+              fontWeight: 800,
+              padding: '10px 12px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            打開管理後台
+          </button>
+        )}
 
         <div style={{ borderTop: '1px solid #e4ebe4', marginTop: 6, paddingTop: 8, display: 'grid', gap: 7 }}>
           {['付款方式', '語言與地區', '通知設定', '幫助中心'].map((item) => (

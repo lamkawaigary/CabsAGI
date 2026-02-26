@@ -8,6 +8,7 @@ const PassengerHome = lazy(() => import('./pages/PassengerHome'))
 const OrdersPage = lazy(() => import('./pages/Orders'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const ProfilePage = lazy(() => import('./pages/Profile'))
+const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const PassengerLayout = lazy(() => import('./layouts/PassengerLayout'))
 
 function FullscreenLoading({ text }: { text: string }) {
@@ -45,14 +46,22 @@ function RequireAuth() {
   return currentUser ? <Outlet /> : <Navigate to="/login" replace />
 }
 
+function RequireAdmin() {
+  const { currentUser } = useAuth()
+  if (!currentUser) return <Navigate to="/login" replace />
+  return currentUser.role === 'admin' ? <Outlet /> : <Navigate to="/home" replace />
+}
+
+const getDefaultAuthPath = (role: string | undefined) => (role === 'admin' ? '/admin' : '/home')
+
 function PublicOnly() {
   const { currentUser } = useAuth()
-  return currentUser ? <Navigate to="/home" replace /> : <Outlet />
+  return currentUser ? <Navigate to={getDefaultAuthPath(currentUser.role)} replace /> : <Outlet />
 }
 
 function CatchAllRedirect() {
   const { currentUser } = useAuth()
-  return <Navigate to={currentUser ? '/home' : '/login'} replace />
+  return <Navigate to={currentUser ? getDefaultAuthPath(currentUser.role) : '/login'} replace />
 }
 
 function AppShell() {
@@ -74,6 +83,12 @@ function AppShell() {
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+            </Route>
+          </Route>
+
+          <Route element={<RequireAuth />}>
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin" element={<AdminConsole />} />
             </Route>
           </Route>
 

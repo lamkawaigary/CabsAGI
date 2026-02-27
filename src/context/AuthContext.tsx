@@ -67,6 +67,18 @@ const getErrorCode = (err: unknown) =>
 
 const getErrorMessage = (err: unknown) => (err instanceof Error ? err.message : 'Unknown error')
 
+const normalizeUserRole = (role: unknown, fallbackEmail = ''): UserRole => {
+  if (typeof role === 'string') {
+    const normalized = role.trim().toLowerCase()
+    if (normalized === 'driver' || normalized.startsWith('driver')) return 'driver'
+    if (normalized === 'admin' || normalized.startsWith('admin') || normalized.includes('admin_')) {
+      return 'admin'
+    }
+    if (normalized === 'passenger' || normalized.startsWith('passenger')) return 'passenger'
+  }
+  return fallbackEmail === MASTER_EMAIL ? 'admin' : 'passenger'
+}
+
 const normalizePhone = (regionCode: string, phone: string) => {
   let cleanPhone = phone.replace(/\D/g, '')
   const cleanRegion = regionCode.replace(/\D/g, '')
@@ -104,7 +116,7 @@ const defaultProfile = (uid: string, email: string): AuthUser => ({
   name: email.split('@')[0] || 'Cabs User',
   phone: email.endsWith('@p7s.app') ? `+${email.split('@')[0]}` : '',
   email,
-  role: email === MASTER_EMAIL ? 'admin' : 'passenger',
+  role: normalizeUserRole(undefined, email),
   points: email === MASTER_EMAIL ? 999999 : 0,
 })
 
@@ -138,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: data.name || 'Cabs User',
           phone: data.phone || fbUser.phoneNumber || '',
           email: data.email || fallbackEmail,
-          role: (data.role as UserRole) || 'passenger',
+          role: normalizeUserRole(data.role, data.email || fallbackEmail),
           points: data.points || 0,
         })
       } else {

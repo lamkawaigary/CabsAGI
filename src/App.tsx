@@ -47,21 +47,33 @@ function RequireAuth() {
   return currentUser ? <Outlet /> : <Navigate to="/login" replace />
 }
 
+const normalizeRole = (role: string | undefined) => {
+  if (!role) return 'passenger'
+  const normalized = role.trim().toLowerCase()
+  if (normalized === 'driver' || normalized.startsWith('driver')) return 'driver'
+  if (normalized === 'admin' || normalized.startsWith('admin') || normalized.includes('admin_')) {
+    return 'admin'
+  }
+  if (normalized === 'passenger' || normalized.startsWith('passenger')) return 'passenger'
+  return 'passenger'
+}
+
 function RequireAdmin() {
   const { currentUser } = useAuth()
   if (!currentUser) return <Navigate to="/login" replace />
-  return currentUser.role === 'admin' ? <Outlet /> : <Navigate to="/home" replace />
+  return normalizeRole(currentUser.role) === 'admin' ? <Outlet /> : <Navigate to="/home" replace />
 }
 
 function RequireDriver() {
   const { currentUser } = useAuth()
   if (!currentUser) return <Navigate to="/login" replace />
-  return currentUser.role === 'driver' ? <Outlet /> : <Navigate to="/home" replace />
+  return normalizeRole(currentUser.role) === 'driver' ? <Outlet /> : <Navigate to="/home" replace />
 }
 
 const getDefaultAuthPath = (role: string | undefined) => {
-  if (role === 'admin') return '/admin'
-  if (role === 'driver') return '/driver'
+  const normalized = normalizeRole(role)
+  if (normalized === 'admin') return '/admin'
+  if (normalized === 'driver') return '/driver'
   return '/home'
 }
 

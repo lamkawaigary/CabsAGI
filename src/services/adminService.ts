@@ -12,12 +12,14 @@ import {
   updateDoc,
 } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
-import type {
+import {
+  acceptOrderAsDriver,
+  canTransitionOrderStatus,
+  type OrderRecord,
+  type OrderStatus,
+  type OrderType,
   OfficialRouteRecord,
   OfficialRouteStatus,
-  OrderRecord,
-  OrderStatus,
-  OrderType,
 } from './orderService'
 
 export type AdminUserRole = 'passenger' | 'driver' | 'admin'
@@ -195,6 +197,8 @@ const sanitizeOrderDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): OrderRe
     status,
     passengerId: typeof clean.passengerId === 'string' ? clean.passengerId : '',
     passengerName: typeof clean.passengerName === 'string' ? clean.passengerName : '',
+    driverId: typeof clean.driverId === 'string' ? clean.driverId : undefined,
+    driverName: typeof clean.driverName === 'string' ? clean.driverName : undefined,
     orderType,
     passengersCount: Math.max(1, Math.round(pickNumber(clean.passengersCount, clean.passengers))),
     vehicleType: firstString(clean.vehicleType, clean.carType) || undefined,
@@ -203,6 +207,9 @@ const sanitizeOrderDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): OrderRe
     isOfficial: isOfficial || orderType === 'official_route',
     createdAt,
     createdAtISO,
+    acceptedAt: typeof clean.acceptedAt === 'string' ? clean.acceptedAt : undefined,
+    completedAt: typeof clean.completedAt === 'string' ? clean.completedAt : undefined,
+    cancelledAt: typeof clean.cancelledAt === 'string' ? clean.cancelledAt : undefined,
     updatedAt: typeof clean.updatedAt === 'string' ? clean.updatedAt : undefined,
   }
 }
@@ -338,7 +345,21 @@ export const subscribePricingConfig = (
     (error) => onError?.(error as Error),
   )
 
-export const updateAdminOrderStatus = async (params: { orderId: string; status: OrderStatus }) => {
+export const updateAdminOrderStatus = async (params: {
+  orderId: string
+  status: OrderStatus
+  fromStatus?: OrderStatus
+  force?: boolean
+}) => {
+  if (
+    !params.force &&
+    params.fromStatus &&
+    params.fromStatus !== params.status &&
+    !canTransitionOrderStatus(params.fromStatus, params.status)
+  ) {
+    throw new Error(`狀態不可由 ${params.fromStatus} 轉為 ${params.status}`)
+  }
+
   const nowISO = new Date().toISOString()
   const payload: Record<string, unknown> = {
     status: params.status,
@@ -351,10 +372,23 @@ export const updateAdminOrderStatus = async (params: { orderId: string; status: 
   await updateDoc(doc(db, 'orders', params.orderId), payload)
 }
 
+export const assignOrderToDriverByAdmin = async (params: {
+  orderId: string
+  driverId: string
+  driverName?: string
+}) => {
+  await acceptOrderAsDriver({
+    orderId: params.orderId,
+    driverId: params.driverId,
+    driverName: params.driverName,
+  })
+}
+
 export const updateAdminUser = async (params: {
   userId: string
   role?: AdminUserRole
   points?: number
+  status?: string
 }) => {
   const payload: Record<string, unknown> = {
     updatedAt: new Date().toISOString(),
@@ -363,6 +397,9 @@ export const updateAdminUser = async (params: {
   if (params.role) payload.role = params.role
   if (typeof params.points === 'number' && Number.isFinite(params.points)) {
     payload.points = params.points
+  }
+  if (typeof params.status === 'string' && params.status.trim()) {
+    payload.status = params.status.trim()
   }
   await updateDoc(doc(db, 'users', params.userId), payload)
 }

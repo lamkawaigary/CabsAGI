@@ -154,6 +154,26 @@ export default function PassengerLayout() {
                   管理後台
                 </button>
               )}
+              {currentUser?.role === 'driver' && (
+                <button
+                  onClick={() => {
+                    navigate('/driver')
+                    setMenuOpen(false)
+                  }}
+                  style={{
+                    border: '1px solid #cadfd2',
+                    background: '#edf5f8',
+                    color: '#204654',
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    textAlign: 'left',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  司機接單中心
+                </button>
+              )}
             </div>
             <button
               onClick={() => void handleLogout()}

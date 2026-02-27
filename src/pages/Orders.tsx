@@ -154,6 +154,11 @@ export default function OrdersPage() {
                 {order.officialRouteId && <span>班次: {order.officialRouteId}</span>}
               </div>
             )}
+            {(order.driverName || order.driverId) && (
+              <div style={{ fontSize: 12, color: '#60756d' }}>
+                司機: {order.driverName || order.driverId}
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#24463e', fontWeight: 700 }}>
               <span>
                 {Number(order.distance || 0).toFixed(1)} km / {order.duration} 分鐘

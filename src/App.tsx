@@ -9,6 +9,7 @@ const OrdersPage = lazy(() => import('./pages/Orders'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const ProfilePage = lazy(() => import('./pages/Profile'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
+const DriverDashboard = lazy(() => import('./pages/DriverDashboard'))
 const PassengerLayout = lazy(() => import('./layouts/PassengerLayout'))
 
 function FullscreenLoading({ text }: { text: string }) {
@@ -52,7 +53,17 @@ function RequireAdmin() {
   return currentUser.role === 'admin' ? <Outlet /> : <Navigate to="/home" replace />
 }
 
-const getDefaultAuthPath = (role: string | undefined) => (role === 'admin' ? '/admin' : '/home')
+function RequireDriver() {
+  const { currentUser } = useAuth()
+  if (!currentUser) return <Navigate to="/login" replace />
+  return currentUser.role === 'driver' ? <Outlet /> : <Navigate to="/home" replace />
+}
+
+const getDefaultAuthPath = (role: string | undefined) => {
+  if (role === 'admin') return '/admin'
+  if (role === 'driver') return '/driver'
+  return '/home'
+}
 
 function PublicOnly() {
   const { currentUser } = useAuth()
@@ -89,6 +100,12 @@ function AppShell() {
           <Route element={<RequireAuth />}>
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminConsole />} />
+            </Route>
+          </Route>
+
+          <Route element={<RequireAuth />}>
+            <Route element={<RequireDriver />}>
+              <Route path="/driver" element={<DriverDashboard />} />
             </Route>
           </Route>
 

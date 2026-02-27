@@ -54,6 +54,23 @@ export default function ProfilePage() {
             打開管理後台
           </button>
         )}
+        {currentUser?.role === 'driver' && (
+          <button
+            onClick={() => navigate('/driver')}
+            style={{
+              border: '1px solid #cfdde4',
+              borderRadius: 10,
+              background: '#edf5f8',
+              color: '#234a59',
+              fontWeight: 800,
+              padding: '10px 12px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            打開司機接單中心
+          </button>
+        )}
 
         <div style={{ borderTop: '1px solid #e4ebe4', marginTop: 6, paddingTop: 8, display: 'grid', gap: 7 }}>
           {['付款方式', '語言與地區', '通知設定', '幫助中心'].map((item) => (

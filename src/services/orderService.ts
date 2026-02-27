@@ -39,6 +39,8 @@ export interface OrderRecord {
   status: OrderStatus
   passengerId: string
   passengerName: string
+  driverId?: string
+  driverName?: string
   orderType?: OrderType
   passengersCount?: number
   vehicleType?: string
@@ -47,6 +49,9 @@ export interface OrderRecord {
   isOfficial?: boolean
   createdAt: string
   createdAtISO?: string
+  acceptedAt?: string
+  completedAt?: string
+  cancelledAt?: string
   updatedAt?: string
 }
 
@@ -98,6 +103,13 @@ const OFFICIAL_ROUTE_STATUS_VALUES: OfficialRouteStatus[] = [
   'completed',
   'cancelled',
 ]
+const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending: ['accepted', 'cancelled'],
+  accepted: ['in_progress', 'cancelled'],
+  in_progress: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+}
 
 const isRecord = (val: unknown): val is Record<string, unknown> =>
   typeof val === 'object' && val !== null
@@ -156,6 +168,18 @@ const normalizeOfficialRouteStatus = (value: unknown): OfficialRouteStatus => {
   }
   return 'collecting'
 }
+
+const normalizeOrderStatus = (value: unknown): OrderStatus => {
+  if (typeof value !== 'string') return 'pending'
+  const normalized = value.trim().toLowerCase()
+  if (ORDER_STATUS_VALUES.includes(normalized as OrderStatus)) {
+    return normalized as OrderStatus
+  }
+  return 'pending'
+}
+
+export const canTransitionOrderStatus = (from: OrderStatus, to: OrderStatus) =>
+  from === to || ORDER_TRANSITIONS[from].includes(to)
 
 const sanitizeValue = (val: unknown): unknown => {
   if (val === null || val === undefined) return val
@@ -228,6 +252,8 @@ const sanitizeDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): OrderRecord 
     status,
     passengerId: typeof clean.passengerId === 'string' ? clean.passengerId : '',
     passengerName: typeof clean.passengerName === 'string' ? clean.passengerName : '',
+    driverId: typeof clean.driverId === 'string' ? clean.driverId : undefined,
+    driverName: typeof clean.driverName === 'string' ? clean.driverName : undefined,
     orderType,
     passengersCount,
     vehicleType: vehicleType || undefined,
@@ -236,6 +262,9 @@ const sanitizeDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): OrderRecord 
     isOfficial: isOfficial || orderType === 'official_route',
     createdAt,
     createdAtISO,
+    acceptedAt: typeof clean.acceptedAt === 'string' ? clean.acceptedAt : undefined,
+    completedAt: typeof clean.completedAt === 'string' ? clean.completedAt : undefined,
+    cancelledAt: typeof clean.cancelledAt === 'string' ? clean.cancelledAt : undefined,
     updatedAt,
   }
 }
@@ -307,6 +336,50 @@ export const subscribePassengerOrders = (
     (error) => {
       if (onError) onError(error as Error)
     },
+  )
+}
+
+export const subscribeDriverOrders = (
+  driverId: string,
+  callback: (orders: OrderRecord[]) => void,
+  onError?: (error: Error) => void,
+) => {
+  const q = query(collection(db, 'orders'), where('driverId', '==', driverId), limit(300))
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const orders = snapshot.docs
+        .map((docSnap) => sanitizeDoc(docSnap))
+        .sort(
+          (a, b) =>
+            new Date(b.createdAtISO || b.createdAt || 0).getTime() -
+            new Date(a.createdAtISO || a.createdAt || 0).getTime(),
+        )
+      callback(orders)
+    },
+    (error) => onError?.(error as Error),
+  )
+}
+
+export const subscribeDriverOrderPool = (
+  callback: (orders: OrderRecord[]) => void,
+  onError?: (error: Error) => void,
+) => {
+  const q = query(collection(db, 'orders'), where('status', '==', 'pending'), limit(300))
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const orders = snapshot.docs
+        .map((docSnap) => sanitizeDoc(docSnap))
+        .filter((order) => !order.driverId)
+        .sort(
+          (a, b) =>
+            new Date(b.createdAtISO || b.createdAt || 0).getTime() -
+            new Date(a.createdAtISO || a.createdAt || 0).getTime(),
+        )
+      callback(orders)
+    },
+    (error) => onError?.(error as Error),
   )
 }
 
@@ -396,5 +469,70 @@ export const joinOfficialRoute = async (params: {
       createdAtServer: serverTimestamp(),
       updatedAtServer: serverTimestamp(),
     })
+  })
+}
+
+export const acceptOrderAsDriver = async (params: {
+  orderId: string
+  driverId: string
+  driverName?: string
+}) => {
+  const nowISO = new Date().toISOString()
+  await runTransaction(db, async (tx) => {
+    const orderRef = doc(db, 'orders', params.orderId)
+    const orderSnap = await tx.get(orderRef)
+    if (!orderSnap.exists()) throw new Error('訂單不存在')
+
+    const data = orderSnap.data() || {}
+    const currentStatus = normalizeOrderStatus(data.status)
+    const existingDriverId = firstString(data.driverId)
+
+    if (currentStatus !== 'pending') {
+      throw new Error('訂單已不可接單')
+    }
+    if (existingDriverId && existingDriverId !== params.driverId) {
+      throw new Error('訂單已被其他司機接走')
+    }
+
+    tx.update(orderRef, {
+      driverId: params.driverId,
+      driverName: firstString(params.driverName, data.driverName),
+      status: 'accepted',
+      acceptedAt: nowISO,
+      updatedAt: nowISO,
+      updatedAtServer: serverTimestamp(),
+    })
+  })
+}
+
+export const advanceOrderStatusAsDriver = async (params: {
+  orderId: string
+  driverId: string
+  toStatus: Extract<OrderStatus, 'in_progress' | 'completed' | 'cancelled'>
+}) => {
+  const nowISO = new Date().toISOString()
+  await runTransaction(db, async (tx) => {
+    const orderRef = doc(db, 'orders', params.orderId)
+    const orderSnap = await tx.get(orderRef)
+    if (!orderSnap.exists()) throw new Error('訂單不存在')
+
+    const data = orderSnap.data() || {}
+    const currentStatus = normalizeOrderStatus(data.status)
+    const assignedDriverId = firstString(data.driverId)
+    if (!assignedDriverId || assignedDriverId !== params.driverId) {
+      throw new Error('你不是此訂單的司機')
+    }
+    if (!canTransitionOrderStatus(currentStatus, params.toStatus)) {
+      throw new Error(`狀態不可由 ${currentStatus} 轉為 ${params.toStatus}`)
+    }
+
+    const payload: Record<string, unknown> = {
+      status: params.toStatus,
+      updatedAt: nowISO,
+      updatedAtServer: serverTimestamp(),
+    }
+    if (params.toStatus === 'completed') payload.completedAt = nowISO
+    if (params.toStatus === 'cancelled') payload.cancelledAt = nowISO
+    tx.update(orderRef, payload)
   })
 }

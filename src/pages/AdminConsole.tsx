@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
+  assignOrderToDriverByAdmin,
   savePricingConfig,
   subscribeAdminOfficialRoutes,
   subscribeAdminOrders,
@@ -141,11 +142,13 @@ export default function AdminConsole() {
   const [orderFilter, setOrderFilter] = useState<'all' | OrderStatus>('all')
   const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'charter' | 'official_route'>('all')
   const [orderStatusDrafts, setOrderStatusDrafts] = useState<Record<string, OrderStatus>>({})
+  const [orderDriverDrafts, setOrderDriverDrafts] = useState<Record<string, string>>({})
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
   const [userSearch, setUserSearch] = useState('')
   const [userRoleDrafts, setUserRoleDrafts] = useState<Record<string, AdminUserRecord['role']>>({})
   const [userPointsDrafts, setUserPointsDrafts] = useState<Record<string, string>>({})
+  const [userStatusDrafts, setUserStatusDrafts] = useState<Record<string, string>>({})
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
 
   const [routeForm, setRouteForm] = useState<RouteFormState>(EMPTY_ROUTE_FORM)
@@ -263,6 +266,8 @@ export default function AdminConsole() {
     })
   }, [users, userSearch])
 
+  const driverUsers = useMemo(() => users.filter((user) => user.role === 'driver'), [users])
+
   const handleLogout = async () => {
     if (loggingOut) return
     setLoggingOut(true)
@@ -284,7 +289,11 @@ export default function AdminConsole() {
 
     setUpdatingOrderId(order.id)
     try {
-      await updateAdminOrderStatus({ orderId: order.id, status: nextStatus })
+      await updateAdminOrderStatus({
+        orderId: order.id,
+        status: nextStatus,
+        fromStatus: order.status,
+      })
       setNotice({ text: `訂單 ${order.id} 已更新為 ${STATUS_LABELS[nextStatus]}`, tone: 'ok' })
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '未知錯誤'
@@ -294,12 +303,47 @@ export default function AdminConsole() {
     }
   }
 
+  const handleAssignDriver = async (order: OrderRecord) => {
+    if (!order.id) return
+    const draftDriverId = orderDriverDrafts[order.id] || order.driverId || ''
+    if (!draftDriverId) {
+      setNotice({ text: '請先選擇要派送的司機', tone: 'error' })
+      return
+    }
+    const driver = driverUsers.find((item) => item.id === draftDriverId)
+    if (!driver) {
+      setNotice({ text: '司機資料不存在，請重新選擇', tone: 'error' })
+      return
+    }
+
+    setUpdatingOrderId(order.id)
+    try {
+      await assignOrderToDriverByAdmin({
+        orderId: order.id,
+        driverId: driver.id,
+        driverName: driver.name,
+      })
+      setOrderStatusDrafts((prev) => ({ ...prev, [order.id as string]: 'accepted' }))
+      setNotice({
+        text: `訂單 ${order.id} 已派給司機 ${driver.name || driver.id}`,
+        tone: 'ok',
+      })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤'
+      setNotice({ text: `派單失敗: ${message}`, tone: 'error' })
+    } finally {
+      setUpdatingOrderId(null)
+    }
+  }
+
   const handleSaveUser = async (user: AdminUserRecord) => {
     const role = userRoleDrafts[user.id] || user.role
     const points = parseNumber(userPointsDrafts[user.id] ?? String(user.points), user.points)
+    const status = userStatusDrafts[user.id] || user.status || 'ACTIVE'
     const roleChanged = role !== user.role
     const pointsChanged = points !== user.points
-    if (!roleChanged && !pointsChanged) {
+    const statusChanged = status !== (user.status || 'ACTIVE')
+    if (!roleChanged && !pointsChanged && !statusChanged) {
       setNotice({ text: '用戶資料未改動', tone: 'info' })
       return
     }
@@ -310,6 +354,7 @@ export default function AdminConsole() {
         userId: user.id,
         role,
         points,
+        status,
       })
       setNotice({ text: `已更新用戶 ${user.name || user.id}`, tone: 'ok' })
     } catch (error: unknown) {
@@ -558,6 +603,7 @@ export default function AdminConsole() {
           {filteredOrders.map((order) => {
             const draftStatus = order.id ? orderStatusDrafts[order.id] || order.status : order.status
             const orderType = order.orderType || (order.isOfficial ? 'official_route' : 'charter')
+            const draftDriverId = order.id ? orderDriverDrafts[order.id] || order.driverId || '' : ''
             return (
               <article
                 key={order.id || `${order.passengerId}-${order.createdAt}`}
@@ -596,6 +642,9 @@ export default function AdminConsole() {
                     {order.passengerName} ({order.passengerId})
                   </span>
                 </div>
+                <div style={{ fontSize: 12, color: '#60766f' }}>
+                  司機: {order.driverName ? `${order.driverName} (${order.driverId || '-'})` : '未派單'}
+                </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <select
                     value={draftStatus}
@@ -628,6 +677,67 @@ export default function AdminConsole() {
                     }}
                   >
                     {updatingOrderId === order.id ? '更新中...' : '更新狀態'}
+                  </button>
+                  <select
+                    value={draftDriverId}
+                    onChange={(event) => {
+                      if (!order.id) return
+                      setOrderDriverDrafts((prev) => ({
+                        ...prev,
+                        [order.id as string]: event.target.value,
+                      }))
+                    }}
+                    style={{
+                      border: '1px solid #dce6dd',
+                      borderRadius: 10,
+                      padding: '7px 10px',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="">選擇司機</option>
+                    {driverUsers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>
+                        {driver.name || driver.id}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => void handleAssignDriver(order)}
+                    disabled={
+                      !order.id ||
+                      !draftDriverId ||
+                      updatingOrderId === order.id ||
+                      order.status !== 'pending'
+                    }
+                    style={{
+                      border: 0,
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      fontWeight: 700,
+                      background:
+                        !order.id ||
+                        !draftDriverId ||
+                        updatingOrderId === order.id ||
+                        order.status !== 'pending'
+                          ? '#e8e8e4'
+                          : '#355f9e',
+                      color:
+                        !order.id ||
+                        !draftDriverId ||
+                        updatingOrderId === order.id ||
+                        order.status !== 'pending'
+                          ? '#8d8a80'
+                          : '#f2f7ff',
+                      cursor:
+                        !order.id ||
+                        !draftDriverId ||
+                        updatingOrderId === order.id ||
+                        order.status !== 'pending'
+                          ? 'not-allowed'
+                          : 'pointer',
+                    }}
+                  >
+                    {updatingOrderId === order.id ? '派單中...' : '派單給司機'}
                   </button>
                 </div>
               </article>
@@ -662,6 +772,7 @@ export default function AdminConsole() {
           {filteredUsers.map((user) => {
             const roleDraft = userRoleDrafts[user.id] || user.role
             const pointsDraft = userPointsDrafts[user.id] ?? String(user.points)
+            const statusDraft = userStatusDrafts[user.id] || user.status || 'ACTIVE'
             return (
               <article
                 key={user.id}
@@ -699,6 +810,25 @@ export default function AdminConsole() {
                     <option value="passenger">乘客</option>
                     <option value="driver">司機</option>
                     <option value="admin">管理員</option>
+                  </select>
+                  <select
+                    value={statusDraft}
+                    onChange={(event) =>
+                      setUserStatusDrafts((prev) => ({
+                        ...prev,
+                        [user.id]: event.target.value,
+                      }))
+                    }
+                    style={{
+                      border: '1px solid #dce6dd',
+                      borderRadius: 10,
+                      padding: '7px 10px',
+                      background: '#fff',
+                    }}
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="PENDING">PENDING</option>
+                    <option value="BANNED">BANNED</option>
                   </select>
                   <input
                     type="number"

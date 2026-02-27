@@ -246,7 +246,7 @@ export default function DriverDashboard() {
             </div>
             <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
               <button
-                onClick={() => navigate('/messages')}
+                onClick={() => navigate('/driver/messages')}
                 style={{
                   flex: isMobile ? 1 : 'none',
                   minHeight: 42,

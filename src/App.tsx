@@ -10,6 +10,7 @@ const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const ProfilePage = lazy(() => import('./pages/Profile'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const DriverDashboard = lazy(() => import('./pages/DriverDashboard'))
+const DriverMessagesPage = lazy(() => import('./pages/DriverMessagesPage'))
 const PassengerLayout = lazy(() => import('./layouts/PassengerLayout'))
 
 function FullscreenLoading({ text }: { text: string }) {
@@ -70,6 +71,14 @@ function RequireDriver() {
   return normalizeRole(currentUser.role) === 'driver' ? <Outlet /> : <Navigate to="/home" replace />
 }
 
+function RequirePassenger() {
+  const { currentUser } = useAuth()
+  if (!currentUser) return <Navigate to="/login" replace />
+  const role = normalizeRole(currentUser.role)
+  if (role === 'passenger') return <Outlet />
+  return <Navigate to={role === 'admin' ? '/admin' : '/driver'} replace />
+}
+
 const getDefaultAuthPath = (role: string | undefined) => {
   const normalized = normalizeRole(role)
   if (normalized === 'admin') return '/admin'
@@ -101,11 +110,13 @@ function AppShell() {
           </Route>
 
           <Route element={<RequireAuth />}>
-            <Route element={<PassengerLayout />}>
-              <Route path="/home" element={<PassengerHome />} />
-              <Route path="/orders" element={<OrdersPage />} />
-              <Route path="/messages" element={<MessagesPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
+            <Route element={<RequirePassenger />}>
+              <Route element={<PassengerLayout />}>
+                <Route path="/home" element={<PassengerHome />} />
+                <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/messages" element={<MessagesPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Route>
             </Route>
           </Route>
 
@@ -118,6 +129,7 @@ function AppShell() {
           <Route element={<RequireAuth />}>
             <Route element={<RequireDriver />}>
               <Route path="/driver" element={<DriverDashboard />} />
+              <Route path="/driver/messages" element={<DriverMessagesPage />} />
             </Route>
           </Route>
 

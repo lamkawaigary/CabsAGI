@@ -43,6 +43,9 @@ export default function DriverDashboard() {
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
   const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null)
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === 'undefined' ? 1024 : window.innerWidth,
+  )
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -78,6 +81,14 @@ export default function DriverDashboard() {
     }
   }, [currentUser?.id])
 
+  useEffect(() => {
+    const onResize = () => {
+      setViewportWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   const summary = useMemo(() => {
     const now = new Date()
     const todayCompleted = myOrders.filter(
@@ -95,6 +106,8 @@ export default function DriverDashboard() {
       todayRevenue,
     }
   }, [myOrders, poolOrders.length])
+
+  const isMobile = viewportWidth < 780
 
   const handleLogout = async () => {
     if (loggingOut) return
@@ -154,7 +167,18 @@ export default function DriverDashboard() {
 
   if (currentUser.role !== 'driver') {
     return (
-      <div style={{ maxWidth: 680, margin: '40px auto', background: '#fff', border: '1px solid #dce6dd', borderRadius: 14, padding: 16, display: 'grid', gap: 10 }}>
+      <div
+        style={{
+          maxWidth: 680,
+          margin: isMobile ? '20px 12px' : '40px auto',
+          background: '#fff',
+          border: '1px solid #dce6dd',
+          borderRadius: 14,
+          padding: 16,
+          display: 'grid',
+          gap: 10,
+        }}
+      >
         <strong style={{ color: '#29473f' }}>此頁僅供司機使用</strong>
         <div style={{ fontSize: 13, color: '#5d746d' }}>目前登入身份為：{currentUser.role}</div>
         <button
@@ -176,103 +200,166 @@ export default function DriverDashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f4f7f5' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(180deg, #edf4f2 0%, #f6f8f6 45%, #f3f6f4 100%)',
+        paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
+      }}
+    >
       <header
         style={{
-          padding: '14px 16px',
-          borderBottom: '1px solid #dce6dd',
-          background: 'linear-gradient(90deg, #2f3d4f 0%, #355f6a 52%, #2d7a66 100%)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          borderBottom: '1px solid rgba(214,227,220,0.9)',
+          backdropFilter: 'blur(10px)',
+          background: 'linear-gradient(95deg, rgba(47,61,79,0.95) 0%, rgba(53,95,106,0.95) 48%, rgba(45,122,102,0.95) 100%)',
           color: '#f3fff8',
-          display: 'grid',
-          gap: 10,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 11, letterSpacing: '0.14em', opacity: 0.8, fontWeight: 700 }}>CABS DRIVER DASHBOARD</div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>司機接單中心 · {currentUser.name}</div>
+        <div
+          style={{
+            maxWidth: 1080,
+            margin: '0 auto',
+            padding: isMobile ? '12px 12px 10px' : '14px 16px 12px',
+            display: 'grid',
+            gap: 10,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, letterSpacing: '0.14em', opacity: 0.82, fontWeight: 700 }}>
+                CABS DRIVER DASHBOARD
+              </div>
+              <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 900 }}>
+                司機接單中心 · {currentUser.name}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, width: isMobile ? '100%' : 'auto' }}>
+              <button
+                onClick={() => navigate('/messages')}
+                style={{
+                  flex: isMobile ? 1 : 'none',
+                  minHeight: 42,
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  borderRadius: 11,
+                  background: 'rgba(255,255,255,0.11)',
+                  color: '#f3fff8',
+                  fontWeight: 800,
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                }}
+              >
+                訊息中心
+              </button>
+              <button
+                onClick={() => void handleLogout()}
+                disabled={loggingOut}
+                style={{
+                  flex: isMobile ? 1 : 'none',
+                  minHeight: 42,
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  borderRadius: 11,
+                  background: loggingOut ? 'rgba(255,255,255,0.12)' : '#ffffff',
+                  color: loggingOut ? '#f3fff8' : '#27483f',
+                  fontWeight: 800,
+                  padding: '8px 12px',
+                  cursor: loggingOut ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {loggingOut ? '登出中...' : '登出'}
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+
+          <div
+            style={{
+              display: isMobile ? 'flex' : 'grid',
+              gridTemplateColumns: isMobile ? undefined : 'repeat(4,minmax(120px,1fr))',
+              gap: 8,
+              overflowX: isMobile ? 'auto' : 'visible',
+              paddingBottom: isMobile ? 2 : 0,
+            }}
+          >
+            {[
+              { label: '接單池', value: summary.poolCount },
+              { label: '進行中', value: summary.activeTrips },
+              { label: '今日完成', value: summary.todayCompleted },
+              { label: '今日收入', value: `HK$${summary.todayRevenue}` },
+            ].map((item) => (
+              <article
+                key={item.label}
+                style={{
+                  minWidth: isMobile ? 132 : undefined,
+                  border: '1px solid rgba(255,255,255,0.26)',
+                  borderRadius: 12,
+                  background: 'rgba(255,255,255,0.1)',
+                  padding: '9px 10px',
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{ fontSize: 11, opacity: 0.82, fontWeight: 700 }}>{item.label}</div>
+                <div style={{ fontSize: isMobile ? 20 : 22, fontWeight: 900 }}>{item.value}</div>
+              </article>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.24)',
+              background: 'rgba(255,255,255,0.07)',
+              padding: '8px 10px',
+            }}
+          >
             <button
-              onClick={() => navigate('/messages')}
+              onClick={() => setOnline((prev) => !prev)}
               style={{
+                minHeight: 36,
                 border: '1px solid rgba(255,255,255,0.35)',
-                borderRadius: 10,
-                background: 'rgba(255,255,255,0.1)',
-                color: '#f3fff8',
-                fontWeight: 700,
-                padding: '8px 12px',
+                borderRadius: 999,
+                background: online ? '#1fbf90' : '#a8afb2',
+                color: '#fff',
+                fontWeight: 800,
+                padding: '6px 14px',
                 cursor: 'pointer',
               }}
             >
-              訊息中心
+              {online ? '接單中' : '休息中'}
             </button>
-            <button
-              onClick={() => void handleLogout()}
-              disabled={loggingOut}
-              style={{
-                border: '1px solid rgba(255,255,255,0.35)',
-                borderRadius: 10,
-                background: loggingOut ? 'rgba(255,255,255,0.12)' : '#ffffff',
-                color: loggingOut ? '#f3fff8' : '#27483f',
-                fontWeight: 700,
-                padding: '8px 12px',
-                cursor: loggingOut ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {loggingOut ? '登出中...' : '登出'}
-            </button>
+            <span style={{ fontSize: 12, opacity: 0.9 }}>
+              {online ? '你目前會接收待接訂單' : '已暫停接收新訂單（仍可管理我的行程）'}
+            </span>
           </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(120px,1fr))', gap: 8 }}>
-          {[
-            { label: '接單池', value: summary.poolCount },
-            { label: '進行中', value: summary.activeTrips },
-            { label: '今日完成', value: summary.todayCompleted },
-            { label: '今日收入', value: `HK$${summary.todayRevenue}` },
-          ].map((item) => (
-            <article
-              key={item.label}
-              style={{
-                border: '1px solid rgba(255,255,255,0.28)',
-                borderRadius: 12,
-                background: 'rgba(255,255,255,0.08)',
-                padding: '9px 10px',
-              }}
-            >
-              <div style={{ fontSize: 11, opacity: 0.8, fontWeight: 700 }}>{item.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{item.value}</div>
-            </article>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={() => setOnline((prev) => !prev)}
-            style={{
-              border: '1px solid rgba(255,255,255,0.35)',
-              borderRadius: 999,
-              background: online ? '#1fbf90' : '#a8afb2',
-              color: '#fff',
-              fontWeight: 800,
-              padding: '6px 12px',
-              cursor: 'pointer',
-            }}
-          >
-            {online ? '接單中' : '休息中'}
-          </button>
-          <span style={{ fontSize: 12, opacity: 0.86 }}>
-            {online ? '你目前會接收待接訂單' : '已暫停接收新訂單（仍可管理我的行程）'}
-          </span>
         </div>
       </header>
 
-      <main style={{ maxWidth: 1080, margin: '0 auto', padding: 16, display: 'grid', gap: 12 }}>
+      <main
+        style={{
+          maxWidth: 1080,
+          margin: '0 auto',
+          padding: isMobile ? '12px' : '16px',
+          display: 'grid',
+          gap: 12,
+        }}
+      >
         {notice && (
           <div
             style={{
-              borderRadius: 10,
+              borderRadius: 12,
               padding: '10px 12px',
               border:
                 notice.tone === 'error'
@@ -293,15 +380,30 @@ export default function DriverDashboard() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div
+          style={{
+            position: 'sticky',
+            top: isMobile ? 112 : 128,
+            zIndex: 9,
+            background: 'rgba(243,247,245,0.88)',
+            backdropFilter: 'blur(6px)',
+            border: '1px solid #dce6dd',
+            borderRadius: 14,
+            padding: 4,
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 4,
+          }}
+        >
           <button
             onClick={() => setActiveTab('pool')}
             style={{
+              minHeight: 42,
               border: 0,
               borderRadius: 10,
               padding: '9px 12px',
               fontWeight: 800,
-              background: activeTab === 'pool' ? '#1f4f43' : '#ecf2ef',
+              background: activeTab === 'pool' ? '#1f4f43' : 'transparent',
               color: activeTab === 'pool' ? '#effff7' : '#33584d',
               cursor: 'pointer',
             }}
@@ -311,11 +413,12 @@ export default function DriverDashboard() {
           <button
             onClick={() => setActiveTab('mine')}
             style={{
+              minHeight: 42,
               border: 0,
               borderRadius: 10,
               padding: '9px 12px',
               fontWeight: 800,
-              background: activeTab === 'mine' ? '#1f4f43' : '#ecf2ef',
+              background: activeTab === 'mine' ? '#1f4f43' : 'transparent',
               color: activeTab === 'mine' ? '#effff7' : '#33584d',
               cursor: 'pointer',
             }}
@@ -341,10 +444,11 @@ export default function DriverDashboard() {
                     style={{
                       background: '#fff',
                       border: '1px solid #dce6dd',
-                      borderRadius: 14,
-                      padding: 12,
+                      borderRadius: 16,
+                      padding: isMobile ? 12 : 14,
                       display: 'grid',
-                      gap: 6,
+                      gap: 8,
+                      boxShadow: '0 4px 14px rgba(29,53,44,0.06)',
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -353,7 +457,7 @@ export default function DriverDashboard() {
                         style={{
                           border: '1px solid #d9e5dc',
                           borderRadius: 999,
-                          padding: '2px 8px',
+                          padding: '3px 9px',
                           fontSize: 11,
                           color: '#31564b',
                           background: '#f8fbf9',
@@ -362,24 +466,35 @@ export default function DriverDashboard() {
                         {orderType === 'official_route' ? '官方班次' : '包車點對點'}
                       </span>
                     </div>
-                    <div style={{ fontSize: 13, color: '#37564e' }}>
+                    <div style={{ fontSize: 14, color: '#2b4e44', lineHeight: 1.4, fontWeight: 700 }}>
                       {order.pickup} {'->'} {order.dropoff}
                     </div>
-                    <div style={{ fontSize: 12, color: '#60766f', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile
+                          ? 'repeat(2,minmax(0,1fr))'
+                          : 'repeat(auto-fit,minmax(160px,1fr))',
+                        gap: 6,
+                        fontSize: 12,
+                        color: '#60766f',
+                      }}
+                    >
                       <span>建立: {formatDateTime(order.createdAtISO || order.createdAt)}</span>
                       <span>乘客: {order.passengerName || order.passengerId}</span>
                       <span>人數: {order.passengersCount || 1}</span>
-                      <span>HK${order.price}</span>
+                      <span>車資: HK${order.price}</span>
                     </div>
                     <button
                       onClick={() => void handleAcceptOrder(order)}
                       disabled={!order.id || processingOrderId === order.id}
                       style={{
-                        justifySelf: 'start',
+                        width: isMobile ? '100%' : 'fit-content',
+                        minHeight: 44,
                         border: 0,
-                        borderRadius: 10,
-                        padding: '8px 12px',
-                        fontWeight: 700,
+                        borderRadius: 11,
+                        padding: '8px 14px',
+                        fontWeight: 800,
                         background:
                           !order.id || processingOrderId === order.id ? '#e8e8e4' : '#1f4f43',
                         color:
@@ -419,6 +534,14 @@ export default function DriverDashboard() {
                     ? { label: '完成行程', status: 'completed' as const }
                     : null
               const canCancel = order.status === 'accepted'
+              const statusTone =
+                order.status === 'completed'
+                  ? '#2f8f64'
+                  : order.status === 'cancelled'
+                    ? '#a34f45'
+                    : order.status === 'in_progress'
+                      ? '#355f9e'
+                      : '#31564b'
 
               return (
                 <article
@@ -426,46 +549,64 @@ export default function DriverDashboard() {
                   style={{
                     background: '#fff',
                     border: '1px solid #dce6dd',
-                    borderRadius: 14,
-                    padding: 12,
+                    borderRadius: 16,
+                    padding: isMobile ? 12 : 14,
                     display: 'grid',
-                    gap: 6,
+                    gap: 8,
+                    boxShadow: '0 4px 14px rgba(29,53,44,0.06)',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                     <strong style={{ color: '#27483f' }}>{order.id}</strong>
                     <span
                       style={{
-                        border: '1px solid #d9e5dc',
+                        border: `1px solid ${statusTone}33`,
                         borderRadius: 999,
-                        padding: '2px 8px',
+                        padding: '3px 9px',
                         fontSize: 11,
-                        color: '#31564b',
-                        background: '#f8fbf9',
+                        color: statusTone,
+                        background: `${statusTone}14`,
                       }}
                     >
                       {statusLabel}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, color: '#37564e' }}>
+                  <div style={{ fontSize: 14, color: '#2b4e44', lineHeight: 1.4, fontWeight: 700 }}>
                     {order.pickup} {'->'} {order.dropoff}
                   </div>
-                  <div style={{ fontSize: 12, color: '#60766f', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: isMobile
+                        ? 'repeat(2,minmax(0,1fr))'
+                        : 'repeat(auto-fit,minmax(160px,1fr))',
+                      gap: 6,
+                      fontSize: 12,
+                      color: '#60766f',
+                    }}
+                  >
                     <span>乘客: {order.passengerName || order.passengerId}</span>
                     <span>人數: {order.passengersCount || 1}</span>
                     <span>車資: HK${order.price}</span>
                     <span>建立: {formatDateTime(order.createdAtISO || order.createdAt)}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gap: 8,
+                      gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit,minmax(160px,1fr))',
+                    }}
+                  >
                     {nextAction && (
                       <button
                         onClick={() => void handleAdvanceStatus(order, nextAction.status)}
                         disabled={!order.id || processingOrderId === order.id}
                         style={{
+                          minHeight: 44,
                           border: 0,
-                          borderRadius: 10,
-                          padding: '8px 12px',
-                          fontWeight: 700,
+                          borderRadius: 11,
+                          padding: '9px 12px',
+                          fontWeight: 800,
                           background:
                             !order.id || processingOrderId === order.id ? '#e8e8e4' : '#1f4f43',
                           color:
@@ -484,10 +625,11 @@ export default function DriverDashboard() {
                         onClick={() => void handleAdvanceStatus(order, 'cancelled')}
                         disabled={!order.id || processingOrderId === order.id}
                         style={{
+                          minHeight: 44,
                           border: '1px solid #e0d1cc',
-                          borderRadius: 10,
-                          padding: '8px 12px',
-                          fontWeight: 700,
+                          borderRadius: 11,
+                          padding: '9px 12px',
+                          fontWeight: 800,
                           background: '#fff5f1',
                           color: '#9f4236',
                           cursor:

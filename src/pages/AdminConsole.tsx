@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   assignOrderToDriverByAdmin,
+  executeAdminPointOperation,
   savePricingConfig,
   subscribeAdminOfficialRoutes,
   subscribeAdminOrders,
+  subscribePlatformPointBalance,
+  subscribePointLedger,
   subscribeAdminUsers,
   subscribePricingConfig,
   updateAdminOrderStatus,
@@ -13,6 +16,8 @@ import {
   updateOfficialRouteStatus,
   upsertOfficialRoute,
   type AdminUserRecord,
+  type PointLedgerRecord,
+  type PointOperationType,
   type PricingConfigRecord,
 } from '../services/adminService'
 import type {
@@ -21,9 +26,30 @@ import type {
   OrderRecord,
   OrderStatus,
 } from '../services/orderService'
+import {
+  markConversationAsRead,
+  sendTextMessage,
+  subscribeAllMessages,
+  SUPPORT_SYSTEM_ID,
+  type MessageRecord,
+} from '../services/messageService'
 
 type NoticeTone = 'ok' | 'error' | 'info'
-type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing'
+type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing' | 'points' | 'support'
+
+type SupportThreadCategory = 'support' | 'order'
+
+type SupportThread = {
+  id: string
+  category: SupportThreadCategory
+  orderId: string | null
+  supportPartnerId?: string
+  participantIds: string[]
+  title: string
+  subtitle: string
+  time: string
+  unreadForSupport: number
+}
 
 type RouteFormState = {
   id?: string
@@ -73,6 +99,15 @@ const ROUTE_STATUS_LABELS: Record<OfficialRouteStatus, string> = {
   cancelled: '已取消',
 }
 
+const POINT_OPERATION_LABELS: Record<PointOperationType, string> = {
+  distribute: '平台發放至用戶',
+  reclaim: '由用戶回收到平台',
+  mint: '平台增發點數',
+  burn: '平台銷毀點數',
+}
+
+const POINT_OPERATION_OPTIONS: PointOperationType[] = ['distribute', 'reclaim', 'mint', 'burn']
+
 const EMPTY_ROUTE_FORM: RouteFormState = {
   pickup: '',
   pickupLat: '',
@@ -103,11 +138,23 @@ const parseNumber = (value: string, fallback: number) => {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+const parseInteger = (value: string) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, Math.round(parsed))
+}
+
 const formatDateTime = (raw: string | undefined) => {
   if (!raw) return '-'
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) return raw
   return date.toLocaleString()
+}
+
+const getMessagePreview = (message: MessageRecord) => {
+  if (message.type === 'IMAGE') return '📷 圖片'
+  if (!message.content) return '(無內容)'
+  return message.content
 }
 
 const isSameDay = (raw: string | undefined, now: Date) => {
@@ -147,7 +194,6 @@ export default function AdminConsole() {
 
   const [userSearch, setUserSearch] = useState('')
   const [userRoleDrafts, setUserRoleDrafts] = useState<Record<string, AdminUserRecord['role']>>({})
-  const [userPointsDrafts, setUserPointsDrafts] = useState<Record<string, string>>({})
   const [userStatusDrafts, setUserStatusDrafts] = useState<Record<string, string>>({})
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
 
@@ -157,6 +203,27 @@ export default function AdminConsole() {
   const [updatingRouteId, setUpdatingRouteId] = useState<string | null>(null)
 
   const [savingPricing, setSavingPricing] = useState(false)
+
+  const [loadingPlatformPoints, setLoadingPlatformPoints] = useState(true)
+  const [loadingPointLogs, setLoadingPointLogs] = useState(true)
+  const [platformPoints, setPlatformPoints] = useState(0)
+  const [pointLogs, setPointLogs] = useState<PointLedgerRecord[]>([])
+  const [pointActionType, setPointActionType] = useState<PointOperationType>('distribute')
+  const [pointTargetUserId, setPointTargetUserId] = useState('')
+  const [pointAmountDraft, setPointAmountDraft] = useState('100')
+  const [pointOrderIdDraft, setPointOrderIdDraft] = useState('')
+  const [pointNoteDraft, setPointNoteDraft] = useState('')
+  const [processingPointAction, setProcessingPointAction] = useState(false)
+
+  const [loadingSupportMessages, setLoadingSupportMessages] = useState(true)
+  const [supportMessages, setSupportMessages] = useState<MessageRecord[]>([])
+  const [supportFilter, setSupportFilter] = useState<'all' | SupportThreadCategory>('all')
+  const [supportSearch, setSupportSearch] = useState('')
+  const [activeSupportThreadId, setActiveSupportThreadId] = useState<string | null>(null)
+  const [supportReplyDraft, setSupportReplyDraft] = useState('')
+  const [supportReplyTargetDrafts, setSupportReplyTargetDrafts] = useState<Record<string, string>>({})
+  const [sendingSupportReply, setSendingSupportReply] = useState(false)
+
   const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
@@ -165,6 +232,9 @@ export default function AdminConsole() {
       setLoadingUsers(true)
       setLoadingRoutes(true)
       setLoadingPricing(true)
+      setLoadingPlatformPoints(true)
+      setLoadingPointLogs(true)
+      setLoadingSupportMessages(true)
     })
 
     const unsubOrders = subscribeAdminOrders(
@@ -208,12 +278,45 @@ export default function AdminConsole() {
         setLoadingPricing(false)
       },
     )
+    const unsubPlatformPoints = subscribePlatformPointBalance(
+      (nextPoints) => {
+        setPlatformPoints(nextPoints)
+        setLoadingPlatformPoints(false)
+      },
+      (error) => {
+        setNotice({ text: `讀取平台點數失敗: ${error.message}`, tone: 'error' })
+        setLoadingPlatformPoints(false)
+      },
+    )
+    const unsubPointLedger = subscribePointLedger(
+      (nextLogs) => {
+        setPointLogs(nextLogs)
+        setLoadingPointLogs(false)
+      },
+      (error) => {
+        setNotice({ text: `讀取點數台帳失敗: ${error.message}`, tone: 'error' })
+        setLoadingPointLogs(false)
+      },
+    )
+    const unsubSupportMessages = subscribeAllMessages(
+      (rows) => {
+        setSupportMessages(rows)
+        setLoadingSupportMessages(false)
+      },
+      (error) => {
+        setNotice({ text: `讀取客服訊息失敗: ${error.message}`, tone: 'error' })
+        setLoadingSupportMessages(false)
+      },
+    )
 
     return () => {
       unsubOrders()
       unsubUsers()
       unsubRoutes()
       unsubPricing()
+      unsubPlatformPoints()
+      unsubPointLedger()
+      unsubSupportMessages()
     }
   }, [])
 
@@ -267,6 +370,212 @@ export default function AdminConsole() {
   }, [users, userSearch])
 
   const driverUsers = useMemo(() => users.filter((user) => user.role === 'driver'), [users])
+  const pointTargetUsers = useMemo(
+    () => users.filter((user) => user.role === 'passenger' || user.role === 'driver'),
+    [users],
+  )
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    users.forEach((user) => {
+      map.set(user.id, user.name || user.id)
+    })
+    return map
+  }, [users])
+
+  const supportThreads = useMemo<SupportThread[]>(() => {
+    const map = new Map<string, SupportThread>()
+    supportMessages.forEach((message) => {
+      const timestamp = Number.isNaN(new Date(message.timestamp).getTime())
+        ? new Date(0).toISOString()
+        : message.timestamp
+      const unreadInc = message.receiverId === SUPPORT_SYSTEM_ID && !message.isRead ? 1 : 0
+      const preview = getMessagePreview(message)
+
+      if (message.orderId) {
+        const key = `order::${message.orderId}`
+        const existing = map.get(key)
+        const participantSet = new Set<string>(existing?.participantIds || [])
+        if (message.senderId && message.senderId !== 'ALL') participantSet.add(message.senderId)
+        if (message.receiverId && message.receiverId !== 'ALL') participantSet.add(message.receiverId)
+        const participantIds = Array.from(participantSet)
+        const participantText = participantIds
+          .filter((id) => id !== SUPPORT_SYSTEM_ID)
+          .map((id) => userNameById.get(id) || id.slice(0, 8))
+          .join(' / ')
+        const orderTitle = `訂單 ${message.orderId}`
+        const subtitle = participantText ? `${participantText} · ${preview}` : preview
+
+        if (!existing) {
+          map.set(key, {
+            id: key,
+            category: 'order',
+            orderId: message.orderId,
+            participantIds,
+            title: orderTitle,
+            subtitle,
+            time: timestamp,
+            unreadForSupport: unreadInc,
+          })
+          return
+        }
+
+        existing.participantIds = participantIds
+        if (new Date(timestamp).getTime() >= new Date(existing.time).getTime()) {
+          existing.subtitle = subtitle
+          existing.time = timestamp
+        }
+        existing.unreadForSupport += unreadInc
+        return
+      }
+
+      const isSupportConversation =
+        message.senderId === SUPPORT_SYSTEM_ID || message.receiverId === SUPPORT_SYSTEM_ID
+      if (!isSupportConversation) return
+
+      const partnerId =
+        message.senderId === SUPPORT_SYSTEM_ID ? message.receiverId : message.senderId
+      if (!partnerId || partnerId === SUPPORT_SYSTEM_ID || partnerId === 'ALL') return
+
+      const key = `support::${partnerId}`
+      const existing = map.get(key)
+      const partnerName = userNameById.get(partnerId) || `用戶 ${partnerId.slice(0, 8)}`
+      if (!existing) {
+        map.set(key, {
+          id: key,
+          category: 'support',
+          orderId: null,
+          supportPartnerId: partnerId,
+          participantIds: [partnerId, SUPPORT_SYSTEM_ID],
+          title: `${partnerName} · 客服`,
+          subtitle: preview,
+          time: timestamp,
+          unreadForSupport: unreadInc,
+        })
+        return
+      }
+
+      if (new Date(timestamp).getTime() >= new Date(existing.time).getTime()) {
+        existing.subtitle = preview
+        existing.time = timestamp
+      }
+      existing.unreadForSupport += unreadInc
+    })
+
+    return Array.from(map.values()).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+  }, [supportMessages, userNameById])
+
+  const filteredSupportThreads = useMemo(() => {
+    const q = supportSearch.trim().toLowerCase()
+    return supportThreads.filter((thread) => {
+      if (supportFilter !== 'all' && thread.category !== supportFilter) return false
+      if (!q) return true
+      const searchable = `${thread.title} ${thread.subtitle} ${thread.orderId || ''} ${thread.participantIds.join(' ')} ${thread.id}`.toLowerCase()
+      return searchable.includes(q)
+    })
+  }, [supportThreads, supportFilter, supportSearch])
+
+  const activeSupportThread = useMemo(
+    () => supportThreads.find((thread) => thread.id === activeSupportThreadId) || null,
+    [supportThreads, activeSupportThreadId],
+  )
+
+  const activeSupportMessages = useMemo(() => {
+    if (!activeSupportThread) return []
+
+    return supportMessages
+      .filter((message) => {
+        if (activeSupportThread.category === 'support') {
+          const partnerId = activeSupportThread.supportPartnerId
+          if (!partnerId) return false
+          if (message.orderId) return false
+          return (
+            (message.senderId === SUPPORT_SYSTEM_ID && message.receiverId === partnerId) ||
+            (message.senderId === partnerId && message.receiverId === SUPPORT_SYSTEM_ID)
+          )
+        }
+        return message.orderId === activeSupportThread.orderId
+      })
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+  }, [activeSupportThread, supportMessages])
+
+  const supportReplyTargets = useMemo(() => {
+    if (!activeSupportThread) return []
+    if (activeSupportThread.category === 'support') {
+      return activeSupportThread.supportPartnerId ? [activeSupportThread.supportPartnerId] : []
+    }
+
+    const targetSet = new Set<string>(
+      activeSupportThread.participantIds.filter((id) => id && id !== SUPPORT_SYSTEM_ID && id !== 'ALL'),
+    )
+    activeSupportMessages.forEach((message) => {
+      if (message.senderId && message.senderId !== SUPPORT_SYSTEM_ID && message.senderId !== 'ALL') {
+        targetSet.add(message.senderId)
+      }
+      if (message.receiverId && message.receiverId !== SUPPORT_SYSTEM_ID && message.receiverId !== 'ALL') {
+        targetSet.add(message.receiverId)
+      }
+    })
+    return Array.from(targetSet)
+  }, [activeSupportThread, activeSupportMessages])
+
+  const supportUnreadCount = useMemo(
+    () => supportMessages.filter((message) => message.receiverId === SUPPORT_SYSTEM_ID && !message.isRead).length,
+    [supportMessages],
+  )
+
+  useEffect(() => {
+    if (!activeSupportThreadId) return
+    const exists = supportThreads.some((thread) => thread.id === activeSupportThreadId)
+    if (!exists) {
+      setActiveSupportThreadId(null)
+      setSupportReplyDraft('')
+    }
+  }, [activeSupportThreadId, supportThreads])
+
+  useEffect(() => {
+    if (!activeSupportThread || supportReplyTargets.length === 0) return
+    setSupportReplyTargetDrafts((prev) => {
+      if (prev[activeSupportThread.id]) return prev
+      return {
+        ...prev,
+        [activeSupportThread.id]: supportReplyTargets[0],
+      }
+    })
+  }, [activeSupportThread, supportReplyTargets])
+
+  useEffect(() => {
+    if (!activeSupportThread) return
+
+    const markThreadAsRead = async () => {
+      try {
+        if (activeSupportThread.category === 'support' && activeSupportThread.supportPartnerId) {
+          await markConversationAsRead({
+            currentUserId: SUPPORT_SYSTEM_ID,
+            partnerId: activeSupportThread.supportPartnerId,
+            orderId: null,
+          })
+          return
+        }
+
+        if (activeSupportThread.category === 'order' && activeSupportThread.orderId) {
+          const partners = activeSupportThread.participantIds.filter((id) => id && id !== SUPPORT_SYSTEM_ID)
+          await Promise.all(
+            partners.map((partnerId) =>
+              markConversationAsRead({
+                currentUserId: SUPPORT_SYSTEM_ID,
+                partnerId,
+                orderId: activeSupportThread.orderId,
+              }),
+            ),
+          )
+        }
+      } catch {
+        // non-blocking for admin inbox display
+      }
+    }
+
+    void markThreadAsRead()
+  }, [activeSupportThread])
 
   const handleLogout = async () => {
     if (loggingOut) return
@@ -338,12 +647,10 @@ export default function AdminConsole() {
 
   const handleSaveUser = async (user: AdminUserRecord) => {
     const role = userRoleDrafts[user.id] || user.role
-    const points = parseNumber(userPointsDrafts[user.id] ?? String(user.points), user.points)
     const status = userStatusDrafts[user.id] || user.status || 'ACTIVE'
     const roleChanged = role !== user.role
-    const pointsChanged = points !== user.points
     const statusChanged = status !== (user.status || 'ACTIVE')
-    if (!roleChanged && !pointsChanged && !statusChanged) {
+    if (!roleChanged && !statusChanged) {
       setNotice({ text: '用戶資料未改動', tone: 'info' })
       return
     }
@@ -353,7 +660,6 @@ export default function AdminConsole() {
       await updateAdminUser({
         userId: user.id,
         role,
-        points,
         status,
       })
       setNotice({ text: `已更新用戶 ${user.name || user.id}`, tone: 'ok' })
@@ -474,6 +780,103 @@ export default function AdminConsole() {
       setNotice({ text: `保存定價設定失敗: ${message}`, tone: 'error' })
     } finally {
       setSavingPricing(false)
+    }
+  }
+
+  const handleSubmitPointAction = async () => {
+    if (!currentUser?.id) {
+      setNotice({ text: '尚未登入，無法執行點數操作', tone: 'error' })
+      return
+    }
+
+    const amount = parseInteger(pointAmountDraft)
+    if (amount <= 0) {
+      setNotice({ text: '請輸入正整數點數', tone: 'error' })
+      return
+    }
+
+    const needTargetUser = pointActionType === 'distribute' || pointActionType === 'reclaim'
+    if (needTargetUser && !pointTargetUserId) {
+      setNotice({ text: '此操作需要指定目標用戶', tone: 'error' })
+      return
+    }
+
+    setProcessingPointAction(true)
+    try {
+      await executeAdminPointOperation({
+        type: pointActionType,
+        amount,
+        operatorId: currentUser.id,
+        operatorName: currentUser.name || currentUser.id,
+        targetUserId: needTargetUser ? pointTargetUserId : undefined,
+        orderId: pointOrderIdDraft.trim() || undefined,
+        note: pointNoteDraft.trim() || undefined,
+      })
+      setNotice({ text: `點數操作完成：${POINT_OPERATION_LABELS[pointActionType]}`, tone: 'ok' })
+      setPointAmountDraft('100')
+      setPointOrderIdDraft('')
+      setPointNoteDraft('')
+      if (!needTargetUser) setPointTargetUserId('')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤'
+      setNotice({ text: `點數操作失敗: ${message}`, tone: 'error' })
+    } finally {
+      setProcessingPointAction(false)
+    }
+  }
+
+  const handleOpenSupportThread = (thread: SupportThread) => {
+    setActiveSupportThreadId(thread.id)
+    setSupportReplyDraft('')
+    if (thread.category === 'support' && thread.supportPartnerId) {
+      setSupportReplyTargetDrafts((prev) => ({
+        ...prev,
+        [thread.id]: thread.supportPartnerId,
+      }))
+    }
+  }
+
+  const handleSendSupportReply = async () => {
+    if (!activeSupportThread) {
+      setNotice({ text: '請先選擇對話', tone: 'error' })
+      return
+    }
+    if (!supportReplyDraft.trim()) {
+      setNotice({ text: '請先輸入訊息內容', tone: 'error' })
+      return
+    }
+    if (!currentUser?.id) {
+      setNotice({ text: '尚未登入，無法發送訊息', tone: 'error' })
+      return
+    }
+
+    const receiverId =
+      supportReplyTargetDrafts[activeSupportThread.id] ||
+      supportReplyTargets[0] ||
+      activeSupportThread.supportPartnerId ||
+      ''
+    if (!receiverId) {
+      setNotice({ text: '此對話沒有可回覆的對象', tone: 'error' })
+      return
+    }
+
+    setSendingSupportReply(true)
+    try {
+      await sendTextMessage({
+        senderId: SUPPORT_SYSTEM_ID,
+        realSenderId: currentUser.id,
+        senderName: `客服 ${currentUser.name || currentUser.id}`,
+        receiverId,
+        content: supportReplyDraft.trim(),
+        orderId: activeSupportThread.orderId || undefined,
+      })
+      setSupportReplyDraft('')
+      setNotice({ text: '客服訊息已送出', tone: 'ok' })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤'
+      setNotice({ text: `發送客服訊息失敗: ${message}`, tone: 'error' })
+    } finally {
+      setSendingSupportReply(false)
     }
   }
 
@@ -771,7 +1174,6 @@ export default function AdminConsole() {
         <div style={{ display: 'grid', gap: 10 }}>
           {filteredUsers.map((user) => {
             const roleDraft = userRoleDrafts[user.id] || user.role
-            const pointsDraft = userPointsDrafts[user.id] ?? String(user.points)
             const statusDraft = userStatusDrafts[user.id] || user.status || 'ACTIVE'
             return (
               <article
@@ -794,6 +1196,9 @@ export default function AdminConsole() {
                 </div>
                 <div style={{ fontSize: 12, color: '#6a8179' }}>
                   建立時間: {formatDateTime(user.createdAt)}
+                </div>
+                <div style={{ fontSize: 12, color: '#5c726b' }}>
+                  目前點數: <strong>{user.points}</strong>（請到「點數中心」操作）
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -830,23 +1235,6 @@ export default function AdminConsole() {
                     <option value="PENDING">PENDING</option>
                     <option value="BANNED">BANNED</option>
                   </select>
-                  <input
-                    type="number"
-                    value={pointsDraft}
-                    onChange={(event) =>
-                      setUserPointsDrafts((prev) => ({
-                        ...prev,
-                        [user.id]: event.target.value,
-                      }))
-                    }
-                    style={{
-                      width: 120,
-                      border: '1px solid #dce6dd',
-                      borderRadius: 10,
-                      padding: '7px 10px',
-                      outline: 'none',
-                    }}
-                  />
                   <button
                     onClick={() => void handleSaveUser(user)}
                     disabled={savingUserId === user.id}
@@ -1234,6 +1622,562 @@ export default function AdminConsole() {
     </div>
   )
 
+  const renderPointsTab = () => {
+    const requiresTargetUser = pointActionType === 'distribute' || pointActionType === 'reclaim'
+    const totalUserPoints = users.reduce((sum, user) => sum + Number(user.points || 0), 0)
+
+    return (
+      <div style={{ display: 'grid', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
+          <article
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: '12px 14px',
+              display: 'grid',
+              gap: 6,
+            }}
+          >
+            <div style={{ fontSize: 12, color: '#647a73', fontWeight: 700 }}>平台點數池</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#355f9e' }}>
+              {loadingPlatformPoints ? '...' : platformPoints}
+            </div>
+          </article>
+          <article
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: '12px 14px',
+              display: 'grid',
+              gap: 6,
+            }}
+          >
+            <div style={{ fontSize: 12, color: '#647a73', fontWeight: 700 }}>用戶總點數</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#1f7a68' }}>{totalUserPoints}</div>
+          </article>
+          <article
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: '12px 14px',
+              display: 'grid',
+              gap: 6,
+            }}
+          >
+            <div style={{ fontSize: 12, color: '#647a73', fontWeight: 700 }}>台帳筆數</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#8942FE' }}>
+              {loadingPointLogs ? '...' : pointLogs.length}
+            </div>
+          </article>
+        </div>
+
+        <section
+          style={{
+            background: '#fff',
+            border: '1px solid #dce6dd',
+            borderRadius: 14,
+            padding: 12,
+            display: 'grid',
+            gap: 10,
+          }}
+        >
+          <h3 style={{ margin: 0, color: '#27483f' }}>中央點數操作台</h3>
+          <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
+              操作類型
+              <select
+                value={pointActionType}
+                onChange={(event) => setPointActionType(event.target.value as PointOperationType)}
+                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', background: '#fff' }}
+              >
+                {POINT_OPERATION_OPTIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {POINT_OPERATION_LABELS[item]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
+              目標用戶（發放/回收必填）
+              <select
+                value={pointTargetUserId}
+                onChange={(event) => setPointTargetUserId(event.target.value)}
+                disabled={!requiresTargetUser}
+                style={{
+                  border: '1px solid #dce6dd',
+                  borderRadius: 10,
+                  padding: '9px 10px',
+                  background: !requiresTargetUser ? '#f4f6f5' : '#fff',
+                }}
+              >
+                <option value="">選擇用戶</option>
+                {pointTargetUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name || user.id} · {user.id.slice(0, 8)} · 目前 {user.points}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
+              點數數量
+              <input
+                type="number"
+                min={1}
+                value={pointAmountDraft}
+                onChange={(event) => setPointAmountDraft(event.target.value)}
+                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
+              關聯訂單（可選）
+              <input
+                value={pointOrderIdDraft}
+                onChange={(event) => setPointOrderIdDraft(event.target.value)}
+                placeholder="例：order id"
+                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+              />
+            </label>
+          </div>
+          <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
+            備註（可選）
+            <textarea
+              value={pointNoteDraft}
+              onChange={(event) => setPointNoteDraft(event.target.value)}
+              placeholder="輸入操作原因，方便日後追查"
+              rows={2}
+              style={{
+                border: '1px solid #dce6dd',
+                borderRadius: 10,
+                padding: '9px 10px',
+                outline: 'none',
+                resize: 'vertical',
+              }}
+            />
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => void handleSubmitPointAction()}
+              disabled={processingPointAction}
+              style={{
+                border: 0,
+                borderRadius: 10,
+                padding: '9px 14px',
+                fontWeight: 700,
+                background: processingPointAction ? '#e8e8e4' : '#1f4f43',
+                color: processingPointAction ? '#8d8a80' : '#effff7',
+                cursor: processingPointAction ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {processingPointAction ? '處理中...' : '提交點數操作'}
+            </button>
+          </div>
+        </section>
+
+        <section
+          style={{
+            background: '#fff',
+            border: '1px solid #dce6dd',
+            borderRadius: 14,
+            padding: 12,
+            display: 'grid',
+            gap: 8,
+          }}
+        >
+          <h3 style={{ margin: 0, color: '#27483f' }}>點數台帳</h3>
+          {loadingPointLogs ? (
+            <div style={{ fontSize: 13, color: '#6e827c' }}>讀取點數台帳中...</div>
+          ) : pointLogs.length === 0 ? (
+            <div style={{ fontSize: 13, color: '#6e827c' }}>尚未有任何點數操作記錄</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {pointLogs.slice(0, 120).map((log) => (
+                <article
+                  key={log.id}
+                  style={{
+                    border: '1px solid #e2ebe5',
+                    borderRadius: 10,
+                    padding: '9px 10px',
+                    display: 'grid',
+                    gap: 4,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <strong style={{ color: '#27483f', fontSize: 13 }}>
+                      {POINT_OPERATION_LABELS[log.type]} · {log.amount}
+                    </strong>
+                    <span style={{ fontSize: 11, color: '#6a8179' }}>{formatDateTime(log.createdAt)}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#4f675f' }}>
+                    平台: {log.platformBefore} {'->'} {log.platformAfter}
+                    {typeof log.userBefore === 'number' && typeof log.userAfter === 'number'
+                      ? ` · 用戶: ${log.userBefore} -> ${log.userAfter}`
+                      : ''}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#60766f', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <span>操作人: {log.operatorName || log.operatorId}</span>
+                    {log.targetUserId && (
+                      <span>
+                        目標: {log.targetUserName || userNameById.get(log.targetUserId) || log.targetUserId}
+                      </span>
+                    )}
+                    {log.orderId && <span>訂單: {log.orderId}</span>}
+                  </div>
+                  {log.note && <div style={{ fontSize: 12, color: '#5d746d' }}>備註: {log.note}</div>}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    )
+  }
+
+  const renderSupportTab = () => {
+    const activeReplyTarget =
+      (activeSupportThread ? supportReplyTargetDrafts[activeSupportThread.id] : '') ||
+      supportReplyTargets[0] ||
+      activeSupportThread?.supportPartnerId ||
+      ''
+    const orderRef = activeSupportThread?.orderId
+      ? orders.find((order) => order.id === activeSupportThread.orderId)
+      : undefined
+
+    return (
+      <div style={{ display: 'grid', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
+          <article
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: '12px 14px',
+              display: 'grid',
+              gap: 6,
+            }}
+          >
+            <div style={{ fontSize: 12, color: '#647a73', fontWeight: 700 }}>客服未讀訊息</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#b34f44' }}>{supportUnreadCount}</div>
+          </article>
+          <article
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: '12px 14px',
+              display: 'grid',
+              gap: 6,
+            }}
+          >
+            <div style={{ fontSize: 12, color: '#647a73', fontWeight: 700 }}>客服會話數</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#355f9e' }}>
+              {supportThreads.filter((thread) => thread.category === 'support').length}
+            </div>
+          </article>
+          <article
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: '12px 14px',
+              display: 'grid',
+              gap: 6,
+            }}
+          >
+            <div style={{ fontSize: 12, color: '#647a73', fontWeight: 700 }}>訂單聊天室數</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#1f7a68' }}>
+              {supportThreads.filter((thread) => thread.category === 'order').length}
+            </div>
+          </article>
+        </div>
+
+        <section
+          style={{
+            display: 'grid',
+            gap: 10,
+            gridTemplateColumns: 'minmax(280px,360px) minmax(0,1fr)',
+            alignItems: 'start',
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: 10,
+              display: 'grid',
+              gap: 8,
+              maxHeight: 680,
+              overflow: 'auto',
+            }}
+          >
+            <div style={{ display: 'grid', gap: 8 }}>
+              <input
+                value={supportSearch}
+                onChange={(event) => setSupportSearch(event.target.value)}
+                placeholder="搜尋對話 / 用戶 / 訂單"
+                style={{
+                  border: '1px solid #dce6dd',
+                  borderRadius: 10,
+                  padding: '9px 10px',
+                  outline: 'none',
+                  background: '#fff',
+                }}
+              />
+              <select
+                value={supportFilter}
+                onChange={(event) => setSupportFilter(event.target.value as 'all' | SupportThreadCategory)}
+                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '8px 10px', background: '#fff' }}
+              >
+                <option value="all">全部會話</option>
+                <option value="support">客服會話</option>
+                <option value="order">訂單聊天室</option>
+              </select>
+            </div>
+
+            {loadingSupportMessages ? (
+              <div style={{ fontSize: 13, color: '#6e827c' }}>讀取客服訊息中...</div>
+            ) : filteredSupportThreads.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#6e827c' }}>目前沒有符合條件的對話</div>
+            ) : (
+              filteredSupportThreads.map((thread) => (
+                <button
+                  key={thread.id}
+                  onClick={() => handleOpenSupportThread(thread)}
+                  style={{
+                    border: activeSupportThreadId === thread.id ? '1px solid #8db8aa' : '1px solid #dce6dd',
+                    background: activeSupportThreadId === thread.id ? '#edf7f2' : '#fff',
+                    borderRadius: 10,
+                    padding: '9px 10px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'grid',
+                    gap: 4,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <strong style={{ color: '#214239', fontSize: 13 }}>{thread.title}</strong>
+                    {thread.unreadForSupport > 0 && (
+                      <span
+                        style={{
+                          minWidth: 20,
+                          height: 20,
+                          borderRadius: 999,
+                          background: '#1f4f43',
+                          color: '#fff',
+                          fontSize: 11,
+                          display: 'grid',
+                          placeItems: 'center',
+                          padding: '0 5px',
+                        }}
+                      >
+                        {thread.unreadForSupport}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#60766f' }}>
+                    {thread.category === 'order' ? '訂單聊天室' : '客服會話'}
+                    {thread.orderId ? ` · ${thread.orderId}` : ''}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#5f746d',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {thread.subtitle}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#8a9a94' }}>{formatDateTime(thread.time)}</div>
+                </button>
+              ))
+            )}
+          </div>
+
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #dce6dd',
+              borderRadius: 14,
+              padding: 12,
+              minHeight: 560,
+              display: 'grid',
+              gridTemplateRows: 'auto auto 1fr auto',
+              gap: 10,
+            }}
+          >
+            {!activeSupportThread ? (
+              <div style={{ fontSize: 13, color: '#6e827c' }}>請先從左側選擇一個會話</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#23493f' }}>
+                      {activeSupportThread.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#627a73' }}>
+                      類型: {activeSupportThread.category === 'order' ? '訂單聊天室' : '客服會話'}
+                      {activeSupportThread.orderId ? ` · 訂單 ${activeSupportThread.orderId}` : ''}
+                    </div>
+                  </div>
+                  {orderRef && (
+                    <button
+                      onClick={() => setActiveTab('orders')}
+                      style={{
+                        border: '1px solid #dce6dd',
+                        borderRadius: 10,
+                        padding: '8px 10px',
+                        background: '#fff',
+                        color: '#244a3f',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      前往訂單管理
+                    </button>
+                  )}
+                </div>
+
+                {orderRef && (
+                  <div
+                    style={{
+                      border: '1px solid #e4ece6',
+                      borderRadius: 10,
+                      padding: '8px 10px',
+                      background: '#f7faf8',
+                      fontSize: 12,
+                      color: '#4f675f',
+                    }}
+                  >
+                    {orderRef.pickup} {'->'} {orderRef.dropoff} · {STATUS_LABELS[orderRef.status]} · HK$
+                    {orderRef.price}
+                  </div>
+                )}
+
+                <div style={{ overflow: 'auto', display: 'grid', gap: 8, alignContent: 'start' }}>
+                  {activeSupportMessages.length === 0 ? (
+                    <div style={{ color: '#6f847d', fontSize: 13 }}>這個會話尚未有訊息</div>
+                  ) : (
+                    activeSupportMessages.map((message) => {
+                      const fromSupport = message.senderId === SUPPORT_SYSTEM_ID
+                      const bubbleColor = fromSupport ? '#1f4f43' : '#f3f6f4'
+                      const textColor = fromSupport ? '#effff7' : '#2f4e46'
+                      const senderLabel = fromSupport
+                        ? `客服${
+                            message.realSenderId
+                              ? ` · ${userNameById.get(message.realSenderId) || message.realSenderId.slice(0, 8)}`
+                              : ''
+                          }`
+                        : userNameById.get(message.senderId) || message.senderName || message.senderId.slice(0, 8)
+
+                      return (
+                        <div
+                          key={message.id}
+                          style={{
+                            justifySelf: fromSupport ? 'end' : 'start',
+                            maxWidth: '86%',
+                            background: bubbleColor,
+                            color: textColor,
+                            borderRadius: 12,
+                            padding: '8px 10px',
+                            fontSize: 13,
+                            display: 'grid',
+                            gap: 5,
+                          }}
+                        >
+                          <div style={{ fontSize: 11, opacity: 0.75 }}>{senderLabel}</div>
+                          {message.type === 'IMAGE' ? (
+                            <a
+                              href={message.content}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: 'inherit', textDecoration: 'underline' }}
+                            >
+                              圖片訊息
+                            </a>
+                          ) : (
+                            <div>{message.content || '(空訊息)'}</div>
+                          )}
+                          <div style={{ fontSize: 11, opacity: 0.7 }}>{formatDateTime(message.timestamp)}</div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    <label style={{ fontSize: 12, color: '#60766f' }}>回覆對象</label>
+                    <select
+                      value={activeReplyTarget}
+                      onChange={(event) => {
+                        if (!activeSupportThread) return
+                        setSupportReplyTargetDrafts((prev) => ({
+                          ...prev,
+                          [activeSupportThread.id]: event.target.value,
+                        }))
+                      }}
+                      disabled={supportReplyTargets.length <= 1}
+                      style={{
+                        border: '1px solid #dce6dd',
+                        borderRadius: 10,
+                        padding: '8px 10px',
+                        background: supportReplyTargets.length <= 1 ? '#f4f6f5' : '#fff',
+                      }}
+                    >
+                      {supportReplyTargets.map((targetId) => (
+                        <option key={targetId} value={targetId}>
+                          {userNameById.get(targetId) || targetId}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={supportReplyDraft}
+                      onChange={(event) => setSupportReplyDraft(event.target.value)}
+                      placeholder="輸入客服回覆..."
+                      style={{
+                        flex: 1,
+                        border: '1px solid #d6dfd6',
+                        borderRadius: 10,
+                        padding: '10px 12px',
+                        outline: 'none',
+                        fontSize: 13,
+                      }}
+                    />
+                    <button
+                      onClick={() => void handleSendSupportReply()}
+                      disabled={!supportReplyDraft.trim() || sendingSupportReply}
+                      style={{
+                        border: 0,
+                        borderRadius: 10,
+                        padding: '10px 14px',
+                        background:
+                          !supportReplyDraft.trim() || sendingSupportReply ? '#e8e8e4' : '#1f4f43',
+                        color:
+                          !supportReplyDraft.trim() || sendingSupportReply ? '#8d8a80' : '#effff7',
+                        fontWeight: 700,
+                        cursor:
+                          !supportReplyDraft.trim() || sendingSupportReply ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {sendingSupportReply ? '發送中...' : '送出客服回覆'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#f4f7f5' }}>
       <header
@@ -1291,6 +2235,8 @@ export default function AdminConsole() {
             { key: 'users', label: '用戶管理' },
             { key: 'routes', label: '官方班次' },
             { key: 'pricing', label: '價格設定' },
+            { key: 'points', label: '點數中心' },
+            { key: 'support', label: '客服中心' },
           ].map((item) => (
             <button
               key={item.key}
@@ -1342,6 +2288,8 @@ export default function AdminConsole() {
         {activeTab === 'users' && renderUsersTab()}
         {activeTab === 'routes' && renderRoutesTab()}
         {activeTab === 'pricing' && renderPricingTab()}
+        {activeTab === 'points' && renderPointsTab()}
+        {activeTab === 'support' && renderSupportTab()}
       </main>
     </div>
   )

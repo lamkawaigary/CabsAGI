@@ -7,6 +7,7 @@ import {
   onSnapshot,
   query,
   type QueryDocumentSnapshot,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -49,6 +50,25 @@ export interface PricingConfigRecord {
   updatedAt: string
 }
 
+export type PointOperationType = 'distribute' | 'reclaim' | 'mint' | 'burn'
+
+export interface PointLedgerRecord {
+  id: string
+  type: PointOperationType
+  amount: number
+  operatorId: string
+  operatorName: string
+  targetUserId?: string
+  targetUserName?: string
+  orderId?: string
+  note?: string
+  platformBefore: number
+  platformAfter: number
+  userBefore?: number
+  userAfter?: number
+  createdAt: string
+}
+
 export interface UpsertOfficialRouteInput {
   id?: string
   pickup: string
@@ -75,6 +95,7 @@ const OFFICIAL_ROUTE_STATUS_VALUES: OfficialRouteStatus[] = [
   'completed',
   'cancelled',
 ]
+const POINT_OPERATION_VALUES: PointOperationType[] = ['distribute', 'reclaim', 'mint', 'burn']
 
 const DEFAULT_PRICING_CONFIG: PricingConfigRecord = {
   activeSystem: 'distance',
@@ -280,6 +301,36 @@ const sanitizePricingConfig = (raw: unknown): PricingConfigRecord => {
   }
 }
 
+const sanitizePointOperationType = (value: unknown): PointOperationType => {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (POINT_OPERATION_VALUES.includes(normalized as PointOperationType)) {
+      return normalized as PointOperationType
+    }
+  }
+  return 'distribute'
+}
+
+const sanitizePointLedgerDoc = (docSnap: QueryDocumentSnapshot<DocumentData>): PointLedgerRecord => {
+  const clean = toCleanRecord(docSnap)
+  return {
+    id: docSnap.id,
+    type: sanitizePointOperationType(clean.type),
+    amount: Math.max(0, pickNumber(clean.amount)),
+    operatorId: firstString(clean.operatorId),
+    operatorName: firstString(clean.operatorName, clean.operatorId, 'SYSTEM_ADMIN'),
+    targetUserId: firstString(clean.targetUserId) || undefined,
+    targetUserName: firstString(clean.targetUserName) || undefined,
+    orderId: firstString(clean.orderId) || undefined,
+    note: firstString(clean.note) || undefined,
+    platformBefore: pickNumber(clean.platformBefore),
+    platformAfter: pickNumber(clean.platformAfter),
+    userBefore: clean.userBefore === null || clean.userBefore === undefined ? undefined : pickNumber(clean.userBefore),
+    userAfter: clean.userAfter === null || clean.userAfter === undefined ? undefined : pickNumber(clean.userAfter),
+    createdAt: firstString(clean.createdAt, new Date(0).toISOString()),
+  }
+}
+
 export const subscribeAdminOrders = (
   callback: (orders: OrderRecord[]) => void,
   onError?: (error: Error) => void,
@@ -346,6 +397,140 @@ export const subscribePricingConfig = (
     },
     (error) => onError?.(error as Error),
   )
+
+const getPlatformPointBalanceFromRaw = (raw: unknown) => {
+  if (!isRecord(raw)) return 0
+  return pickNumber(raw.balancePoints, raw.points, raw.totalPoints)
+}
+
+export const subscribePlatformPointBalance = (
+  callback: (points: number) => void,
+  onError?: (error: Error) => void,
+) =>
+  onSnapshot(
+    doc(db, 'config', 'platform_wallet'),
+    (snap) => {
+      callback(getPlatformPointBalanceFromRaw(snap.exists() ? snap.data() : null))
+    },
+    (error) => onError?.(error as Error),
+  )
+
+export const subscribePointLedger = (
+  callback: (rows: PointLedgerRecord[]) => void,
+  onError?: (error: Error) => void,
+) => {
+  const q = query(collection(db, 'wallet_logs'), limit(400))
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const logs = snapshot.docs
+        .map((docSnap) => sanitizePointLedgerDoc(docSnap))
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      callback(logs)
+    },
+    (error) => onError?.(error as Error),
+  )
+}
+
+export const executeAdminPointOperation = async (params: {
+  type: PointOperationType
+  amount: number
+  operatorId: string
+  operatorName: string
+  targetUserId?: string
+  orderId?: string
+  note?: string
+}) => {
+  const amount = Math.max(0, Math.round(params.amount))
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('點數數量必須為正整數')
+  }
+
+  const nowISO = new Date().toISOString()
+  const targetUserId = firstString(params.targetUserId)
+  const orderId = firstString(params.orderId)
+  const note = firstString(params.note)
+
+  await runTransaction(db, async (tx) => {
+    const walletRef = doc(db, 'config', 'platform_wallet')
+    const walletSnap = await tx.get(walletRef)
+    const walletData = walletSnap.exists() ? walletSnap.data() : {}
+    const platformBefore = getPlatformPointBalanceFromRaw(walletData)
+    let platformAfter = platformBefore
+    let userBefore: number | undefined
+    let userAfter: number | undefined
+    let targetUserName = ''
+
+    if (params.type === 'distribute' || params.type === 'reclaim') {
+      if (!targetUserId) {
+        throw new Error('請先選擇要操作點數的用戶')
+      }
+      const userRef = doc(db, 'users', targetUserId)
+      const userSnap = await tx.get(userRef)
+      if (!userSnap.exists()) {
+        throw new Error('目標用戶不存在')
+      }
+      const userData = userSnap.data() || {}
+      targetUserName = firstString(userData.name, targetUserId)
+      userBefore = pickNumber(userData.points)
+
+      if (params.type === 'distribute') {
+        if (platformBefore < amount) {
+          throw new Error('平台點數不足，請先增發平台點數')
+        }
+        platformAfter = platformBefore - amount
+        userAfter = userBefore + amount
+      } else {
+        if (userBefore < amount) {
+          throw new Error('用戶點數不足，無法回收超過餘額的點數')
+        }
+        platformAfter = platformBefore + amount
+        userAfter = userBefore - amount
+      }
+
+      tx.update(userRef, {
+        points: userAfter,
+        updatedAt: nowISO,
+        updatedAtServer: serverTimestamp(),
+      })
+    } else if (params.type === 'mint') {
+      platformAfter = platformBefore + amount
+    } else {
+      if (platformBefore < amount) {
+        throw new Error('平台點數不足，無法銷毀超過餘額的點數')
+      }
+      platformAfter = platformBefore - amount
+    }
+
+    tx.set(
+      walletRef,
+      {
+        balancePoints: platformAfter,
+        updatedAt: nowISO,
+        updatedAtServer: serverTimestamp(),
+      },
+      { merge: true },
+    )
+
+    const logRef = doc(collection(db, 'wallet_logs'))
+    tx.set(logRef, {
+      type: params.type,
+      amount,
+      operatorId: params.operatorId,
+      operatorName: params.operatorName,
+      targetUserId: targetUserId || null,
+      targetUserName: targetUserName || null,
+      orderId: orderId || null,
+      note: note || null,
+      platformBefore,
+      platformAfter,
+      userBefore: userBefore ?? null,
+      userAfter: userAfter ?? null,
+      createdAt: nowISO,
+      createdAtServer: serverTimestamp(),
+    })
+  })
+}
 
 export const updateAdminOrderStatus = async (params: {
   orderId: string

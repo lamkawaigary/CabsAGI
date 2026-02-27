@@ -16,6 +16,8 @@ import { db, storage } from '../firebaseConfig'
 
 export type MessageType = 'TEXT' | 'IMAGE' | 'SYSTEM'
 
+export const SUPPORT_SYSTEM_ID = 'SYSTEM_ADMIN'
+
 export interface MessageRecord {
   id: string
   senderId: string
@@ -107,8 +109,21 @@ export const subscribeMessagesByReceiver = (
   )
 }
 
+export const subscribeAllMessages = (
+  callback: (messages: MessageRecord[]) => void,
+  onError?: (error: Error) => void,
+) => {
+  const q = query(collection(db, 'messages'), limit(1200))
+  return onSnapshot(
+    q,
+    (snapshot) => callback(snapshot.docs.map((d) => sanitizeDoc(d))),
+    (error) => onError?.(error as Error),
+  )
+}
+
 export const sendTextMessage = async (params: {
   senderId: string
+  realSenderId?: string
   senderName?: string
   receiverId: string
   content: string
@@ -117,7 +132,7 @@ export const sendTextMessage = async (params: {
   const nowISO = new Date().toISOString()
   return addDoc(collection(db, 'messages'), {
     senderId: params.senderId,
-    realSenderId: params.senderId,
+    realSenderId: params.realSenderId || params.senderId,
     senderName: params.senderName || '',
     receiverId: params.receiverId,
     content: params.content,
@@ -240,6 +255,7 @@ const buildInlineImageDataUrl = async (file: File) => {
 
 const createImageMessagePayload = (params: {
   senderId: string
+  realSenderId?: string
   senderName?: string
   receiverId: string
   orderId?: string
@@ -248,7 +264,7 @@ const createImageMessagePayload = (params: {
   metadata: Record<string, unknown>
 }) => ({
   senderId: params.senderId,
-  realSenderId: params.senderId,
+  realSenderId: params.realSenderId || params.senderId,
   senderName: params.senderName || '',
   receiverId: params.receiverId,
   content: params.content,
@@ -265,6 +281,7 @@ const createImageMessagePayload = (params: {
 
 export const sendImageMessage = async (params: {
   senderId: string
+  realSenderId?: string
   senderName?: string
   receiverId: string
   file: File
@@ -300,6 +317,7 @@ export const sendImageMessage = async (params: {
         collection(db, 'messages'),
         createImageMessagePayload({
           senderId: params.senderId,
+          realSenderId: params.realSenderId,
           senderName: params.senderName,
           receiverId: params.receiverId,
           orderId: params.orderId,
@@ -328,6 +346,7 @@ export const sendImageMessage = async (params: {
     collection(db, 'messages'),
     createImageMessagePayload({
       senderId: params.senderId,
+      realSenderId: params.realSenderId,
       senderName: params.senderName,
       receiverId: params.receiverId,
       orderId: params.orderId,

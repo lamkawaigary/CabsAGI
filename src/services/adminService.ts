@@ -15,11 +15,13 @@ import { db } from '../firebaseConfig'
 import {
   acceptOrderAsDriver,
   canTransitionOrderStatus,
-  type OrderRecord,
-  type OrderStatus,
-  type OrderType,
+} from './orderService'
+import type {
   OfficialRouteRecord,
   OfficialRouteStatus,
+  OrderRecord,
+  OrderStatus,
+  OrderType,
 } from './orderService'
 
 export type AdminUserRole = 'passenger' | 'driver' | 'admin'

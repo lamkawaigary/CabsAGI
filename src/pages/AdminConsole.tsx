@@ -828,10 +828,11 @@ export default function AdminConsole() {
   const handleOpenSupportThread = (thread: SupportThread) => {
     setActiveSupportThreadId(thread.id)
     setSupportReplyDraft('')
-    if (thread.category === 'support' && thread.supportPartnerId) {
+    const supportPartnerId = thread.supportPartnerId
+    if (thread.category === 'support' && supportPartnerId) {
       setSupportReplyTargetDrafts((prev) => ({
         ...prev,
-        [thread.id]: thread.supportPartnerId,
+        [thread.id]: supportPartnerId,
       }))
     }
   }

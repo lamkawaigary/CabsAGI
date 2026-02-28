@@ -226,7 +226,7 @@ export default function Messages({ orders = [] }: MessagesProps) {
                     style={{ border: '1px solid #dce6dd', background: '#fff', borderRadius: 10, padding: 10, textAlign: 'left', cursor: 'pointer' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                      <strong style={{ color: '#214239', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.title}</strong>
+                      <strong style={{ color: '#214239', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{conv.title}</strong>
                       {conv.unread > 0 && (
                         <span style={{ minWidth: 18, height: 18, borderRadius: 999, background: '#1f4f43', color: '#fff', fontSize: 11, display: 'grid', placeItems: 'center', padding: '0 4px', flexShrink: 0 }}>
                           {conv.unread}

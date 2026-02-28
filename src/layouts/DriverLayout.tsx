@@ -56,6 +56,7 @@ export default function DriverLayout() {
     background: 'rgba(26,35,50,0.9)',
     borderBottom: '1px solid rgba(255,255,255,0.1)',
     padding: '14px 18px',
+    paddingTop: 'max(14px, env(safe-area-inset-top))',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -89,7 +90,7 @@ export default function DriverLayout() {
 
   return (
     <main style={shellStyle}>
-      <header style={headerStyle}>
+      <header style={{ ...headerStyle, paddingTop: 18 }}>
         <div>
           <div style={{ letterSpacing: '0.12em', fontSize: 11, color: 'rgba(243,255,248,0.5)', fontWeight: 700 }}>CABS DRIVER</div>
           <div style={{ fontSize: 19, fontWeight: 800, color: '#f3fff8' }}>{pageTitle} · {currentUser?.name}</div>
@@ -176,18 +177,19 @@ export default function DriverLayout() {
       <nav
         style={{
           position: 'fixed',
-          left: 10,
-          right: 10,
+          left: 16,
+          right: 16,
           bottom: 10,
-          borderRadius: 16,
-          border: '1px solid rgba(255,255,255,0.1)',
-          background: 'rgba(26,35,50,0.95)',
-          backdropFilter: 'blur(8px)',
-          padding: '8px 10px',
+          borderRadius: 24,
+          border: '1px solid rgba(255,255,255,0.15)',
+          background: 'rgba(26,35,50,0.98)',
+          backdropFilter: 'blur(12px)',
+          padding: '10px 12px',
           display: 'grid',
           gridTemplateColumns: 'repeat(4,1fr)',
           gap: 4,
           zIndex: 15,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
         }}
       >
         {driverNavItems.map((item) => (

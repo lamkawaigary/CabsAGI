@@ -64,10 +64,25 @@ export default function Messages({ orders = [] }: MessagesProps) {
       const existing = map.get(key)
       const isUnread = m.receiverId === currentUser.id && !m.isRead
 
-      const orderTitle = orderId ? orders.find((o) => o.id === orderId)?.id || `訂單 ${orderId.slice(0, 8)}` : ''
-      const title = partnerId === SUPPORT_ID || partnerId === 'SYSTEM' ? '客服中心' : `對話 ${partnerId.slice(0, 8)}`
+      // Build order info: time + route
+      let orderInfo = ''
+      if (orderId) {
+        const order = orders.find((o) => o.id === orderId)
+        if (order) {
+          const time = order.bookingDateTime 
+            ? new Date(order.bookingDateTime).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : ''
+          const route = order.pickup && order.dropoff 
+            ? `${order.pickup} → ${order.dropoff}` 
+            : order.pickup || order.dropoff || ''
+          orderInfo = time ? `${time} · ${route}` : route
+        } else {
+          orderInfo = `訂單 ${orderId.slice(0, 8)}`
+        }
+      }
+      const title = partnerId === SUPPORT_ID || partnerId === 'SYSTEM' ? '客服中心' : (orderInfo || `對話 ${partnerId.slice(0, 8)}`)
       const preview = toConversationSubtitle(m.type, m.content)
-      const subtitle = orderTitle ? `${orderTitle} · ${preview}` : preview
+      const subtitle = orderInfo ? `${orderInfo} · ${preview}` : preview
       const time = m.timestamp
 
       if (!existing) {

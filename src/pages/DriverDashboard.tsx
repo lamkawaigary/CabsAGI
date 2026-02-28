@@ -204,7 +204,7 @@ export default function DriverDashboard() {
       style={{
         minHeight: '100vh',
         background: 'linear-gradient(180deg, #edf4f2 0%, #f6f8f6 45%, #f3f6f4 100%)',
-        paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
+        paddingBottom: 'calc(94px + env(safe-area-inset-bottom))',
       }}
     >
       <header

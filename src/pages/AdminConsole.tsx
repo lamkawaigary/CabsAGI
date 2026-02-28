@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   assignOrderToDriverByAdmin,
+  resetUserPassword,
   savePricingConfig,
   subscribeAdminOfficialRoutes,
   subscribeAdminOrders,
@@ -150,6 +151,7 @@ export default function AdminConsole() {
   const [userPointsDrafts, setUserPointsDrafts] = useState<Record<string, string>>({})
   const [userStatusDrafts, setUserStatusDrafts] = useState<Record<string, string>>({})
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
+  const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null)
 
   const [routeForm, setRouteForm] = useState<RouteFormState>(EMPTY_ROUTE_FORM)
   const [routeStatusDrafts, setRouteStatusDrafts] = useState<Record<string, OfficialRouteStatus>>({})
@@ -362,6 +364,23 @@ export default function AdminConsole() {
       setNotice({ text: `更新用戶失敗: ${message}`, tone: 'error' })
     } finally {
       setSavingUserId(null)
+    }
+  }
+
+  const handleResetPassword = async (user: AdminUserRecord) => {
+    if (!user.email) {
+      setNotice({ text: '該用戶沒有 email，無法發送重設郵件', tone: 'error' })
+      return
+    }
+    setResettingPasswordId(user.id)
+    try {
+      await resetUserPassword(user.email)
+      setNotice({ text: `密碼重設郵件已發送到 ${user.email}`, tone: 'ok' })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤'
+      setNotice({ text: `發送重設郵件失敗: ${message}`, tone: 'error' })
+    } finally {
+      setResettingPasswordId(null)
     }
   }
 
@@ -861,6 +880,21 @@ export default function AdminConsole() {
                     }}
                   >
                     {savingUserId === user.id ? '保存中...' : '保存'}
+                  </button>
+                  <button
+                    onClick={() => void handleResetPassword(user)}
+                    disabled={!user.email || resettingPasswordId === user.id}
+                    style={{
+                      border: '1px solid #dce6dd',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      fontWeight: 700,
+                      background: !user.email || resettingPasswordId === user.id ? '#e8e8e4' : '#fff',
+                      color: !user.email || resettingPasswordId === user.id ? '#8d8a80' : '#b35c2e',
+                      cursor: !user.email || resettingPasswordId === user.id ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {resettingPasswordId === user.id ? '發送中...' : '重設密碼'}
                   </button>
                 </div>
               </article>

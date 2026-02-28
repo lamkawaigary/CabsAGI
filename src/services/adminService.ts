@@ -11,7 +11,8 @@ import {
   setDoc,
   updateDoc,
 } from 'firebase/firestore'
-import { db } from '../firebaseConfig'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth, db } from '../firebaseConfig'
 import {
   acceptOrderAsDriver,
   canTransitionOrderStatus,
@@ -404,6 +405,13 @@ export const updateAdminUser = async (params: {
     payload.status = params.status.trim()
   }
   await updateDoc(doc(db, 'users', params.userId), payload)
+}
+
+export const resetUserPassword = async (email: string) => {
+  if (!email || !email.includes('@')) {
+    throw new Error('無效的 email 地址')
+  }
+  await sendPasswordResetEmail(auth, email)
 }
 
 export const upsertOfficialRoute = async (input: UpsertOfficialRouteInput) => {

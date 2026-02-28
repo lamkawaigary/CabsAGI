@@ -147,8 +147,23 @@ export default function Messages({ orders = [] }: MessagesProps) {
     const match = conversations.find(
       (item) => item.partnerId === activePartnerId && (item.orderId || null) === (activeOrderId || null),
     )
+    
+    // If there's an order ID, show order details in title
+    if (activeOrderId) {
+      const order = orders.find(o => o.id === activeOrderId)
+      if (order) {
+        const route = order.pickup && order.dropoff 
+          ? `${order.pickup} → ${order.dropoff}` 
+          : '路線'
+        const time = order.bookingDateTime 
+          ? new Date(order.bookingDateTime).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : ''
+        return time ? `${time} · ${route}` : route
+      }
+    }
+    
     return match?.title || (activePartnerId === SUPPORT_ID ? '客服中心' : `對話 ${activePartnerId.slice(0, 8)}`)
-  }, [activePartnerId, activeOrderId, conversations])
+  }, [activePartnerId, activeOrderId, conversations, orders])
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', display: 'grid', gap: 10 }}>

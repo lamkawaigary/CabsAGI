@@ -193,7 +193,16 @@ export default function DriverLayout() {
         }}
       >
         {driverNavItems.map((item) => (
-          <NavLink key={item.path} to={item.path} style={navLinkStyle}>
+          <NavLink 
+            key={item.path} 
+            to={item.path} 
+            end={item.path === '/driver'}
+            style={({ isActive }) => ({
+              ...navLinkStyle({ isActive }),
+              background: isActive ? 'rgba(31,191,144,0.25)' : 'transparent',
+              color: isActive ? '#1fbf90' : 'rgba(243,255,248,0.5)',
+            })}
+          >
             <span style={{ width: 20, height: 20 }}>{item.icon}</span>
             {item.label}
           </NavLink>

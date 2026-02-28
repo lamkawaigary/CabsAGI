@@ -82,7 +82,8 @@ export default function Messages({ orders = [] }: MessagesProps) {
       }
       const title = partnerId === SUPPORT_ID || partnerId === 'SYSTEM' ? '客服中心' : (orderInfo || `對話 ${partnerId.slice(0, 8)}`)
       const preview = toConversationSubtitle(m.type, m.content)
-      const subtitle = orderInfo ? `${orderInfo} · ${preview}` : preview
+      // Only show message preview in subtitle (order info is already in title)
+      const subtitle = preview
       const time = m.timestamp
 
       if (!existing) {
@@ -224,16 +225,16 @@ export default function Messages({ orders = [] }: MessagesProps) {
                     onClick={() => void openConversation(conv.partnerId, conv.orderId)}
                     style={{ border: '1px solid #dce6dd', background: '#fff', borderRadius: 10, padding: 10, textAlign: 'left', cursor: 'pointer' }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ color: '#214239', fontSize: 13 }}>{conv.title}</strong>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <strong style={{ color: '#214239', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.title}</strong>
                       {conv.unread > 0 && (
-                        <span style={{ minWidth: 18, height: 18, borderRadius: 999, background: '#1f4f43', color: '#fff', fontSize: 11, display: 'grid', placeItems: 'center', padding: '0 4px' }}>
+                        <span style={{ minWidth: 18, height: 18, borderRadius: 999, background: '#1f4f43', color: '#fff', fontSize: 11, display: 'grid', placeItems: 'center', padding: '0 4px', flexShrink: 0 }}>
                           {conv.unread}
                         </span>
                       )}
                     </div>
                     <div style={{ marginTop: 4, color: '#5f746d', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.subtitle}</div>
-                    <div style={{ marginTop: 4, color: '#8a9a94', fontSize: 11 }}>{new Date(conv.time).toLocaleString()}</div>
+                    <div style={{ marginTop: 4, color: '#8a9a94', fontSize: 11 }}>{new Date(conv.time).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                   </button>
                 )
               })

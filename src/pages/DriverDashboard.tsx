@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   acceptOrderAsDriver,
@@ -9,39 +9,22 @@ import {
   type OrderRecord,
 } from '../services/orderService'
 
-type DriverTab = 'pool' | 'mine'
 type NoticeTone = 'ok' | 'error' | 'info'
 
-const formatDateTime = (raw: string | undefined) => {
-  if (!raw) return '-'
-  const date = new Date(raw)
-  if (Number.isNaN(date.getTime())) return raw
-  return date.toLocaleString()
-}
-
-const isSameDay = (raw: string | undefined, now: Date) => {
-  if (!raw) return false
-  const date = new Date(raw)
-  if (Number.isNaN(date.getTime())) return false
-  return (
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  )
-}
-
 export default function DriverDashboard() {
-  const { currentUser, logout } = useAuth()
+  const { currentUser } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const [activeTab, setActiveTab] = useState<DriverTab>('pool')
-  const [online, setOnline] = useState(true)
+  // Determine active tab from URL
+  const activeTab: 'pool' | 'mine' = location.pathname === '/driver/orders' ? 'mine' : 'pool'
+
+  const [online] = useState(true)
   const [poolOrders, setPoolOrders] = useState<OrderRecord[]>([])
   const [myOrders, setMyOrders] = useState<OrderRecord[]>([])
   const [loadingPool, setLoadingPool] = useState(true)
   const [loadingMine, setLoadingMine] = useState(true)
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null)
-  const [loggingOut, setLoggingOut] = useState(false)
   const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null)
 
   useEffect(() => {
@@ -77,35 +60,6 @@ export default function DriverDashboard() {
       unsubMine()
     }
   }, [currentUser?.id])
-
-  const summary = useMemo(() => {
-    const now = new Date()
-    const todayCompleted = myOrders.filter(
-      (order) => order.status === 'completed' && isSameDay(order.completedAt || order.updatedAt, now),
-    )
-    const todayRevenue = todayCompleted.reduce((sum, order) => sum + Number(order.price || 0), 0)
-    const activeTrips = myOrders.filter(
-      (order) => order.status === 'accepted' || order.status === 'in_progress',
-    ).length
-
-    return {
-      poolCount: poolOrders.length,
-      activeTrips,
-      todayCompleted: todayCompleted.length,
-      todayRevenue,
-    }
-  }, [myOrders, poolOrders.length])
-
-  const handleLogout = async () => {
-    if (loggingOut) return
-    setLoggingOut(true)
-    try {
-      await logout()
-      navigate('/login', { replace: true })
-    } finally {
-      setLoggingOut(false)
-    }
-  }
 
   const handleAcceptOrder = async (order: OrderRecord) => {
     if (!currentUser?.id || !order.id) return
@@ -176,99 +130,8 @@ export default function DriverDashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f4f7f5' }}>
-      <header
-        style={{
-          padding: '14px 16px',
-          borderBottom: '1px solid #dce6dd',
-          background: 'linear-gradient(90deg, #2f3d4f 0%, #355f6a 52%, #2d7a66 100%)',
-          color: '#f3fff8',
-          display: 'grid',
-          gap: 10,
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 11, letterSpacing: '0.14em', opacity: 0.8, fontWeight: 700 }}>CABS DRIVER DASHBOARD</div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>司機接單中心 · {currentUser.name}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => navigate('/messages')}
-              style={{
-                border: '1px solid rgba(255,255,255,0.35)',
-                borderRadius: 10,
-                background: 'rgba(255,255,255,0.1)',
-                color: '#f3fff8',
-                fontWeight: 700,
-                padding: '8px 12px',
-                cursor: 'pointer',
-              }}
-            >
-              訊息中心
-            </button>
-            <button
-              onClick={() => void handleLogout()}
-              disabled={loggingOut}
-              style={{
-                border: '1px solid rgba(255,255,255,0.35)',
-                borderRadius: 10,
-                background: loggingOut ? 'rgba(255,255,255,0.12)' : '#ffffff',
-                color: loggingOut ? '#f3fff8' : '#27483f',
-                fontWeight: 700,
-                padding: '8px 12px',
-                cursor: loggingOut ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {loggingOut ? '登出中...' : '登出'}
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(120px,1fr))', gap: 8 }}>
-          {[
-            { label: '接單池', value: summary.poolCount },
-            { label: '進行中', value: summary.activeTrips },
-            { label: '今日完成', value: summary.todayCompleted },
-            { label: '今日收入', value: `HK$${summary.todayRevenue}` },
-          ].map((item) => (
-            <article
-              key={item.label}
-              style={{
-                border: '1px solid rgba(255,255,255,0.28)',
-                borderRadius: 12,
-                background: 'rgba(255,255,255,0.08)',
-                padding: '9px 10px',
-              }}
-            >
-              <div style={{ fontSize: 11, opacity: 0.8, fontWeight: 700 }}>{item.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{item.value}</div>
-            </article>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={() => setOnline((prev) => !prev)}
-            style={{
-              border: '1px solid rgba(255,255,255,0.35)',
-              borderRadius: 999,
-              background: online ? '#1fbf90' : '#a8afb2',
-              color: '#fff',
-              fontWeight: 800,
-              padding: '6px 12px',
-              cursor: 'pointer',
-            }}
-          >
-            {online ? '接單中' : '休息中'}
-          </button>
-          <span style={{ fontSize: 12, opacity: 0.86 }}>
-            {online ? '你目前會接收待接訂單' : '已暫停接收新訂單（仍可管理我的行程）'}
-          </span>
-        </div>
-      </header>
-
-      <main style={{ maxWidth: 1080, margin: '0 auto', padding: 16, display: 'grid', gap: 12 }}>
+    <div style={{ padding: '0 0 80px 0' }}>
+      <main style={{ display: 'grid', gap: 12 }}>
         {notice && (
           <div
             style={{
@@ -295,7 +158,7 @@ export default function DriverDashboard() {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => setActiveTab('pool')}
+            onClick={() => navigate('/driver')}
             style={{
               border: 0,
               borderRadius: 10,
@@ -309,7 +172,7 @@ export default function DriverDashboard() {
             訂單公海
           </button>
           <button
-            onClick={() => setActiveTab('mine')}
+            onClick={() => navigate('/driver/orders')}
             style={{
               border: 0,
               borderRadius: 10,
@@ -366,7 +229,7 @@ export default function DriverDashboard() {
                       {order.pickup} {'->'} {order.dropoff}
                     </div>
                     <div style={{ fontSize: 12, color: '#60766f', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <span>建立: {formatDateTime(order.createdAtISO || order.createdAt)}</span>
+                      <span>建立: {order.createdAtISO || order.createdAt || '-'}</span>
                       <span>乘客: {order.passengerName || order.passengerId}</span>
                       <span>人數: {order.passengersCount || 1}</span>
                       <span>HK${order.price}</span>
@@ -454,7 +317,7 @@ export default function DriverDashboard() {
                     <span>乘客: {order.passengerName || order.passengerId}</span>
                     <span>人數: {order.passengersCount || 1}</span>
                     <span>車資: HK${order.price}</span>
-                    <span>建立: {formatDateTime(order.createdAtISO || order.createdAt)}</span>
+                    <span>建立: {order.createdAtISO || order.createdAt || '-'}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {nextAction && (

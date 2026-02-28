@@ -11,6 +11,7 @@ const ProfilePage = lazy(() => import('./pages/Profile'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const DriverDashboard = lazy(() => import('./pages/DriverDashboard'))
 const PassengerLayout = lazy(() => import('./layouts/PassengerLayout'))
+const DriverLayout = lazy(() => import('./layouts/DriverLayout'))
 
 function FullscreenLoading({ text }: { text: string }) {
   return (
@@ -117,7 +118,12 @@ function AppShell() {
 
           <Route element={<RequireAuth />}>
             <Route element={<RequireDriver />}>
-              <Route path="/driver" element={<DriverDashboard />} />
+              <Route element={<DriverLayout />}>
+                <Route path="/driver" element={<DriverDashboard />} />
+                <Route path="/driver/orders" element={<DriverDashboard />} />
+                <Route path="/driver/messages" element={<MessagesPage />} />
+                <Route path="/driver/profile" element={<ProfilePage />} />
+              </Route>
             </Route>
           </Route>
 

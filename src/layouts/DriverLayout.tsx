@@ -40,11 +40,6 @@ export default function DriverLayout() {
     }
   }
 
-  const handleSwitchToPassenger = () => {
-    navigate('/home')
-    setMenuOpen(false)
-  }
-
   const shellStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(160deg, #1a2332 0%, #2d3d4f 50%, #1f3d4f 100%)',
@@ -153,21 +148,6 @@ export default function DriverLayout() {
                   </button>
                 )
               })}
-              <button
-                onClick={handleSwitchToPassenger}
-                style={{
-                  border: '1px solid rgba(137,66,254,0.3)',
-                  background: 'rgba(137,66,254,0.1)',
-                  color: '#b88aff',
-                  padding: '10px 12px',
-                  borderRadius: 10,
-                  textAlign: 'left',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                }}
-              >
-                切換至乘客模式
-              </button>
             </div>
             <button
               onClick={() => void handleLogout()}

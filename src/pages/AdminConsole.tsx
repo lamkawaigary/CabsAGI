@@ -372,7 +372,7 @@ export default function AdminConsole() {
 
   const handleResetPassword = async (user: AdminUserRecord) => {
     if (resetStep === 1) {
-      // Step 1: Send OTP
+      // Step 1: Send OTP (test v3)
       if (!user.phone) {
         setNotice({ text: '該用戶沒有電話', tone: 'error' })
         return

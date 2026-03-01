@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, GoogleAuthProvider } from 'firebase/auth'
+import { getAuth, GoogleAuthProvider, sendPasswordResetEmail } from 'firebase/auth'
 import { initializeFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getFunctions } from 'firebase/functions'
@@ -33,6 +33,7 @@ export const db = initializeFirestore(app, {
 
 export const storage = getStorage(app)
 export const functions = getFunctions(app)
+export { sendPasswordResetEmail }
 export const googleProvider = new GoogleAuthProvider()
 
 // Analytics

@@ -7,7 +7,8 @@
         "node_modules",
         "lib",
         ".git"
-      ]
+      ],
+      "runtime": "nodejs20"
     }
   ]
 }

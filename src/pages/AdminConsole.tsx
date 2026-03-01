@@ -15,8 +15,8 @@ import {
   type AdminUserRecord,
   type PricingConfigRecord,
 } from '../services/adminService'
-import { functions } from '../firebaseConfig'
-import { httpsCallable } from 'firebase/functions'
+import { auth } from '../firebaseConfig'
+import { sendPasswordResetEmail } from 'firebase/auth'
 import type {
   OfficialRouteRecord,
   OfficialRouteStatus,
@@ -153,8 +153,6 @@ export default function AdminConsole() {
   const [userStatusDrafts, setUserStatusDrafts] = useState<Record<string, string>>({})
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
   const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null)
-  const [editingPasswordUserId, setEditingPasswordUserId] = useState<string | null>(null)
-  const [newPassword, setNewPassword] = useState('')
 
   const [routeForm, setRouteForm] = useState<RouteFormState>(EMPTY_ROUTE_FORM)
   const [routeStatusDrafts, setRouteStatusDrafts] = useState<Record<string, OfficialRouteStatus>>({})
@@ -371,20 +369,17 @@ export default function AdminConsole() {
   }
 
   const handleResetPassword = async (user: AdminUserRecord) => {
-    if (!newPassword || newPassword.length < 6) {
-      setNotice({ text: '請輸入至少 6 位字符的新密碼', tone: 'error' })
+    if (!user.email) {
+      setNotice({ text: '該用戶沒有 email', tone: 'error' })
       return
     }
     setResettingPasswordId(user.id)
     try {
-      const setUserPassword = httpsCallable(functions, 'setUserPassword')
-      await setUserPassword({ uid: user.id, newPassword })
-      setNotice({ text: `用戶 ${user.name || user.id} 的密碼已更新`, tone: 'ok' })
-      setNewPassword('')
-      setEditingPasswordUserId(null)
+      await sendPasswordResetEmail(auth, user.email)
+      setNotice({ text: `密碼重設郵件已發送到 ${user.email}`, tone: 'ok' })
     } catch (error: any) {
       const message = error?.message || '未知錯誤'
-      setNotice({ text: `更新密碼失敗: ${message}`, tone: 'error' })
+      setNotice({ text: `發送失敗: ${message}`, tone: 'error' })
     } finally {
       setResettingPasswordId(null)
     }
@@ -887,70 +882,21 @@ export default function AdminConsole() {
                   >
                     {savingUserId === user.id ? '保存中...' : '保存'}
                   </button>
-                  {editingPasswordUserId === user.id ? (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(event) => setNewPassword(event.target.value)}
-                        placeholder="新密碼 (6+ 位)"
-                        style={{
-                          width: 140,
-                          border: '1px solid #dce6dd',
-                          borderRadius: 10,
-                          padding: '7px 10px',
-                          outline: 'none',
-                        }}
-                      />
-                      <button
-                        onClick={() => void handleResetPassword(user)}
-                        disabled={resettingPasswordId === user.id || newPassword.length < 6}
-                        style={{
-                          border: 0,
-                          borderRadius: 10,
-                          padding: '7px 10px',
-                          fontWeight: 700,
-                          background: resettingPasswordId === user.id || newPassword.length < 6 ? '#e8e8e4' : '#b35c2e',
-                          color: resettingPasswordId === user.id || newPassword.length < 6 ? '#8d8a80' : '#fff',
-                          cursor: resettingPasswordId === user.id || newPassword.length < 6 ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        {resettingPasswordId === user.id ? '設定中...' : '確認'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingPasswordUserId(null)
-                          setNewPassword('')
-                        }}
-                        style={{
-                          border: '1px solid #dce6dd',
-                          borderRadius: 10,
-                          padding: '7px 10px',
-                          fontWeight: 700,
-                          background: '#fff',
-                          color: '#6a8179',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        取消
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setEditingPasswordUserId(user.id)}
-                      style={{
-                        border: '1px solid #dce6dd',
-                        borderRadius: 10,
-                        padding: '8px 12px',
-                        fontWeight: 700,
-                        background: '#fff',
-                        color: '#b35c2e',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      重設密碼
-                    </button>
-                  )}
+                  <button
+                    onClick={() => void handleResetPassword(user)}
+                    disabled={!user.email || resettingPasswordId === user.id}
+                    style={{
+                      border: '1px solid #dce6dd',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      fontWeight: 700,
+                      background: !user.email || resettingPasswordId === user.id ? '#e8e8e4' : '#fff',
+                      color: !user.email || resettingPasswordId === user.id ? '#8d8a80' : '#b35c2e',
+                      cursor: !user.email || resettingPasswordId === user.id ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {resettingPasswordId === user.id ? '發送中...' : '重設密碼'}
+                  </button>
                 </div>
               </article>
             )

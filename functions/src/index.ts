@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin'
 
 admin.initializeApp()
 
-export const setUserPassword = functions.https.onCall(async (data, context) => {
+export const setUserPassword = functions.https.onCall({ region: 'us-central1' }, async (data, context) => {
   // Check authentication
   if (!context.auth) {
     throw new functions.https.HttpsError(

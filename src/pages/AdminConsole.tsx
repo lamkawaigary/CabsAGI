@@ -377,7 +377,7 @@ export default function AdminConsole() {
     setResettingPasswordId(user.id)
     try {
       const idToken = await auth.currentUser?.getIdToken()
-      const response = await fetch('/api/set-user-password', {
+      const response = await fetch('https://us-central1-p7s-web.cloudfunctions.net/setUserPassword', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

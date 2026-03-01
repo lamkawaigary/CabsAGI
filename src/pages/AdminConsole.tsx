@@ -15,8 +15,6 @@ import {
   type AdminUserRecord,
   type PricingConfigRecord,
 } from '../services/adminService'
-import { auth } from '../firebaseConfig'
-import { sendPasswordResetEmail } from 'firebase/auth'
 import type {
   OfficialRouteRecord,
   OfficialRouteStatus,
@@ -124,7 +122,7 @@ const isSameDay = (raw: string | undefined, now: Date) => {
 }
 
 export default function AdminConsole() {
-  const { currentUser, logout } = useAuth()
+  const { currentUser, logout, resetPasswordByPhone } = useAuth()
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
@@ -153,6 +151,10 @@ export default function AdminConsole() {
   const [userStatusDrafts, setUserStatusDrafts] = useState<Record<string, string>>({})
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
   const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null)
+  const [otpCode, setOtpCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [resetStep, setResetStep] = useState<1 | 2>(1)
+  const [editingPasswordUserId, setEditingPasswordUserId] = useState<string | null>(null)
 
   const [routeForm, setRouteForm] = useState<RouteFormState>(EMPTY_ROUTE_FORM)
   const [routeStatusDrafts, setRouteStatusDrafts] = useState<Record<string, OfficialRouteStatus>>({})
@@ -369,19 +371,51 @@ export default function AdminConsole() {
   }
 
   const handleResetPassword = async (user: AdminUserRecord) => {
-    if (!user.email) {
-      setNotice({ text: '該用戶沒有 email', tone: 'error' })
-      return
-    }
-    setResettingPasswordId(user.id)
-    try {
-      await sendPasswordResetEmail(auth, user.email)
-      setNotice({ text: `密碼重設郵件已發送到 ${user.email}`, tone: 'ok' })
-    } catch (error: any) {
-      const message = error?.message || '未知錯誤'
-      setNotice({ text: `發送失敗: ${message}`, tone: 'error' })
-    } finally {
-      setResettingPasswordId(null)
+    if (resetStep === 1) {
+      // Step 1: Send OTP
+      if (!user.phone) {
+        setNotice({ text: '該用戶沒有電話', tone: 'error' })
+        return
+      }
+      setResettingPasswordId(user.id)
+      try {
+        const result = await resetPasswordByPhone('852', user.phone)
+        if (result.ok) {
+          setNotice({ text: '驗證碼已發送到用戶手機', tone: 'ok' })
+          setResetStep(2)
+        } else {
+          setNotice({ text: result.message, tone: 'error' })
+        }
+      } catch (error: any) {
+        const message = error?.message || '未知錯誤'
+        setNotice({ text: `發送失敗: ${message}`, tone: 'error' })
+      } finally {
+        setResettingPasswordId(null)
+      }
+    } else {
+      // Step 2: Verify OTP and set new password
+      if (!otpCode || !newPassword) {
+        setNotice({ text: '請填寫驗證碼和新密碼', tone: 'error' })
+        return
+      }
+      setResettingPasswordId(user.id)
+      try {
+        const result = await resetPasswordByPhone('852', user.phone, newPassword, otpCode)
+        if (result.ok) {
+          setNotice({ text: '密碼重設成功', tone: 'ok' })
+          setResetStep(1)
+          setOtpCode('')
+          setNewPassword('')
+          setEditingPasswordUserId(null)
+        } else {
+          setNotice({ text: result.message, tone: 'error' })
+        }
+      } catch (error: any) {
+        const message = error?.message || '未知錯誤'
+        setNotice({ text: `重設失敗: ${message}`, tone: 'error' })
+      } finally {
+        setResettingPasswordId(null)
+      }
     }
   }
 
@@ -882,21 +916,60 @@ export default function AdminConsole() {
                   >
                     {savingUserId === user.id ? '保存中...' : '保存'}
                   </button>
-                  <button
-                    onClick={() => void handleResetPassword(user)}
-                    disabled={!user.email || resettingPasswordId === user.id}
-                    style={{
-                      border: '1px solid #dce6dd',
-                      borderRadius: 10,
-                      padding: '8px 12px',
-                      fontWeight: 700,
-                      background: !user.email || resettingPasswordId === user.id ? '#e8e8e4' : '#fff',
-                      color: !user.email || resettingPasswordId === user.id ? '#8d8a80' : '#b35c2e',
-                      cursor: !user.email || resettingPasswordId === user.id ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {resettingPasswordId === user.id ? '發送中...' : '重設密碼'}
-                  </button>
+                  {editingPasswordUserId === user.id ? (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        placeholder="驗證碼"
+                        style={{ width: 80, border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px' }}
+                      />
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="新密碼"
+                        style={{ width: 100, border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px' }}
+                      />
+                      <button
+                        onClick={() => void handleResetPassword(user)}
+                        disabled={resettingPasswordId === user.id}
+                        style={{
+                          border: 0,
+                          borderRadius: 10,
+                          padding: '7px 10px',
+                          fontWeight: 700,
+                          background: resettingPasswordId === user.id ? '#e8e8e4' : '#b35c2e',
+                          color: resettingPasswordId === user.id ? '#8d8a80' : '#fff',
+                        }}
+                      >
+                        {resettingPasswordId === user.id ? '處理中...' : '確認'}
+                      </button>
+                      <button
+                        onClick={() => { setEditingPasswordUserId(null); setResetStep(1); setOtpCode(''); setNewPassword('') }}
+                        style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px', background: '#fff' }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setEditingPasswordUserId(user.id); setResetStep(1) }}
+                      disabled={!user.phone}
+                      style={{
+                        border: '1px solid #dce6dd',
+                        borderRadius: 10,
+                        padding: '8px 12px',
+                        fontWeight: 700,
+                        background: !user.phone ? '#e8e8e4' : '#fff',
+                        color: !user.phone ? '#8d8a80' : '#b35c2e',
+                        cursor: !user.phone ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      重設密碼
+                    </button>
+                  )}
                 </div>
               </article>
             )

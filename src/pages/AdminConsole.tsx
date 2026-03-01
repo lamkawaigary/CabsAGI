@@ -15,8 +15,7 @@ import {
   type AdminUserRecord,
   type PricingConfigRecord,
 } from '../services/adminService'
-import { httpsCallable } from 'firebase/functions'
-import { functions } from '../firebaseConfig'
+import { auth } from '../firebaseConfig'
 import type {
   OfficialRouteRecord,
   OfficialRouteStatus,
@@ -377,8 +376,19 @@ export default function AdminConsole() {
     }
     setResettingPasswordId(user.id)
     try {
-      const setUserPassword = httpsCallable(functions, 'setUserPassword')
-      await setUserPassword({ uid: user.id, newPassword })
+      const idToken = await auth.currentUser?.getIdToken()
+      const response = await fetch('https://us-central1-p7s-web.cloudfunctions.net/setUserPassword', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ uid: user.id, newPassword }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to reset password')
+      }
       setNotice({ text: `用戶 ${user.name || user.id} 的密碼已更新`, tone: 'ok' })
       setNewPassword('')
       setEditingPasswordUserId(null)

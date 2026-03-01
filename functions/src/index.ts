@@ -27,7 +27,7 @@ export const setUserPassword = functions.https.onCall(async (data, context) => {
 
   if (!uid || !newPassword) {
     throw new functions.https.HttpsError(
-      'invalid-arguments',
+      'invalid-argument',
       'UID and newPassword are required'
     )
   }

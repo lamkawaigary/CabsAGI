@@ -2,57 +2,35 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setUserPassword = void 0;
 const functions = require("firebase-functions");
-const admin = require('firebase-admin');
+const admin = require("firebase-admin");
 admin.initializeApp();
-exports.setUserPassword = functions
-    .runWith({ secrets: ['FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL'] })
-    .https.onRequest(async (req, res) => {
-    // CORS
-    res.set('Access-Control-Allow-Origin', 'https://cabs-agi.vercel.app');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') {
-        res.status(204).send('');
-        return;
+exports.setUserPassword = functions.https.onCall(async (data, context) => {
+    // Check authentication
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
     }
-    if (req.method !== 'POST') {
-        res.status(405).send('Method not allowed');
-        return;
+    // Verify admin
+    const userRecord = await admin.auth().getUser(context.auth.uid);
+    if (userRecord.email !== 'lamgary@p7s.app') {
+        const customClaims = userRecord.customClaims || {};
+        if (customClaims.role !== 'admin') {
+            throw new functions.https.HttpsError('permission-denied', 'Only admins can reset passwords');
+        }
+    }
+    const { uid, newPassword } = data;
+    if (!uid || !newPassword) {
+        throw new functions.https.HttpsError('invalid-argument', 'UID and newPassword are required');
+    }
+    if (newPassword.length < 6) {
+        throw new functions.https.HttpsError('invalid-argument', 'Password must be at least 6 characters');
     }
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            res.status(401).json({ error: 'Unauthorized' });
-            return;
-        }
-        const idToken = authHeader.split('Bearer ')[1];
-        let decodedToken;
-        try {
-            decodedToken = await admin.auth().verifyIdToken(idToken);
-        }
-        catch (e) {
-            res.status(401).json({ error: 'Invalid token' });
-            return;
-        }
-        const userRecord = await admin.auth().getUser(decodedToken.uid);
-        if (userRecord.email !== 'lamgary@p7s.app') {
-            const customClaims = userRecord.customClaims || {};
-            if (customClaims.role !== 'admin') {
-                res.status(403).json({ error: 'Only admins can reset passwords' });
-                return;
-            }
-        }
-        const { uid, newPassword } = req.body;
-        if (!uid || !newPassword || newPassword.length < 6) {
-            res.status(400).json({ error: 'Invalid parameters' });
-            return;
-        }
         await admin.auth().updateUser(uid, { password: newPassword });
-        res.json({ success: true });
+        return { success: true, message: 'Password updated' };
     }
     catch (error) {
         console.error('Error:', error);
-        res.status(500).json({ error: error.message });
+        throw new functions.https.HttpsError('internal', error.message || 'Failed to update password');
     }
 });
 //# sourceMappingURL=index.js.map

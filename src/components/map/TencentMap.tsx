@@ -1,5 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+// Tencent Map API Key
+const TENCENT_MAP_KEY = 'D42BZ-JZFCL-A2QPT-E2EKZ-D2WX5-VPFWY'
+
+// SDK Loader
+const loadTencentSDK = (): Promise<boolean> => {
+  if (typeof window === 'undefined') return Promise.resolve(false)
+  if (window.TMap && window.TMap.Map) return Promise.resolve(true)
+  
+  return new Promise((resolve) => {
+    const script = document.createElement('script')
+    script.src = `https://map.qq.com/api/gljs?v=1.exp&key=${TENCENT_MAP_KEY}`
+    script.async = true
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.head.appendChild(script)
+  })
+}
+
 interface TMapMap {
   destroy: () => void
   fitBounds: (bounds: unknown, options?: { padding: number }) => void
@@ -89,11 +107,27 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
     queueMicrotask(() => setMapUnavailable(true))
   }, [])
 
+  // Load SDK and initialize map
   useEffect(() => {
-    const tmap = window.TMap
-    if (!mapRef.current || !tmap || initFailedRef.current) return
+    let mounted = true
 
-    try {
+    const init = async () => {
+      if (!mapRef.current || initFailedRef.current) return
+      
+      // Load SDK first
+      const loaded = await loadTencentSDK()
+      if (!mounted || !loaded) {
+        markUnavailable()
+        return
+      }
+
+      const tmap = window.TMap
+      if (!tmap || !mapRef.current) {
+        markUnavailable()
+        return
+      }
+
+      try {
       const defaultCenter = [114.0579, 22.5431] as const
       mapInstance.current = new tmap.Map(mapRef.current, {
         center: new tmap.LatLng(defaultCenter[1], defaultCenter[0]),
@@ -156,6 +190,7 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
     }
 
     return () => {
+      mounted = false
       try {
         if (mapInstance.current) mapInstance.current.destroy()
         mapInstance.current = null

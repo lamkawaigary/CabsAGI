@@ -418,7 +418,7 @@ export default function PassengerHome() {
         </div>
       )}
 
-      <div style={{ borderRadius: 18, overflow: 'hidden', border: '1px solid #dce6dd', background: '#fff', marginBottom: 12 }}>
+      <div style={{ borderRadius: 18, overflow: 'hidden', border: '1px solid #dce6dd', background: '#fff', marginBottom: 12, minHeight: '60vh' }}>
         <TencentMap
           pickup={bookingMode === 'charter' ? pickup : officialPickup}
           dropoff={bookingMode === 'charter' ? dropoff : officialDropoff}
@@ -432,7 +432,7 @@ export default function PassengerHome() {
                   ]
                 : undefined
           }
-          height="45vh"
+          height="60vh"
         />
       </div>
 

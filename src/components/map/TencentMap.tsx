@@ -106,26 +106,28 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
         map: mapInstance.current,
         styles: {
           pickup: new tmap.MarkerStyle({
-            width: 25,
-            height: 35,
-            anchor: { x: 16, y: 32 },
+            width: 40,
+            height: 50,
+            anchor: { x: 20, y: 45 },
             src: 'data:image/svg+xml;base64,' +
               btoa(`
-            <svg width="25" height="35" viewBox="0 0 25 35" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 10.3 12.5 22.5 12.5 22.5s12.5-12.2 12.5-22.5C25 5.6 19.4 0 12.5 0z" fill="#667eea"/>
-              <circle cx="12.5" cy="12.5" r="6" fill="white"/>
+            <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 0C8.9 0 0 8.9 0 20c0 15 20 30 20 30s20-15 20-30C40 8.9 31.1 0 20 0z" fill="#667eea"/>
+              <circle cx="20" cy="18" r="8" fill="white"/>
+              <text x="20" y="22" text-anchor="middle" font-size="10" fill="#667eea" font-weight="bold">上</text>
             </svg>
           `),
           }),
           dropoff: new tmap.MarkerStyle({
-            width: 25,
-            height: 35,
-            anchor: { x: 16, y: 32 },
+            width: 40,
+            height: 50,
+            anchor: { x: 20, y: 45 },
             src: 'data:image/svg+xml;base64,' +
               btoa(`
-            <svg width="25" height="35" viewBox="0 0 25 35" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 10.3 12.5 22.5 12.5 22.5s12.5-12.2 12.5-22.5C25 5.6 19.4 0 12.5 0z" fill="#f5576c"/>
-              <circle cx="12.5" cy="12.5" r="6" fill="white"/>
+            <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 0C8.9 0 0 8.9 0 20c0 15 20 30 20 30s20-15 20-30C40 8.9 31.1 0 20 0z" fill="#f5576c"/>
+              <circle cx="20" cy="18" r="8" fill="white"/>
+              <text x="20" y="22" text-anchor="middle" font-size="10" fill="#f5576c" font-weight="bold">落</text>
             </svg>
           `),
           }),
@@ -138,10 +140,11 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
         styles: {
           route: new tmap.PolylineStyle({
             color: '#1e4f43',
-            width: 6,
-            borderWidth: 2,
+            width: 10,
+            borderWidth: 4,
             borderColor: '#ffffff',
             lineCap: 'round',
+            lineJoin: 'round',
           }),
         },
         geometries: [],

@@ -98,8 +98,33 @@ const staticSearch = (query: string): LocationRecord[] => {
   return STATIC_LOCATIONS.filter(
     (l) => l.name.toLowerCase().includes(q) || l.address.toLowerCase().includes(q) || l.keywords.some((k) => q.includes(normalize(k))),
   )
-    .slice(0, 8)
+    .slice(0, 10)
     .map((l) => ({ ...l, source: 'local' as const }))
+}
+
+// Fallback: OpenStreetMap Nominatim (free, reliable)
+const fetchOSMSuggestions = async (query: string): Promise<LocationRecord[]> => {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&countrycodes=hk,cn`,
+      { headers: { 'Accept-Language': 'zh-HK,zh,en' } }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    if (!Array.isArray(data)) return []
+    
+    return data.map((item: any) => ({
+      id: `osm-${item.place_id}`,
+      name: item.display_name.split(',')[0] || item.display_name,
+      address: item.display_name,
+      lat: parseFloat(item.lat),
+      lng: parseFloat(item.lon),
+      keywords: [],
+      source: 'ai' as const,
+    }))
+  } catch {
+    return []
+  }
 }
 
 const fetchTencentSuggestions = async (query: string): Promise<LocationRecord[]> => {
@@ -170,16 +195,32 @@ const fetchTencentSuggestions = async (query: string): Promise<LocationRecord[]>
   }
 }
 
-// Search locations with AI-style online suggestions first + static fallback
+// Search locations with online suggestions + static fallback
 export const searchLocation = async (query: string): Promise<LocationRecord[]> => {
-  const [online, local] = await Promise.all([fetchTencentSuggestions(query), Promise.resolve(staticSearch(query))])
-  const merged = [...online, ...local]
+  // Try static first (fast)
+  const local = staticSearch(query)
+  
+  // Try Tencent API
+  let online: LocationRecord[] = []
+  try {
+    online = await fetchTencentSuggestions(query)
+  } catch (e) {
+    console.warn('Tencent search failed, trying OSM fallback:', e)
+    // Fallback to OpenStreetMap if Tencent fails
+    try {
+      online = await fetchOSMSuggestions(query)
+    } catch (e2) {
+      console.warn('OSM fallback also failed:', e2)
+    }
+  }
+
+  const merged = [...local, ...online]
 
   const seen = new Set<string>()
   const deduped: LocationRecord[] = []
 
   for (const item of merged) {
-    const key = `${item.name}-${item.lat.toFixed(5)}-${item.lng.toFixed(5)}`
+    const key = `${item.name}-${item.lat.toFixed(4)}-${item.lng.toFixed(4)}`
     if (seen.has(key)) continue
     seen.add(key)
     deduped.push(item)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import OSMMap from './OSMMap'
 
 // Tencent Map API Key
 const TENCENT_MAP_KEY = 'D42BZ-JZFCL-A2QPT-E2EKZ-D2WX5-VPFWY'
@@ -262,23 +263,8 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
   }, [pickup, dropoff, routePath, markUnavailable])
 
   if (mapUnavailable) {
-    return (
-      <div
-        style={{
-          width: '100%',
-          height,
-          borderRadius: '16px',
-          border: '1px solid #dce6dd',
-          background: '#f6faf8',
-          color: '#5b726b',
-          display: 'grid',
-          placeItems: 'center',
-          fontSize: 13,
-        }}
-      >
-        地圖暫時不可用，但訂單與頁面功能正常。
-      </div>
-    )
+    // Fallback to OpenStreetMap when Tencent fails
+    return <OSMMap pickup={pickup} dropoff={dropoff} routePath={routePath} height={height} />
   }
 
   return (

@@ -51,7 +51,7 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
       const s = wgs84ToGcj02(pickup.lng, pickup.lat)
       const e = wgs84ToGcj02(dropoff.lng, dropoff.lat)
       
-      return `https://apis.map.qq.com/tools/routeplan?type=drive&from=${encodeURIComponent(pickup.name || '上車地點')}&fromcoord=${s.lat},${s.lng}&to=${encodeURIComponent(dropoff.name || '落車地點')}&tocoord=${e.lat},${e.lng}&policy=1&coord_type=5&referer=CabsAGI&key=${TENCENT_MAP_KEY}`
+      return `https://apis.map.qq.com/tools/routeplan?type=drive&from=${encodeURIComponent(pickup.name || '上車地點')}&fromcoord=${s.lat},${s.lng}&to=${encodeURIComponent(dropoff.name || '落車地點')}&tocoord=${e.lat},${e.lng}&policy=1&coord_type=5&referer=CabsAGI&key=${TENCENT_MAP_KEY}&hideRoute=0&newMap=1`
     }
     
     // If we have pickup only
@@ -61,7 +61,7 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
       centerLng = gcj.lng
       label = pickup.name || '上車地點'
       
-      return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${gcj.lat},${gcj.lng};title:${encodeURIComponent(label)};addr:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI`
+      return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${gcj.lat},${gcj.lng};title:${encodeURIComponent(label)};addr:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI&search=0&type=click&compacticon=1`
     }
     
     // If we have dropoff only
@@ -71,11 +71,11 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
       centerLng = gcj.lng
       label = dropoff.name || '落車地點'
       
-      return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${gcj.lat},${gcj.lng};title:${encodeURIComponent(label)};addr:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI`
+      return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${gcj.lat},${gcj.lng};title:${encodeURIComponent(label)};addr:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI&search=0&type=click&compacticon=1`
     }
     
-    // Default: Show Hong Kong
-    return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${centerLat},${centerLng};title:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI`
+    // Default: Show Hong Kong - minimal mode
+    return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${centerLat},${centerLng};title:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI&search=0&type=click&compacticon=1`
   }, [pickup, dropoff, routePath])
 
   return (

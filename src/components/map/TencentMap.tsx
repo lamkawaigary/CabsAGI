@@ -185,39 +185,40 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
       from: new T.LatLng(startGCJ.lat, startGCJ.lng),
       to: new T.LatLng(endGCJ.lat, endGCJ.lng),
     }).then((result: any) => {
+      console.log('Route result:', result)
+      
       if (result && result.result && result.result.routes && result.result.routes.length > 0) {
         const route = result.result.routes[0]
         
-        // Get the polyline path from the route
+        // Get the polyline path from the route - it's already LatLng objects!
         if (route.polyline && route.polyline.length > 0) {
-          const path = route.polyline.map((coord: number[]) => {
-            const wgs = gcj02ToWgs84(coord[0], coord[1])
-            return { lat: wgs.lat, lng: wgs.lng }
-          })
-
-          // Draw the route
-          if (polylineRef.current && T) {
-            const gcjPath = path.map(p => {
-              const gcj = wgs84ToGcj02(p.lng, p.lat)
-              return new T.LatLng(gcj.lat, gcj.lng)
-            })
-
+          // Draw the route directly with the polyline
+          if (polylineRef.current) {
             polylineRef.current.setGeometries([{
               id: 'route',
               styleId: 'route',
-              paths: [gcjPath],
+              paths: [route.polyline],  // Already LatLng objects
             }])
           }
 
+          // Calculate distance in km
+          const distanceKm = route.distance ? (route.distance / 1000).toFixed(1) : '0'
+          const durationMins = route.duration || 0
+
           // Notify parent about the calculated route
           if (onRouteCalculated) {
-            onRouteCalculated(path, route.distance, route.duration)
+            // Convert polyline to WGS84 for parent
+            const wgsPath = route.polyline.map((coord: any) => {
+              const wgs = gcj02ToWgs84(coord.lng || coord[0], coord.lat || coord[1])
+              return { lat: wgs.lat, lng: wgs.lng }
+            })
+            onRouteCalculated(wgsPath, parseFloat(distanceKm), durationMins)
           }
 
           // Fit bounds to show entire route
-          if (mapInstance.current && path.length > 0) {
+          if (mapInstance.current && route.polyline.length > 0) {
             const bounds = new T.LatLngBounds()
-            gcjPath.forEach((pos: any) => bounds.extend(pos))
+            route.polyline.forEach((p: any) => bounds.extend(p))
             mapInstance.current.fitBounds(bounds, { padding: [50, 50] })
           }
         }

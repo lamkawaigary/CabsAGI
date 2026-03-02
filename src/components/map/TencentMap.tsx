@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useRef } from 'react'
 
 interface Location {
   lat: number
@@ -15,96 +15,193 @@ interface TencentMapProps {
 
 const TENCENT_MAP_KEY = 'D42BZ-JZFCL-A2QPT-E2EKZ-D2WX5-VPFWY'
 
-// Convert WGS84 to GCJ02 (for Tencent)
+// Convert WGS84 to GCJ02
 const wgs84ToGcj02 = (lng: number, lat: number) => {
-  const PI = 3.1415926535897932384626
+  const PI = 3.141592653589793
   const a = 6378245.0
   const ee = 0.00669342162296594323
 
   if ((lng < 72.004 || lng > 137.8347) || (lat < 0.8293 || lat > 55.8271)) {
     return { lat, lng }
   }
-  
-  let dlat = (lng - 105.0) * Math.PI * 3000.0 / 180.0
-  let dlng = (lat - 35.0) * Math.PI * 3000.0 / 180.0
-  
+
+  let dlat = (lng - 105.0) * PI * 3000.0 / 180.0
+  let dlng = (lat - 35.0) * PI * 3000.0 / 180.0
+
   const radlat = lat / 180.0 * PI
   let magic = Math.sin(radlat)
   magic = 1 - ee * magic * magic
   const sqrtmagic = Math.sqrt(magic)
-  
+
   dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI)
   dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * PI)
-  
+
   return { lat: lat + dlat, lng: lng + dlng }
 }
 
-export default function TencentMap({ pickup, dropoff, routePath, height = '400px' }: TencentMapProps) {
-  const mapUrl = useMemo(() => {
-    // Default center: Hong Kong
-    let centerLat = 22.3193
-    let centerLng = 114.1694
-    let label = '香港'
+// Load Tencent SDK
+const loadTencentSDK = (): Promise<boolean> => {
+  if (typeof window === 'undefined') return Promise.resolve(false)
+  if ((window as any).TMap && (window as any).TMap.Map) return Promise.resolve(true)
 
-    // If we have both pickup and dropoff, show route
-    if (pickup && dropoff) {
-      const s = wgs84ToGcj02(pickup.lng, pickup.lat)
-      const e = wgs84ToGcj02(dropoff.lng, dropoff.lat)
-      
-      return `https://apis.map.qq.com/tools/routeplan?type=drive&from=${encodeURIComponent(pickup.name || '上車地點')}&fromcoord=${s.lat},${s.lng}&to=${encodeURIComponent(dropoff.name || '落車地點')}&tocoord=${e.lat},${e.lng}&policy=1&coord_type=5&referer=CabsAGI&key=${TENCENT_MAP_KEY}&hideRoute=0&newMap=1`
+  return new Promise((resolve) => {
+    const script = document.createElement('script')
+    script.src = `https://map.qq.com/api/gljs?v=1.exp&key=${TENCENT_MAP_KEY}&libraries=service`
+    script.async = true
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.head.appendChild(script)
+  })
+}
+
+export default function TencentMap({ pickup, dropoff, routePath, height = '400px' }: TencentMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstance = useRef<any>(null)
+  const markersRef = useRef<any>(null)
+  const polylineRef = useRef<any>(null)
+
+  useEffect(() => {
+    let mounted = true
+
+    const init = async () => {
+      if (!mapRef.current) return
+
+      const loaded = await loadTencentSDK()
+      if (!mounted || !loaded) return
+
+      const T = (window as any).TMap
+      if (!T || !mapRef.current) return
+
+      try {
+        // Initialize map centered on HK
+        mapInstance.current = new T.Map(mapRef.current, {
+          center: new T.LatLng(22.3193, 114.1694),
+          zoom: 12,
+          viewMode: '2D',
+          draggable: true,
+          scrollwheel: true,
+          doubleClickZoom: true,
+        })
+
+        // Create marker layer
+        markersRef.current = new T.MultiMarker({
+          map: mapInstance.current,
+          styles: {
+            pickup: new T.MarkerStyle({
+              width: 32,
+              height: 42,
+              anchor: { x: 16, y: 38 },
+              color: '#667eea',
+            }),
+            dropoff: new T.MarkerStyle({
+              width: 32,
+              height: 42,
+              anchor: { x: 16, y: 38 },
+              color: '#f5576c',
+            }),
+          },
+          geometries: [],
+        })
+
+        // Create polyline layer
+        polylineRef.current = new T.MultiPolyline({
+          map: mapInstance.current,
+          styles: {
+            route: new T.PolylineStyle({
+              color: '#1e4f43',
+              width: 6,
+            }),
+          },
+          geometries: [],
+        })
+
+      } catch (e) {
+        console.error('TencentMap init error:', e)
+      }
     }
-    
-    // If we have pickup only
+
+    init()
+
+    return () => {
+      mounted = false
+      try {
+        if (mapInstance.current) {
+          mapInstance.current.destroy()
+          mapInstance.current = null
+        }
+      } catch (e) {}
+    }
+  }, [])
+
+  // Update markers and route when props change
+  useEffect(() => {
+    if (!mapInstance.current || !markersRef.current || !polylineRef.current) return
+
+    const T = (window as any).TMap
+    if (!T) return
+
+    const geometries: any[] = []
+    const polylineGeometries: any[] = []
+
+    // Add pickup marker
     if (pickup) {
       const gcj = wgs84ToGcj02(pickup.lng, pickup.lat)
-      centerLat = gcj.lat
-      centerLng = gcj.lng
-      label = pickup.name || '上車地點'
-      
-      return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${gcj.lat},${gcj.lng};title:${encodeURIComponent(label)};addr:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI&search=0&type=click&compacticon=1`
+      geometries.push({
+        id: 'pickup',
+        styleId: 'pickup',
+        position: new T.LatLng(gcj.lat, gcj.lng),
+        properties: { title: pickup.name },
+      })
     }
-    
-    // If we have dropoff only
+
+    // Add dropoff marker
     if (dropoff) {
       const gcj = wgs84ToGcj02(dropoff.lng, dropoff.lat)
-      centerLat = gcj.lat
-      centerLng = gcj.lng
-      label = dropoff.name || '落車地點'
-      
-      return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${gcj.lat},${gcj.lng};title:${encodeURIComponent(label)};addr:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI&search=0&type=click&compacticon=1`
+      geometries.push({
+        id: 'dropoff',
+        styleId: 'dropoff',
+        position: new T.LatLng(gcj.lat, gcj.lng),
+        properties: { title: dropoff.name },
+      })
     }
-    
-    // Default: Show Hong Kong - minimal mode
-    return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${centerLat},${centerLng};title:${encodeURIComponent(label)}&key=${TENCENT_MAP_KEY}&referer=CabsAGI&search=0&type=click&compacticon=1`
+
+    // Update markers
+    markersRef.current.setGeometries(geometries)
+
+    // Update route polyline
+    if (routePath && routePath.length >= 2) {
+      const path = routePath.map(p => {
+        const gcj = wgs84ToGcj02(p.lng, p.lat)
+        return new T.LatLng(gcj.lat, gcj.lng)
+      })
+      polylineGeometries.push({
+        id: 'route',
+        styleId: 'route',
+        paths: [path],
+      })
+      polylineRef.current.setGeometries(polylineGeometries)
+    } else {
+      polylineRef.current.setGeometries([])
+    }
+
+    // Fit bounds to show all markers
+    if (geometries.length > 0) {
+      const bounds = new T.LatLngBounds()
+      geometries.forEach(g => bounds.extend(g.position))
+      mapInstance.current.fitBounds(bounds, { padding: [50, 50] })
+    }
+
   }, [pickup, dropoff, routePath])
 
   return (
     <div
+      ref={mapRef}
       style={{
         width: '100%',
         height,
         borderRadius: '16px',
         overflow: 'hidden',
-        background: '#f0f0f0',
       }}
-    >
-      <iframe
-        key={mapUrl}
-        width="100%"
-        height="100%"
-        frameBorder="0"
-        scrolling="no"
-        marginHeight={0}
-        marginWidth={0}
-        src={mapUrl}
-        title="地圖"
-        allow="geolocation"
-        style={{
-          width: '100%',
-          height: '100%',
-          border: 'none',
-        }}
-      />
-    </div>
+    />
   )
 }

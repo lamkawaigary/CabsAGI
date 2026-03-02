@@ -1,23 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import OSMMap from './OSMMap'
-
-// Tencent Map API Key
-const TENCENT_MAP_KEY = 'D42BZ-JZFCL-A2QPT-E2EKZ-D2WX5-VPFWY'
-
-// SDK Loader
-const loadTencentSDK = (): Promise<boolean> => {
-  if (typeof window === 'undefined') return Promise.resolve(false)
-  if (window.TMap && window.TMap.Map) return Promise.resolve(true)
-  
-  return new Promise((resolve) => {
-    const script = document.createElement('script')
-    script.src = `https://map.qq.com/api/gljs?v=1.exp&key=${TENCENT_MAP_KEY}`
-    script.async = true
-    script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
-    document.head.appendChild(script)
-  })
-}
 
 interface TMapMap {
   destroy: () => void
@@ -108,27 +89,11 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
     queueMicrotask(() => setMapUnavailable(true))
   }, [])
 
-  // Load SDK and initialize map
   useEffect(() => {
-    let mounted = true
+    const tmap = window.TMap
+    if (!mapRef.current || !tmap || initFailedRef.current) return
 
-    const init = async () => {
-      if (!mapRef.current || initFailedRef.current) return
-      
-      // Load SDK first
-      const loaded = await loadTencentSDK()
-      if (!mounted || !loaded) {
-        markUnavailable()
-        return
-      }
-
-      const tmap = window.TMap
-      if (!tmap || !mapRef.current) {
-        markUnavailable()
-        return
-      }
-
-      try {
+    try {
       const defaultCenter = [114.0579, 22.5431] as const
       mapInstance.current = new tmap.Map(mapRef.current, {
         center: new tmap.LatLng(defaultCenter[1], defaultCenter[0]),
@@ -191,7 +156,6 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
     }
 
     return () => {
-      mounted = false
       try {
         if (mapInstance.current) mapInstance.current.destroy()
         mapInstance.current = null
@@ -263,8 +227,23 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
   }, [pickup, dropoff, routePath, markUnavailable])
 
   if (mapUnavailable) {
-    // Fallback to OpenStreetMap when Tencent fails
-    return <OSMMap pickup={pickup} dropoff={dropoff} routePath={routePath} height={height} />
+    return (
+      <div
+        style={{
+          width: '100%',
+          height,
+          borderRadius: '16px',
+          border: '1px solid #dce6dd',
+          background: '#f6faf8',
+          color: '#5b726b',
+          display: 'grid',
+          placeItems: 'center',
+          fontSize: 13,
+        }}
+      >
+        地圖暫時不可用，但訂單與頁面功能正常。
+      </div>
+    )
   }
 
   return (

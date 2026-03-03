@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Icons from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
@@ -28,6 +28,22 @@ export default function DriverLayout() {
     return active?.label || '司機中心'
   }, [location.pathname])
 
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const previousOverflow = document.body.style.overflow
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeydown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeydown)
+    }
+  }, [menuOpen])
+
   const handleLogout = async () => {
     if (loggingOut) return
     setLoggingOut(true)
@@ -44,7 +60,7 @@ export default function DriverLayout() {
     minHeight: '100vh',
     background: 'linear-gradient(160deg, #1a2332 0%, #2d3d4f 50%, #1f3d4f 100%)',
     fontFamily: 'Avenir Next, SF Pro Display, Noto Sans TC, PingFang TC, sans-serif',
-    paddingBottom: 86,
+    paddingBottom: 'calc(86px + env(safe-area-inset-bottom, 0px))',
     color: '#f3fff8',
   } as const
 
@@ -56,7 +72,7 @@ export default function DriverLayout() {
     background: 'rgba(26,35,50,0.9)',
     borderBottom: '1px solid rgba(255,255,255,0.1)',
     padding: '14px 18px',
-    paddingTop: 'max(14px, env(safe-area-inset-top))',
+    paddingTop: 'max(14px, env(safe-area-inset-top, 0px))',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -90,22 +106,27 @@ export default function DriverLayout() {
 
   return (
     <main style={shellStyle}>
-      <header style={{ ...headerStyle, paddingTop: 18 }}>
+      <header style={{ ...headerStyle, paddingTop: 'max(18px, env(safe-area-inset-top, 0px))' }}>
         <div>
           <div style={{ letterSpacing: '0.12em', fontSize: 11, color: 'rgba(243,255,248,0.5)', fontWeight: 700 }}>CABS DRIVER</div>
           <div style={{ fontSize: 19, fontWeight: 800, color: '#f3fff8' }}>{pageTitle} · {currentUser?.name}</div>
         </div>
-        <button onClick={() => setMenuOpen(true)} style={menuButtonStyle}>
+        <button type="button" aria-label="開啟司機功能菜單" onClick={() => setMenuOpen(true)} style={menuButtonStyle}>
           <Icons.Menu />
         </button>
       </header>
 
       {menuOpen && (
         <div
+          role="presentation"
+          aria-label="關閉司機功能菜單遮罩"
           style={{ position: 'fixed', inset: 0, zIndex: 30, background: 'rgba(10,20,16,0.5)' }}
           onClick={() => setMenuOpen(false)}
         >
           <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="司機功能菜單"
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'absolute',
@@ -120,15 +141,36 @@ export default function DriverLayout() {
               gridTemplateRows: 'auto 1fr auto',
             }}
           >
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#f3fff8' }}>司機功能菜單</div>
-              <div style={{ fontSize: 12, color: 'rgba(243,255,248,0.5)' }}>快速切換與帳戶動作</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#f3fff8' }}>司機功能菜單</div>
+                <div style={{ fontSize: 12, color: 'rgba(243,255,248,0.5)' }}>快速切換與帳戶動作</div>
+              </div>
+              <button
+                type="button"
+                aria-label="關閉司機功能菜單"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.05)',
+                  color: '#f3fff8',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icons.X />
+              </button>
             </div>
             <div style={{ marginTop: 18, display: 'grid', gap: 8, alignContent: 'start' }}>
               {driverNavItems.map((item) => {
                 const active = location.pathname.startsWith(item.path)
                 return (
                   <button
+                    type="button"
                     key={item.path}
                     onClick={() => {
                       navigate(item.path)
@@ -151,6 +193,7 @@ export default function DriverLayout() {
               })}
             </div>
             <button
+              type="button"
               onClick={() => void handleLogout()}
               disabled={loggingOut}
               style={{
@@ -179,12 +222,12 @@ export default function DriverLayout() {
           position: 'fixed',
           left: 16,
           right: 16,
-          bottom: 10,
+          bottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
           borderRadius: 24,
           border: '1px solid rgba(255,255,255,0.15)',
           background: 'rgba(26,35,50,0.98)',
           backdropFilter: 'blur(12px)',
-          padding: '10px 12px',
+          padding: '10px 12px calc(10px + env(safe-area-inset-bottom, 0px))',
           display: 'grid',
           gridTemplateColumns: 'repeat(4,1fr)',
           gap: 4,

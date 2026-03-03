@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import TencentMap from '../components/map/TencentMap'
-import { calculatePrice, calculateRoute, searchLocation, type LocationRecord, type RouteResult } from '../services/mapService'
+import {
+  STATIC_LOCATIONS,
+  calculatePrice,
+  calculateRoute,
+  searchLocation,
+  type LocationRecord,
+  type RouteResult,
+} from '../services/mapService'
 import { useAuth } from '../context/AuthContext'
 import {
   createOrder,
@@ -18,8 +25,17 @@ type QuoteView = {
   tollsTotal: number
 }
 
+type NoticeTone = 'ok' | 'error' | 'info'
+
 type BookingMode = 'charter' | 'official_route'
 type CharterVehicleType = 'standard' | 'luxury' | 'van'
+type CharterRoutePreset = {
+  id: string
+  label: string
+  pickupLocationId: string
+  dropoffLocationId: string
+  note: string
+}
 
 const CHARTER_VEHICLES: {
   id: CharterVehicleType
@@ -53,6 +69,38 @@ const toBookingDateTimeISO = (dateStr: string, timeStr: string) => {
   const safeTime = timeStr || '00:00'
   const parsed = new Date(`${safeDate}T${safeTime}`)
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
+}
+
+const CHARTER_STEPS = ['選擇服務與路線', '計算預估車資', '確認下單']
+
+const CHARTER_ROUTE_PRESETS: CharterRoutePreset[] = [
+  {
+    id: 'central-hkg',
+    label: '中環 -> 機場',
+    pickupLocationId: 'central',
+    dropoffLocationId: 'hkg',
+    note: '商務客常用',
+  },
+  {
+    id: 'hkg-szw',
+    label: '機場 -> 深圳灣口岸',
+    pickupLocationId: 'hkg',
+    dropoffLocationId: 'szw',
+    note: '跨境熱門',
+  },
+  {
+    id: 'tst-lmg',
+    label: '尖沙咀 -> 落馬洲',
+    pickupLocationId: 'tst',
+    dropoffLocationId: 'lmg',
+    note: '拼商務行程',
+  },
+]
+
+const getStaticLocation = (id: string): LocationRecord | null => {
+  const found = STATIC_LOCATIONS.find((location) => location.id === id)
+  if (!found) return null
+  return { ...found, source: 'local' }
 }
 
 function LocationInput({
@@ -162,7 +210,7 @@ export default function PassengerHome() {
   const [officialError, setOfficialError] = useState<string | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [officialSeats, setOfficialSeats] = useState(1)
-  const [notice, setNotice] = useState<{ text: string; tone: 'ok' | 'error' | 'info' } | null>(null)
+  const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null)
 
   const bookingReady = useMemo(() => !!pickup && !!dropoff, [pickup, dropoff])
   const selectedVehicle = useMemo(
@@ -189,6 +237,21 @@ export default function PassengerHome() {
       total: Math.round(quote.total * selectedVehicle.multiplier),
     }
   }, [quote, selectedVehicle.multiplier])
+  const charterStep = useMemo(() => {
+    if (!pickup || !dropoff) return 1
+    if (!quoteWithVehicle || !routeInfo) return 2
+    return 3
+  }, [pickup, dropoff, quoteWithVehicle, routeInfo])
+  const activePresetId = useMemo(() => {
+    if (!pickup || !dropoff) return null
+    return (
+      CHARTER_ROUTE_PRESETS.find(
+        (preset) =>
+          preset.pickupLocationId === pickup.id &&
+          preset.dropoffLocationId === dropoff.id,
+      )?.id || null
+    )
+  }, [pickup, dropoff])
 
   const officialPickup = useMemo<LocationRecord | null>(() => {
     if (!selectedOfficialRoute) return null
@@ -240,6 +303,41 @@ export default function PassengerHome() {
     return () => unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (!notice || notice.tone === 'error') return undefined
+    const timeoutId = window.setTimeout(() => {
+      setNotice((current) => (current?.text === notice.text ? null : current))
+    }, 3600)
+    return () => window.clearTimeout(timeoutId)
+  }, [notice])
+
+  const clearCharterEstimate = () => {
+    setQuote(null)
+    setRouteInfo(null)
+  }
+
+  const applyRoutePreset = (preset: CharterRoutePreset) => {
+    const nextPickup = getStaticLocation(preset.pickupLocationId)
+    const nextDropoff = getStaticLocation(preset.dropoffLocationId)
+    if (!nextPickup || !nextDropoff) {
+      setNotice({ text: '熱門路線資料不完整，請手動選擇地點。', tone: 'error' })
+      return
+    }
+
+    setPickup(nextPickup)
+    setDropoff(nextDropoff)
+    clearCharterEstimate()
+    setNotice({ text: `已套用熱門路線：${preset.label}`, tone: 'info' })
+  }
+
+  const swapStops = () => {
+    if (!pickup || !dropoff) return
+    setPickup(dropoff)
+    setDropoff(pickup)
+    clearCharterEstimate()
+    setNotice({ text: '已交換上車與目的地，請重新計算車資。', tone: 'info' })
+  }
+
   const refreshQuote = async () => {
     if (!pickup || !dropoff) return
     setCalculating(true)
@@ -288,8 +386,7 @@ export default function PassengerHome() {
     })
     setPickup(null)
     setDropoff(null)
-    setQuote(null)
-    setRouteInfo(null)
+    clearCharterEstimate()
   }
 
   const placeCharterOrder = async () => {
@@ -394,6 +491,45 @@ export default function PassengerHome() {
         </button>
       </div>
 
+      {bookingMode === 'charter' && (
+        <div
+          style={{
+            borderRadius: 14,
+            border: '1px solid #d7e4db',
+            background: 'linear-gradient(145deg, #f9fcfa 0%, #f3f8f5 100%)',
+            padding: 12,
+            display: 'grid',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <strong style={{ color: '#1f4f43', fontSize: 14 }}>包車預約流程</strong>
+            <span style={{ fontSize: 12, color: '#5a746d' }}>目前步驟 {charterStep}/3</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+            {CHARTER_STEPS.map((step, index) => {
+              const reached = index + 1 <= charterStep
+              return (
+                <div
+                  key={step}
+                  style={{
+                    borderRadius: 10,
+                    border: reached ? '1px solid #bfdccf' : '1px solid #dde9e2',
+                    background: reached ? '#eaf6f0' : '#fff',
+                    color: reached ? '#1f4f43' : '#688079',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '8px 10px',
+                  }}
+                >
+                  {index + 1}. {step}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {notice && (
         <div
           style={{
@@ -404,21 +540,49 @@ export default function PassengerHome() {
                 ? '1px solid #edc2bb'
                 : notice.tone === 'ok'
                   ? '1px solid #c3dfcf'
-                  : '1px solid #d8e2da',
+                  : '1px solid #c8d7f5',
             background:
               notice.tone === 'error'
                 ? '#fff0ec'
                 : notice.tone === 'ok'
                   ? '#eff9f2'
-                  : '#f5f8f5',
-            color: notice.tone === 'error' ? '#9c3d31' : '#2c5a4f',
+                  : '#edf4ff',
+            color: notice.tone === 'error' ? '#9c3d31' : notice.tone === 'ok' ? '#2c5a4f' : '#2d4f7d',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 8,
           }}
         >
-          {notice.text}
+          <span>{notice.text}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            style={{
+              border: 0,
+              borderRadius: 8,
+              padding: '5px 9px',
+              fontSize: 12,
+              background: 'rgba(255,255,255,0.7)',
+              color: '#3a5850',
+              cursor: 'pointer',
+            }}
+          >
+            關閉
+          </button>
         </div>
       )}
 
-      <div style={{ borderRadius: 18, overflow: 'hidden', border: '1px solid #dce6dd', background: '#fff', marginBottom: 12, minHeight: '60vh' }}>
+      <div
+        style={{
+          borderRadius: 18,
+          overflow: 'hidden',
+          border: '1px solid #dce6dd',
+          background: '#fff',
+          marginBottom: 12,
+          minHeight: 'clamp(260px, 50vh, 540px)',
+        }}
+      >
         <TencentMap
           pickup={bookingMode === 'charter' ? pickup : officialPickup}
           dropoff={bookingMode === 'charter' ? dropoff : officialDropoff}
@@ -432,7 +596,7 @@ export default function PassengerHome() {
                   ]
                 : undefined
           }
-          height="60vh"
+          height="clamp(260px, 50vh, 540px)"
         />
       </div>
 
@@ -540,6 +704,48 @@ export default function PassengerHome() {
             </div>
           </div>
 
+          <div
+            style={{
+              borderRadius: 10,
+              border: '1px solid #dce6dd',
+              background: '#f9fcfa',
+              padding: 10,
+              display: 'grid',
+              gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#36534b' }}>熱門快速路線</div>
+              <span style={{ fontSize: 11, color: '#638079' }}>一鍵帶入上車/目的地</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+              {CHARTER_ROUTE_PRESETS.map((preset) => {
+                const selected = activePresetId === preset.id
+                return (
+                  <button
+                    type="button"
+                    key={preset.id}
+                    onClick={() => applyRoutePreset(preset)}
+                    style={{
+                      border: selected ? '1px solid #1f4f43' : '1px solid #dce6dd',
+                      borderRadius: 10,
+                      background: selected ? '#eaf4ef' : '#fff',
+                      padding: '9px 10px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      color: '#2f4f46',
+                      display: 'grid',
+                      gap: 3,
+                    }}
+                  >
+                    <strong style={{ fontSize: 13 }}>{preset.label}</strong>
+                    <span style={{ fontSize: 11, color: '#678079' }}>{preset.note}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <LocationInput
             key={pickup?.id ?? 'pickup-empty'}
             label="上車地點"
@@ -547,10 +753,28 @@ export default function PassengerHome() {
             value={pickup}
             onPick={(v) => {
               setPickup(v)
-              setQuote(null)
-              setRouteInfo(null)
+              clearCharterEstimate()
             }}
           />
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={swapStops}
+              disabled={!pickup || !dropoff}
+              style={{
+                border: '1px solid #d1ded5',
+                borderRadius: 999,
+                padding: '7px 12px',
+                background: !pickup || !dropoff ? '#f0f3f1' : '#fff',
+                color: !pickup || !dropoff ? '#90a19a' : '#2f564a',
+                cursor: !pickup || !dropoff ? 'not-allowed' : 'pointer',
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              交換上下車地點
+            </button>
+          </div>
           <LocationInput
             key={dropoff?.id ?? 'dropoff-empty'}
             label="目的地"
@@ -558,8 +782,7 @@ export default function PassengerHome() {
             value={dropoff}
             onPick={(v) => {
               setDropoff(v)
-              setQuote(null)
-              setRouteInfo(null)
+              clearCharterEstimate()
             }}
           />
 

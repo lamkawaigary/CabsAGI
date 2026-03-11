@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { MessageProvider } from './context/MessageContext'
 
 const Landing = lazy(() => import('./pages/Landing'))
+const ShiftHome = lazy(() => import('./pages/ShiftHome'))
+const RouteDetail = lazy(() => import('./pages/RouteDetail'))
 const PassengerHome = lazy(() => import('./pages/PassengerHome'))
 const OrdersPage = lazy(() => import('./pages/Orders'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
@@ -97,8 +99,9 @@ function AppShell() {
       <Suspense fallback={<FullscreenLoading text="頁面載入中..." />}>
         <Routes>
           <Route element={<PublicOnly />}>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<ShiftHome />} />
             <Route path="/login" element={<Landing />} />
+            <Route path="/route/:routeId" element={<RouteDetail />} />
           </Route>
 
           <Route element={<RequireAuth />}>
@@ -107,6 +110,9 @@ function AppShell() {
               <Route path="/orders" element={<OrdersPage />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              {/* New shift-based routes */}
+              <Route path="/my-bookings" element={<ShiftHome />} />
+              <Route path="/booking/:shiftId" element={<ShiftHome />} />
             </Route>
           </Route>
 

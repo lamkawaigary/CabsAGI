@@ -97,22 +97,26 @@ function AppShell() {
     <BrowserRouter>
       <Suspense fallback={<FullscreenLoading text="頁面載入中..." />}>
         <Routes>
+          {/* Public routes */}
           <Route element={<PublicOnly />}>
             <Route path="/" element={<ShiftHome />} />
             <Route path="/login" element={<Landing />} />
-            <Route path="/route/:routeId" element={<RouteDetail />} />
-            <Route path="/booking/:shiftId" element={<BookingPage />} />
           </Route>
 
+          {/* Authenticated - Shift based pages (no layout) */}
+          <Route element={<RequireAuth />}>
+            <Route path="/route/:routeId" element={<RouteDetail />} />
+            <Route path="/booking/:shiftId" element={<BookingPage />} />
+            <Route path="/my-bookings" element={<ShiftHome />} />
+          </Route>
+
+          {/* Authenticated - With PassengerLayout */}
           <Route element={<RequireAuth />}>
             <Route element={<PassengerLayout />}>
-              {/* New shift-based service - hide old point-to-point */}
               <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="/orders" element={<Navigate to="/my-bookings" replace />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              {/* New shift-based routes */}
-              <Route path="/my-bookings" element={<ShiftHome />} />
             </Route>
           </Route>
 

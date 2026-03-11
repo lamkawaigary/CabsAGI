@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { routeService } from '../services/shiftService'
+import LoginModal from '../components/LoginModal'
 import type { Route, RouteType } from '../types/shift'
 
 // Icons as SVG components
@@ -66,6 +67,7 @@ export default function ShiftHome() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [selectedType, setSelectedType] = useState<RouteType | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
     loadRoutes()
@@ -109,7 +111,7 @@ export default function ShiftHome() {
               {currentUser.name}
             </button>
           ) : (
-            <button style={styles.loginBtn} onClick={() => navigate('/login')}>
+            <button style={styles.loginBtn} onClick={() => setShowLoginModal(true)}>
               登入
             </button>
           )}
@@ -207,6 +209,13 @@ export default function ShiftHome() {
       <footer style={styles.footer}>
         <p>© 2026 CabsAGI 跨境商務出行平台</p>
       </footer>
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={() => navigate('/dashboard')}
+      />
     </div>
   )
 }

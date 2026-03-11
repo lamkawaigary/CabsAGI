@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { MessageProvider } from './context/MessageContext'
 
 const ShiftHome = lazy(() => import('./pages/ShiftHome'))
+const PassengerDashboard = lazy(() => import('./pages/PassengerDashboard'))
 const Landing = lazy(() => import('./pages/Landing'))
 const RouteDetail = lazy(() => import('./pages/RouteDetail'))
 const BookingPage = lazy(() => import('./pages/BookingPage'))
@@ -39,9 +40,10 @@ function AppShell() {
         <Routes>
           {/* public */}
           <Route path="/" element={<ShiftHome />} />
-          <Route path="/login" element={currentUser ? <Navigate to="/" replace /> : <Landing />} />
+          <Route path="/login" element={currentUser ? <Navigate to="/dashboard" replace /> : <Landing />} />
 
           {/* auth required */}
+          <Route path="/dashboard" element={currentUser ? <PassengerDashboard /> : <Navigate to="/login" />} />
           <Route path="/route/:routeId" element={currentUser ? <RouteDetail /> : <Navigate to="/login" />} />
           <Route path="/booking/:shiftId" element={currentUser ? <BookingPage /> : <Navigate to="/login" />} />
           <Route path="/my-bookings" element={currentUser ? <ShiftHome /> : <Navigate to="/login" />} />

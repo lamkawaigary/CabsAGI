@@ -5,7 +5,6 @@ import { MessageProvider } from './context/MessageContext'
 
 const ShiftHome = lazy(() => import('./pages/ShiftHome'))
 const PassengerDashboard = lazy(() => import('./pages/PassengerDashboard'))
-const Landing = lazy(() => import('./pages/Landing'))
 const RouteDetail = lazy(() => import('./pages/RouteDetail'))
 const BookingPage = lazy(() => import('./pages/BookingPage'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
@@ -21,7 +20,7 @@ function FullscreenLoading({ text }: { text: string }) {
   )
 }
 
-function normalizeRole(role: string | undefined): string {
+function getUserRole(role: string | undefined): 'admin' | 'driver' | 'passenger' {
   if (!role) return 'passenger'
   const normalized = role.toLowerCase()
   if (normalized.includes('admin')) return 'admin'
@@ -29,8 +28,19 @@ function normalizeRole(role: string | undefined): string {
   return 'passenger'
 }
 
+// Get the appropriate dashboard based on user role
+function getDashboardPath(role: string | undefined): string {
+  const userRole = getUserRole(role)
+  switch (userRole) {
+    case 'admin': return '/admin'
+    case 'driver': return '/driver'
+    default: return '/dashboard'
+  }
+}
+
 function AppShell() {
   const { loading, currentUser } = useAuth()
+  const userRole = currentUser ? getUserRole(currentUser.role) : null
   
   if (loading) return <FullscreenLoading text="驗證登入狀態中..." />
 
@@ -38,26 +48,63 @@ function AppShell() {
     <BrowserRouter>
       <Suspense fallback={<FullscreenLoading text="頁面載入中..." />}>
         <Routes>
-          {/* public */}
+          {/* Public - homepage only */}
           <Route path="/" element={<ShiftHome />} />
-          <Route path="/login" element={currentUser ? <Navigate to="/dashboard" replace /> : <Landing />} />
 
-          {/* auth required */}
-          <Route path="/dashboard" element={currentUser ? <PassengerDashboard /> : <Navigate to="/login" />} />
-          <Route path="/route/:routeId" element={currentUser ? <RouteDetail /> : <Navigate to="/login" />} />
-          <Route path="/booking/:shiftId" element={currentUser ? <BookingPage /> : <Navigate to="/login" />} />
-          <Route path="/my-bookings" element={currentUser ? <ShiftHome /> : <Navigate to="/login" />} />
-          <Route path="/messages" element={currentUser ? <MessagesPage /> : <Navigate to="/login" />} />
-          <Route path="/profile" element={currentUser ? <ProfilePage /> : <Navigate to="/login" />} />
-          
-          {/* admin */}
-          <Route path="/admin" element={currentUser && normalizeRole(currentUser.role) === 'admin' ? <AdminConsole /> : <Navigate to="/" />} />
-          
-          {/* driver */}
-          <Route path="/driver" element={currentUser && normalizeRole(currentUser.role) === 'driver' ? <DriverDashboard /> : <Navigate to="/" />} />
+          {/* Auth required - route to appropriate dashboard based on role */}
+          {currentUser && (
+            <>
+              <Route path="/dashboard" element={
+                userRole === 'passenger' 
+                  ? <PassengerDashboard /> 
+                  : <Navigate to={getDashboardPath(currentUser.role)} replace />
+              } />
+              <Route path="/route/:routeId" element={
+                userRole === 'passenger' 
+                  ? <RouteDetail /> 
+                  : <Navigate to={getDashboardPath(currentUser.role)} replace />
+              } />
+              <Route path="/booking/:shiftId" element={
+                userRole === 'passenger' 
+                  ? <BookingPage /> 
+                  : <Navigate to={getDashboardPath(currentUser.role)} replace />
+              } />
+              <Route path="/my-bookings" element={
+                userRole === 'passenger' 
+                  ? <PassengerDashboard /> 
+                  : <Navigate to={getDashboardPath(currentUser.role)} replace />
+              } />
+              <Route path="/messages" element={
+                userRole === 'passenger' 
+                  ? <MessagesPage /> 
+                  : <Navigate to={getDashboardPath(currentUser.role)} replace />
+              } />
+              <Route path="/profile" element={
+                <ProfilePage />
+              } />
+              
+              {/* Admin only */}
+              <Route path="/admin" element={
+                userRole === 'admin' 
+                  ? <AdminConsole /> 
+                  : <Navigate to={getDashboardPath(currentUser.role)} replace />
+              } />
+              
+              {/* Driver only */}
+              <Route path="/driver" element={
+                userRole === 'driver' 
+                  ? <DriverDashboard /> 
+                  : <Navigate to={getDashboardPath(currentUser.role)} replace />
+              } />
+            </>
+          )}
 
-          {/* catch all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Catch all - route to appropriate place */}
+          <Route path="*" element={
+            currentUser 
+              ? <Navigate to={getDashboardPath(currentUser.role)} replace />
+              : <Navigate to="/" replace />
+          } />
         </Routes>
       </Suspense>
     </BrowserRouter>

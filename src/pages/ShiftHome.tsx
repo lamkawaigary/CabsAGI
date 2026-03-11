@@ -211,7 +211,17 @@ export default function ShiftHome() {
       <LoginModal 
         isOpen={showLoginModal} 
         onClose={() => setShowLoginModal(false)}
-        onLoginSuccess={() => navigate('/dashboard')}
+        onLoginSuccess={() => {
+          // Redirect based on user role
+          const role = currentUser?.role?.toLowerCase() || ''
+          if (role.includes('admin')) {
+            navigate('/admin')
+          } else if (role.includes('driver')) {
+            navigate('/driver')
+          } else {
+            navigate('/dashboard')
+          }
+        }}
       />
     </div>
   )

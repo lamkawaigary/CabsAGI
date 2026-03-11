@@ -99,23 +99,20 @@ export default function ShiftHome() {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
+      {/* Header - minimal */}
       <header style={styles.header}>
         <div style={styles.logo}>
           <span style={styles.logoText}>CabsAGI</span>
-          <span style={styles.logoSub}>跨境商務出行</span>
         </div>
-        <div style={styles.headerRight}>
-          {currentUser ? (
-            <button style={styles.profileBtn} onClick={() => navigate('/profile')}>
-              {currentUser.name}
-            </button>
-          ) : (
-            <button style={styles.loginBtn} onClick={() => setShowLoginModal(true)}>
-              登入
-            </button>
-          )}
-        </div>
+        {currentUser ? (
+          <button style={styles.headerBtn} onClick={() => navigate('/dashboard')}>
+            我的
+          </button>
+        ) : (
+          <button style={styles.headerBtn} onClick={() => setShowLoginModal(true)}>
+            登入
+          </button>
+        )}
       </header>
 
       {/* Service Type Selection */}
@@ -232,47 +229,29 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: '16px 20px',
     background: '#fff',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+    borderBottom: '1px solid #f0f0f0'
   },
   logo: {
     display: 'flex',
-    flexDirection: 'column'
+    alignItems: 'center'
   },
   logoText: {
-    fontSize: '20px',
+    fontSize: '22px',
     fontWeight: 700,
-    color: '#1a1a1a',
-    letterSpacing: '-0.5px'
+    color: '#143b34'
   },
-  logoSub: {
-    fontSize: '11px',
-    color: '#666',
-    letterSpacing: '0.5px'
-  },
-  headerRight: {
-    display: 'flex',
-    gap: '12px'
-  },
-  loginBtn: {
+  headerBtn: {
     padding: '8px 16px',
-    borderRadius: '8px',
-    border: 'none',
-    background: '#1976D2',
-    color: '#fff',
-    fontWeight: 600,
-    cursor: 'pointer'
-  },
-  profileBtn: {
-    padding: '8px 16px',
-    borderRadius: '8px',
-    border: '1px solid #e0e0e0',
+    borderRadius: '20px',
+    border: '1px solid #143b34',
     background: '#fff',
-    color: '#333',
+    color: '#143b34',
+    fontSize: '14px',
     fontWeight: 500,
     cursor: 'pointer'
   },
   serviceSection: {
-    padding: '24px 20px'
+    padding: '20px'
   },
   sectionTitle: {
     fontSize: '18px',
@@ -289,13 +268,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: '8px',
-    padding: '20px 16px',
+    padding: '24px 16px',
     borderRadius: '16px',
-    border: '2px solid transparent',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+    border: 'none',
     cursor: 'pointer',
-    transition: 'all 0.2s ease'
+    transition: 'transform 0.15s ease',
+    minHeight: '100px'
   },
   serviceIcon: {
     display: 'flex',

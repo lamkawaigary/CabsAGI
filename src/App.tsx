@@ -6,6 +6,7 @@ import { MessageProvider } from './context/MessageContext'
 const Landing = lazy(() => import('./pages/Landing'))
 const ShiftHome = lazy(() => import('./pages/ShiftHome'))
 const RouteDetail = lazy(() => import('./pages/RouteDetail'))
+const BookingPage = lazy(() => import('./pages/BookingPage'))
 const PassengerHome = lazy(() => import('./pages/PassengerHome'))
 const OrdersPage = lazy(() => import('./pages/Orders'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
@@ -102,6 +103,7 @@ function AppShell() {
             <Route path="/" element={<ShiftHome />} />
             <Route path="/login" element={<Landing />} />
             <Route path="/route/:routeId" element={<RouteDetail />} />
+            <Route path="/booking/:shiftId" element={<BookingPage />} />
           </Route>
 
           <Route element={<RequireAuth />}>

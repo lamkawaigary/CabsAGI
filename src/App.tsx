@@ -3,18 +3,15 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { MessageProvider } from './context/MessageContext'
 
-const Landing = lazy(() => import('./pages/Landing'))
 const ShiftHome = lazy(() => import('./pages/ShiftHome'))
 const RouteDetail = lazy(() => import('./pages/RouteDetail'))
 const BookingPage = lazy(() => import('./pages/BookingPage'))
-const PassengerHome = lazy(() => import('./pages/PassengerHome'))
-const OrdersPage = lazy(() => import('./pages/Orders'))
 const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const ProfilePage = lazy(() => import('./pages/Profile'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const DriverDashboard = lazy(() => import('./pages/DriverDashboard'))
-const PassengerLayout = lazy(() => import('./layouts/PassengerLayout'))
 const DriverLayout = lazy(() => import('./layouts/DriverLayout'))
+const PassengerLayout = lazy(() => import('./layouts/PassengerLayout'))
 
 function FullscreenLoading({ text }: { text: string }) {
   return (
@@ -78,7 +75,7 @@ const getDefaultAuthPath = (role: string | undefined) => {
   const normalized = normalizeRole(role)
   if (normalized === 'admin') return '/admin'
   if (normalized === 'driver') return '/driver'
-  return '/home'
+  return '/'  // Redirect to new shift-based homepage
 }
 
 function PublicOnly() {
@@ -101,20 +98,20 @@ function AppShell() {
         <Routes>
           <Route element={<PublicOnly />}>
             <Route path="/" element={<ShiftHome />} />
-            <Route path="/login" element={<Landing />} />
+            <Route path="/login" element={<ShiftHome />} />
             <Route path="/route/:routeId" element={<RouteDetail />} />
             <Route path="/booking/:shiftId" element={<BookingPage />} />
           </Route>
 
           <Route element={<RequireAuth />}>
             <Route element={<PassengerLayout />}>
-              <Route path="/home" element={<PassengerHome />} />
-              <Route path="/orders" element={<OrdersPage />} />
+              {/* New shift-based service - hide old point-to-point */}
+              <Route path="/home" element={<Navigate to="/" replace />} />
+              <Route path="/orders" element={<Navigate to="/my-bookings" replace />} />
               <Route path="/messages" element={<MessagesPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               {/* New shift-based routes */}
               <Route path="/my-bookings" element={<ShiftHome />} />
-              <Route path="/booking/:shiftId" element={<ShiftHome />} />
             </Route>
           </Route>
 

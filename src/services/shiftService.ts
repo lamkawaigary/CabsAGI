@@ -64,6 +64,12 @@ export const routeService = {
 // ==================== Shifts ====================
 
 export const shiftService = {
+  async getAll(): Promise<Shift[]> {
+    const q = query(shiftsCollection, orderBy('departureTime', 'asc'))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Shift))
+  },
+
   async getByRoute(routeId: string, date?: string): Promise<Shift[]> {
     let q = query(
       shiftsCollection, 

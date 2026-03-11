@@ -16,10 +16,11 @@ import {
   signInWithCredential,
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
+  signInWithPopup,
   signOut,
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, updateDoc, getDocs, query, where, collection } from 'firebase/firestore'
-import { auth, db } from '../firebaseConfig'
+import { auth, db, googleProvider } from '../firebaseConfig'
 import { TwilioService } from '../services/twilioService'
 
 type UserRole = 'passenger' | 'driver' | 'admin'
@@ -37,6 +38,7 @@ interface AuthContextValue {
   currentUser: AuthUser | null
   loading: boolean
   loginWithPassword: (input: string, password: string, regionCode?: string) => Promise<{ ok: boolean; message: string }>
+  loginWithGoogle: () => Promise<{ ok: boolean; message: string }>
   sendOtp: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
   verifyOtp: (otpCode: string) => Promise<{ ok: boolean; message: string }>
   registerUser: (params: {
@@ -189,6 +191,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const loginWithGoogle: AuthContextValue['loginWithGoogle'] = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider)
+      return { ok: true, message: 'Google 登入成功' }
+    } catch (err: unknown) {
+      const code = getErrorCode(err)
+      if (code === 'auth/popup-closed-by-user') {
+        return { ok: false, message: '已取消 Google 登入' }
+      }
+      if (code === 'auth/account-exists-with-different-credential') {
+        return { ok: false, message: '此 Google 帳號已被用作其他登入方式' }
+      }
+      return { ok: false, message: `Google 登入失敗: ${getErrorMessage(err)}` }
+    }
+  }
+
   const getRecaptchaVerifier = () => {
     if (window.recaptchaVerifier) return window.recaptchaVerifier
     const container = document.getElementById('recaptcha-container')
@@ -321,6 +339,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     currentUser,
     loading,
     loginWithPassword,
+    loginWithGoogle,
     sendOtp,
     verifyOtp,
     registerUser,

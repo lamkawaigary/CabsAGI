@@ -1,7 +1,7 @@
 
 import { db } from '../firebaseConfig';
-import { collection, query, getDocs, addDoc, updateDoc, doc, deleteDoc, orderBy, limit, where } from 'firebase/firestore';
-import { LocationData, Region } from '../types';
+import { collection, query, getDocs, addDoc, deleteDoc, doc, orderBy } from 'firebase/firestore';
+import { Region } from '../types';
 
 export interface POI {
     id: string;

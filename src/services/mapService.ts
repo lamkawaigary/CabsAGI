@@ -1,5 +1,5 @@
 
-import { LocationData, Region } from "../types";
+import type { LocationData } from "../types";
 import { STATIC_LOCATIONS } from "../data/staticLocations";
 
 // --- GLOBAL TYPES & DECLARATIONS ---
@@ -18,6 +18,17 @@ declare global {
 
 export type MapProvider = 'GOOGLE' | 'TENCENT' | 'AMAP' | 'OSM' | 'AUTO';
 export type CoordsSystem = 'WGS84' | 'GCJ02';
+
+// Type aliases for PassengerHome compatibility
+export type LocationRecord = LocationData;
+export type RouteResult = {
+  distance: number;
+  duration: number;
+  polyline: string;
+  tolls: number;
+  path?: Array<{ lat: number; lng: number }>;
+  hasRealPath?: boolean;
+};
 
 let isGoogleMapsBroken = false;
 
@@ -191,7 +202,7 @@ export const loadAMapSDK = (key: string, securityCode?: string): Promise<boolean
 // PART 3: URL GENERATORS (Iframe Visualization)
 // ============================================================================
 
-export const generateOSMUrl = (lat: number, lng: number, popupText?: string, coordsType: CoordsSystem = 'WGS84') => {
+export const generateOSMUrl = (lat: number, lng: number, _popupText?: string, coordsType: CoordsSystem = 'WGS84') => {
     let wgs = { lat, lng };
     if (coordsType === 'GCJ02') wgs = gcj02_to_wgs84(lng, lat);
     const delta = 0.008; 
@@ -534,4 +545,38 @@ export const getAMapDiagnostics = () => {
         plugins: isLoaded && window.AMap.Driving ? ['Driving'] : [],
         securityConfig: !!(window as any)._AMapSecurityConfig
     };
+};
+
+// Stub functions for PassengerHome compatibility - TODO: implement properly
+export const calculatePrice = (route: RouteResult): {
+  total: number;
+  distance: string;
+  duration: number;
+  tollsTotal: number;
+} => {
+  const distanceKm = route.distance;
+  const baseRate = 25; // HKD
+  const perKm = 8;
+  const total = baseRate + (distanceKm * perKm);
+  return {
+    total: Math.round(total),
+    distance: `${distanceKm.toFixed(1)} km`,
+    duration: route.duration,
+    tollsTotal: route.tolls
+  };
+};
+
+export const calculateRoute = async (pickup: LocationData, dropoff: LocationData): Promise<RouteResult> => {
+  const distanceKm = getDistanceFromLatLonInKm(
+    pickup.latitude ?? pickup.lat ?? 0,
+    pickup.longitude ?? pickup.lng ?? 0,
+    dropoff.latitude ?? dropoff.lat ?? 0,
+    dropoff.longitude ?? dropoff.lng ?? 0
+  );
+  return {
+    distance: distanceKm,
+    duration: Math.ceil(distanceKm * 2),
+    polyline: '',
+    tolls: 0
+  };
 };

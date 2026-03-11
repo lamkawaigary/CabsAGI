@@ -2,9 +2,9 @@
 import { db } from '../firebaseConfig';
 import { 
     collection, query, where, getDocs, limit, doc, setDoc, 
-    onSnapshot, addDoc, deleteDoc, orderBy, writeBatch
+    onSnapshot, addDoc, deleteDoc, writeBatch
 } from 'firebase/firestore';
-import { Region, PriceRule, FixedRouteRule, PricingConfig, RegionStatus, RegionConfig } from '../types';
+import type { PriceRule, FixedRouteRule, PricingConfig, RegionStatus, RegionConfig } from '../types';
 
 export interface MatrixRule {
     id: string;

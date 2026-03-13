@@ -54,6 +54,9 @@ export default function DriverDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Check if driver can accept orders
+  const canAcceptOrders = currentUser?.kycStatus === 'approved' && currentUser?.driverApproved
+
   useEffect(() => {
     loadData()
   }, [])
@@ -113,6 +116,23 @@ export default function DriverDashboard() {
 
   return (
     <div style={styles.container}>
+      {/* KYC Warning Banner */}
+      {!canAcceptOrders && (
+        <div style={{
+          background: currentUser?.kycStatus === 'pending' ? '#fff3cd' : '#f8d7da',
+          color: currentUser?.kycStatus === 'pending' ? '#856404' : '#721c24',
+          padding: '12px 16px',
+          textAlign: 'center',
+          fontSize: '14px',
+        }}>
+          {currentUser?.kycStatus === 'pending' ? (
+            <>⚠️ 您的KYC申請正在審批中，審批完成後即可接單</>
+          ) : (
+            <>🚫 您需要完成KYC認證並通過審批才能接單 | <a href="/profile" style={{color: '#007bff'}}>前往認證</a></>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <header style={styles.header}>
         <div>
@@ -153,8 +173,13 @@ export default function DriverDashboard() {
                     <div style={styles.shiftActions}>
                       {shift.status === 'SCHEDULED' || shift.status === 'OPEN' ? (
                         <button 
-                          style={styles.actionBtn}
-                          onClick={() => handleStartShift(shift)}
+                          style={{
+                            ...styles.actionBtn,
+                            opacity: canAcceptOrders ? 1 : 0.5,
+                            cursor: canAcceptOrders ? 'pointer' : 'not-allowed',
+                          }}
+                          onClick={() => canAcceptOrders && handleStartShift(shift)}
+                          disabled={!canAcceptOrders}
                         >
                           開始
                         </button>

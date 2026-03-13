@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties } from 'react'
 import { useAuth } from '../context/AuthContext'
+import RoleSelectionModal from '../components/RoleSelectionModal'
 
 type Mode = 'login' | 'register'
 type LoginMethod = 'password' | 'otp'
@@ -59,7 +60,7 @@ const inputStyle: CSSProperties = {
 }
 
 export default function Landing() {
-  const { loginWithPassword, loginWithGoogle, sendOtp, verifyOtp, registerUser, resetPasswordByPhone } = useAuth()
+  const { loginWithPassword, loginWithGoogle, sendOtp, verifyOtp, registerUser, resetPasswordByPhone, currentUser, needsRoleSelection, setNeedsRoleSelection } = useAuth()
 
   const [mode, setMode] = useState<Mode>('login')
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('password')
@@ -498,6 +499,20 @@ export default function Landing() {
           <div id="recaptcha-container" style={{ position: 'absolute', left: -9999, top: -9999 }} />
         </section>
       </div>
+
+      {/* Role Selection Modal for new users */}
+      <RoleSelectionModal
+        isOpen={needsRoleSelection && !!currentUser}
+        onComplete={(role) => {
+          setNeedsRoleSelection(false)
+          // Redirect based on role
+          if (role === 'driver') {
+            window.location.href = '/driver'
+          } else {
+            window.location.href = '/dashboard'
+          }
+        }}
+      />
     </div>
   )
 }

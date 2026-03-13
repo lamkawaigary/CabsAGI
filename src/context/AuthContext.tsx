@@ -32,11 +32,17 @@ export interface AuthUser {
   email: string
   role: UserRole
   points: number
+  // Driver-specific fields
+  kycStatus?: 'pending' | 'submitted' | 'approved' | 'rejected' | 'n/a'
+  driverApproved?: boolean
+  kycSubmittedAt?: string | null
 }
 
 interface AuthContextValue {
   currentUser: AuthUser | null
   loading: boolean
+  needsRoleSelection: boolean
+  setNeedsRoleSelection: (value: boolean) => void
   loginWithPassword: (input: string, password: string, regionCode?: string) => Promise<{ ok: boolean; message: string }>
   loginWithGoogle: () => Promise<{ ok: boolean; message: string }>
   sendOtp: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
@@ -126,9 +132,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [otpSession, setOtpSession] = useState<{ verificationId: string; phone: string } | null>(null)
+  const [needsRoleSelection, setNeedsRoleSelection] = useState(false)
 
   useEffect(() => {
+    // Timeout to prevent infinite loading if Firebase fails
+    const timeoutId = setTimeout(() => {
+      console.warn('Auth initialization timeout, setting loading to false')
+      setLoading(false)
+    }, 10000) // 10 seconds timeout
+
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      clearTimeout(timeoutId)
       if (!fbUser) {
         setCurrentUser(null)
         setLoading(false)
@@ -142,31 +156,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const ref = doc(db, 'users', fbUser.uid)
-      const snap = await getDoc(ref)
+      try {
+        const ref = doc(db, 'users', fbUser.uid)
+        const snap = await getDoc(ref)
 
-      if (snap.exists()) {
-        const data = snap.data() as Partial<AuthUser>
+        if (snap.exists()) {
+          const data = snap.data() as Partial<AuthUser>
+          const userRole = normalizeUserRole(data.role, data.email || fallbackEmail)
+          
+          // Check if user needs to select role (new user without role)
+          if (!data.role || (userRole === 'passenger' && !data.kycStatus)) {
+            setNeedsRoleSelection(true)
+          }
+          
+          setCurrentUser({
+            id: fbUser.uid,
+            name: data.name || 'Cabs User',
+            phone: data.phone || fbUser.phoneNumber || '',
+            email: data.email || fallbackEmail,
+            role: userRole,
+            points: data.points || 0,
+            kycStatus: data.kycStatus || 'n/a',
+            driverApproved: data.driverApproved || false,
+            kycSubmittedAt: data.kycSubmittedAt || null,
+          })
+        } else {
+          // New user - needs role selection
+          setNeedsRoleSelection(true)
+          const profile = defaultProfile(fbUser.uid, fallbackEmail)
+          if (fbUser.phoneNumber) {
+            profile.phone = fbUser.phoneNumber
+          }
+          await setDoc(ref, {
+            ...profile,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            kycStatus: 'n/a',
+            driverApproved: false,
+          })
+          setCurrentUser({ ...profile, kycStatus: 'n/a', driverApproved: false })
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err)
+        // Still allow login even if Firestore fails
         setCurrentUser({
           id: fbUser.uid,
-          name: data.name || 'Cabs User',
-          phone: data.phone || fbUser.phoneNumber || '',
-          email: data.email || fallbackEmail,
-          role: normalizeUserRole(data.role, data.email || fallbackEmail),
-          points: data.points || 0,
+          name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cabs User',
+          phone: fbUser.phoneNumber || '',
+          email: fallbackEmail,
+          role: 'passenger',
+          points: 0,
         })
-      } else {
-        const profile = defaultProfile(fbUser.uid, fallbackEmail)
-        if (fbUser.phoneNumber) {
-          profile.phone = fbUser.phoneNumber
-        }
-        await setDoc(ref, {
-          ...profile,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        setCurrentUser(profile)
       }
+      setLoading(false)
+    }, (error) => {
+      // Handle auth errors
+      console.error('Auth state change error:', error)
+      clearTimeout(timeoutId)
       setLoading(false)
     })
 
@@ -338,6 +384,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     currentUser,
     loading,
+    needsRoleSelection,
+    setNeedsRoleSelection,
     loginWithPassword,
     loginWithGoogle,
     sendOtp,

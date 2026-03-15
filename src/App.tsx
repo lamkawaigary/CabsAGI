@@ -51,6 +51,15 @@ function AppShell() {
         <Routes>
           {/* Public - homepage only */}
           <Route path="/" element={<ShiftHome />} />
+          
+          {/* Driver page - accessible without login */}
+          <Route path="/driver" element={
+            currentUser 
+              ? (userRole === 'driver' 
+                  ? <DriverDashboard /> 
+                  : <Navigate to={getDashboardPath(currentUser.role)} replace />)
+              : <DriverLanding />
+          } />
 
           {/* Auth required - route to appropriate dashboard based on role */}
           {currentUser && (
@@ -89,15 +98,6 @@ function AppShell() {
                 userRole === 'admin' 
                   ? <AdminConsole /> 
                   : <Navigate to={getDashboardPath(currentUser.role)} replace />
-              } />
-              
-              {/* Driver only - show landing if not logged in as driver */}
-              <Route path="/driver" element={
-                currentUser 
-                  ? (userRole === 'driver' 
-                      ? <DriverDashboard /> 
-                      : <Navigate to={getDashboardPath(currentUser.role)} replace />)
-                  : <DriverLanding />
               } />
             </>
           )}

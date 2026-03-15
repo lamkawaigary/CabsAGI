@@ -190,6 +190,11 @@ export default function Landing() {
     setLoading(false)
   }
 
+  // Driver flow - navigate to driver login/register
+  const handleDriverClick = () => {
+    window.location.href = '/driver'
+  }
+
   return (
     <div style={shell}>
       <div style={card}>
@@ -497,6 +502,39 @@ export default function Landing() {
           </div>
 
           <div id="recaptcha-container" style={{ position: 'absolute', left: -9999, top: -9999 }} />
+        </section>
+
+        {/* Driver Section - Separate flow for drivers */}
+        <section style={{ padding: '24px 28px', background: '#f8f7f4', borderTop: '1px solid #e8e2d6' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: '#8a8478', marginBottom: 8, fontWeight: 600, letterSpacing: '0.1em' }}>
+              司機專區
+            </div>
+            <button
+              onClick={handleDriverClick}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 10,
+                border: '1px solid #d2dfd4',
+                borderRadius: 12,
+                padding: '12px 24px',
+                fontWeight: 700,
+                background: '#fff',
+                color: '#284a41',
+                cursor: 'pointer',
+                fontSize: 14,
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M8 17h8M8 17a2 2 0 11-4 0 2 2 0 014 0zM16 17a2 2 0 104 0 2 2 0 00-4 0zM3 9h13a2 2 0 012 2v3H3V9zm13 0V6a2 2 0 00-2-2H5a2 2 0 00-2 2v3" />
+              </svg>
+              司機登入 / 註冊
+            </button>
+            <div style={{ fontSize: 11, color: '#9a948a', marginTop: 8 }}>
+              需要完成 KYC 審批才能接單
+            </div>
+          </div>
         </section>
       </div>
 

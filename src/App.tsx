@@ -11,6 +11,7 @@ const MessagesPage = lazy(() => import('./pages/MessagesPage'))
 const ProfilePage = lazy(() => import('./pages/Profile'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const DriverDashboard = lazy(() => import('./pages/DriverDashboard'))
+const DriverLanding = lazy(() => import('./pages/DriverLanding'))
 
 function FullscreenLoading({ text }: { text: string }) {
   return (
@@ -90,11 +91,13 @@ function AppShell() {
                   : <Navigate to={getDashboardPath(currentUser.role)} replace />
               } />
               
-              {/* Driver only */}
+              {/* Driver only - show landing if not logged in as driver */}
               <Route path="/driver" element={
-                userRole === 'driver' 
-                  ? <DriverDashboard /> 
-                  : <Navigate to={getDashboardPath(currentUser.role)} replace />
+                currentUser 
+                  ? (userRole === 'driver' 
+                      ? <DriverDashboard /> 
+                      : <Navigate to={getDashboardPath(currentUser.role)} replace />)
+                  : <DriverLanding />
               } />
             </>
           )}

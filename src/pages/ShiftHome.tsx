@@ -42,6 +42,21 @@ const Icons = {
     <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
     </svg>
+  ),
+  Home: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+      <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+    </svg>
+  ),
+  Ticket: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+      <path d="M22 10V6c0-1.11-.9-2-2-2H4c-1.1 0-1.99.89-1.99 2v4c1.1 0 1.99.9 1.99 2s-.89 2-2 2v4c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-4c-1.1 0-2-.9-2-2s.9-2 2-2zm-2-1.46c-1.19.69-2 1.99-2 3.46s.81 2.77 2 3.46V18H4v-2.54c1.19-.69 2-1.99 2-3.46 0-1.48-.8-2.77-1.99-3.46L4 6h16v2.54z"/>
+    </svg>
+  ),
+  User: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+    </svg>
   )
 }
 
@@ -202,25 +217,69 @@ export default function ShiftHome() {
         )}
       </section>
 
+      {/* Driver Section - Separate flow for drivers */}
+      <section style={{ padding: '20px 16px', background: '#f8f7f4', borderTop: '1px solid #e8e2d6', marginTop: '8px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: '#8a8478', marginBottom: 8, fontWeight: 600, letterSpacing: '0.1em' }}>
+            司機專區
+          </div>
+          <button
+            onClick={() => window.location.href = '/driver'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              border: '1px solid #d2dfd4',
+              borderRadius: 12,
+              padding: '12px 24px',
+              fontWeight: 700,
+              background: '#fff',
+              color: '#284a41',
+              cursor: 'pointer',
+              fontSize: 14,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M8 17h8M8 17a2 2 0 11-4 0 2 2 0 014 0zM16 17a2 2 0 104 0 2 2 0 00-4 0zM3 9h13a2 2 0 012 2v3H3V9zm13 0V6a2 2 0 00-2-2H5a2 2 0 00-2 2v3" />
+            </svg>
+            司機登入 / 註冊
+          </button>
+          <div style={{ fontSize: 11, color: '#9a948a', marginTop: 8 }}>
+            需要完成 KYC 審批才能接單
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer style={styles.footer}>
         <p>© 2026 CabsAGI 跨境商務出行平台</p>
       </footer>
+
+      {/* Show bottom nav when logged in */}
+      {currentUser && (
+        <nav style={loggedInNavStyle}>
+          <button style={loggedInNavItem} onClick={() => navigate('/dashboard')}>
+            <Icons.Home />
+            <span>首頁</span>
+          </button>
+          <button style={loggedInNavItem} onClick={() => navigate('/dashboard')}>
+            <Icons.Ticket />
+            <span>預訂</span>
+          </button>
+          <button style={loggedInNavItem} onClick={() => navigate('/profile')}>
+            <Icons.User />
+            <span>我的</span>
+          </button>
+        </nav>
+      )}
 
       {/* Login Modal */}
       <LoginModal 
         isOpen={showLoginModal} 
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={() => {
-          // Redirect based on user role
-          const role = currentUser?.role?.toLowerCase() || ''
-          if (role.includes('admin')) {
-            navigate('/admin')
-          } else if (role.includes('driver')) {
-            navigate('/driver')
-          } else {
-            navigate('/dashboard')
-          }
+          // Refresh to ensure auth state is properly reflected
+          window.location.reload()
         }}
       />
     </div>
@@ -402,4 +461,31 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#aaa',
     fontSize: '12px'
   }
+}
+
+// Logged in navigation styles
+const loggedInNavStyle: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  display: 'flex',
+  background: '#143b34',
+  padding: '10px 0',
+  zIndex: 100
+}
+
+const loggedInNavItem: React.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '4px',
+  padding: '8px',
+  border: 'none',
+  background: 'transparent',
+  color: '#fff',
+  fontSize: '12px',
+  cursor: 'pointer',
+  opacity: 0.7
 }

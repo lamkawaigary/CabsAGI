@@ -2,10 +2,24 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+// Role display mapping
+const roleLabels: Record<string, { label: string; color: string; bg: string }> = {
+  passenger: { label: '乘客', color: '#1e56a3', bg: '#e6f0ff' },
+  driver: { label: '司機', color: '#1a7a3a', bg: '#e6f7ed' },
+  admin: { label: '管理員', color: '#7a1a5a', bg: '#f7e6f0' },
+}
+
+function getRoleDisplay(role: string | undefined) {
+  if (!role) return { label: '未設定', color: '#666', bg: '#f0f0f0' }
+  return roleLabels[role.toLowerCase()] || { label: role, color: '#666', bg: '#f0f0f0' }
+}
+
 export default function ProfilePage() {
   const { currentUser, logout } = useAuth()
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
+
+  const roleDisplay = getRoleDisplay(currentUser?.role)
 
   const handleLogout = async () => {
     if (loggingOut) return
@@ -35,7 +49,43 @@ export default function ProfilePage() {
         <div style={{ fontSize: 14, color: '#355149' }}>電話: {currentUser?.phone || '未提供'}</div>
         <div style={{ fontSize: 14, color: '#355149' }}>帳號: {currentUser?.email}</div>
         <div style={{ fontSize: 14, color: '#355149' }}>積分: {currentUser?.points ?? 0}</div>
-        <div style={{ fontSize: 14, color: '#355149' }}>角色: {currentUser?.role || '-'}</div>
+        
+        {/* Role Display */}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 10,
+          marginTop: 4 
+        }}>
+          <span style={{ fontSize: 14, color: '#355149' }}>身份:</span>
+          <span style={{ 
+            display: 'inline-flex',
+            padding: '4px 12px', 
+            borderRadius: 20, 
+            fontSize: 13, 
+            fontWeight: 700,
+            color: roleDisplay.color,
+            background: roleDisplay.bg,
+          }}>
+            {roleDisplay.label}
+          </span>
+        </div>
+
+        {/* KYC Status for drivers */}
+        {currentUser?.role === 'driver' && (
+          <div style={{ 
+            fontSize: 13, 
+            color: currentUser?.kycStatus === 'approved' ? '#1a7a3a' : '#7a5a1a',
+            background: currentUser?.kycStatus === 'approved' ? '#e6f7ed' : '#fff3cd',
+            padding: '8px 12px',
+            borderRadius: 8,
+            marginTop: 4,
+          }}>
+            KYC 狀態: {currentUser?.kycStatus === 'approved' ? '✅ 已通過' : 
+                       currentUser?.kycStatus === 'pending' ? '⏳ 審批中' : 
+                       '❌ 未提交'}
+          </div>
+        )}
 
         {currentUser?.role === 'admin' && (
           <button

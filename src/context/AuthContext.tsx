@@ -68,6 +68,17 @@ declare global {
 const MASTER_EMAIL = 'lamgary@p7s.app'
 const MASTER_PHONE = '+85269277488'
 
+// Admin emails - can be extended
+const ADMIN_EMAILS = [
+  'lamgary@p7s.app',
+  'gary@zerototendesign.com',
+  'gary@zerototendesign.com'.toLowerCase(),
+]
+
+const isAdminEmail = (email: string): boolean => {
+  return ADMIN_EMAILS.includes(email.toLowerCase())
+}
+
 const getErrorCode = (err: unknown) =>
   err && typeof err === 'object' && 'code' in err && typeof (err as FirebaseError).code === 'string'
     ? (err as FirebaseError).code
@@ -83,6 +94,10 @@ const normalizeUserRole = (role: unknown, fallbackEmail = ''): UserRole => {
       return 'admin'
     }
     if (normalized === 'passenger' || normalized.startsWith('passenger')) return 'passenger'
+  }
+  // Check if email is in admin list
+  if (fallbackEmail && isAdminEmail(fallbackEmail)) {
+    return 'admin'
   }
   return fallbackEmail === MASTER_EMAIL ? 'admin' : 'passenger'
 }
@@ -317,6 +332,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cred = await createUserWithEmailAndPassword(auth, email, password)
 
       const isMaster = fullPhone === MASTER_PHONE
+      const isDriver = role === 'driver'
+      
       await setDoc(doc(db, 'users', cred.user.uid), {
         id: cred.user.uid,
         name,
@@ -324,6 +341,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         role: isMaster ? 'admin' : role,
         points: isMaster ? 999999 : 0,
+        // Driver-specific fields
+        kycStatus: isDriver ? 'pending' : 'n/a',
+        driverApproved: false,
+        kycSubmittedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })

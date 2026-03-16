@@ -7,16 +7,14 @@ import { getFunctions } from 'firebase/functions'
 
 // Your web app's Firebase configuration
 export const firebaseConfig = {
-  // Use the specific API Key for the p7s-web Firebase project.
-  // Do NOT use process.env.API_KEY here, as that is injected for the Gemini API
-  // and is not valid for this specific Firebase Authentication project.
-  apiKey: 'AIzaSyCbDYR-oItdJdED8PaZkZPXjRLvnWh7AuQ',
-  authDomain: 'p7s-web.firebaseapp.com',
-  projectId: 'p7s-web',
-  storageBucket: 'p7s-web.firebasestorage.app',
-  messagingSenderId: '498455425578',
-  appId: '1:498455425578:web:912932b56e0db607700953',
-  measurementId: 'G-XY47DGEXBC',
+  // CabsAGI Firebase project
+  apiKey: 'AIzaSyDMc-X5_gq9Z42t4rjSY9D8HiK4t4t_3d4',
+  authDomain: 'cabs-agi-a779f.firebaseapp.com',
+  projectId: 'cabs-agi-a779f',
+  storageBucket: 'cabs-agi-a779f.firebasestorage.app',
+  messagingSenderId: '1053090697035',
+  appId: '1:1053090697035:web:fe85b1b3b87985dc6f22ce',
+  measurementId: 'G-Q8ETG35J7H',
 }
 
 // Initialize Firebase

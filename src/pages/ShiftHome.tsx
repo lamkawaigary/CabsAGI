@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { routeService } from '../services/shiftService'
+import { routeService, shiftService } from '../services/shiftService'
 import LoginModal from '../components/LoginModal'
-import type { Route, RouteType } from '../types/shift'
+import type { Route, RouteType, Shift } from '../types/shift'
 
 // Icons as SVG components
 const Icons = {
@@ -80,21 +80,27 @@ export default function ShiftHome() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const [routes, setRoutes] = useState<Route[]>([])
+  const [shifts, setShifts] = useState<Shift[]>([])
   const [selectedType, setSelectedType] = useState<RouteType | null>(null)
   const [loading, setLoading] = useState(true)
   const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
-    loadRoutes()
+    loadData()
   }, [])
 
-  const loadRoutes = async () => {
+  const loadData = async () => {
     try {
       setLoading(true)
-      const allRoutes = await routeService.getAll()
+      const [allRoutes, allShifts] = await Promise.all([
+        routeService.getAll(),
+        shiftService.getAll()
+      ])
       setRoutes(allRoutes)
+      // Only show OPEN or SCHEDULED shifts
+      setShifts(allShifts.filter(s => s.status === 'OPEN' || s.status === 'SCHEDULED'))
     } catch (error) {
-      console.error('Failed to load routes:', error)
+      console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
     }
@@ -158,6 +164,34 @@ export default function ShiftHome() {
           })}
         </div>
       </section>
+
+      {/* Upcoming Shifts */}
+      {shifts.length > 0 && (
+        <section style={styles.routesSection}>
+          <div style={styles.routesHeader}>
+            <h2 style={styles.sectionTitle}>即將出發班次</h2>
+          </div>
+          <div style={styles.routesList}>
+            {shifts.map(shift => (
+              <div 
+                key={shift.id}
+                style={styles.routeCard}
+                onClick={() => currentUser ? navigate(`/shift/${shift.id}`) : setShowLoginModal(true)}
+              >
+                <div style={styles.routeInfo}>
+                  <span style={styles.routePath}>
+                    {shift.routeName || '班次'} • {new Date(shift.departureTime).toLocaleString('zh-HK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span style={styles.routeMeta}>
+                    {shift.availableSeats}/{shift.totalSeats} 位 • 狀態: {shift.status === 'OPEN' ? '可預訂' : '已滿'}
+                  </span>
+                </div>
+                <span style={styles.routePrice}>${shift.price}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Featured Routes */}
       <section style={styles.routesSection}>

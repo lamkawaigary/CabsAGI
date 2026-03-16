@@ -87,6 +87,11 @@ const getErrorCode = (err: unknown) =>
 const getErrorMessage = (err: unknown) => (err instanceof Error ? err.message : 'Unknown error')
 
 const normalizeUserRole = (role: unknown, fallbackEmail = ''): UserRole => {
+  // First check if email is in admin list (this takes priority)
+  if (fallbackEmail && isAdminEmail(fallbackEmail)) {
+    return 'admin'
+  }
+  
   if (typeof role === 'string') {
     const normalized = role.trim().toLowerCase()
     if (normalized === 'driver' || normalized.startsWith('driver')) return 'driver'
@@ -95,10 +100,7 @@ const normalizeUserRole = (role: unknown, fallbackEmail = ''): UserRole => {
     }
     if (normalized === 'passenger' || normalized.startsWith('passenger')) return 'passenger'
   }
-  // Check if email is in admin list
-  if (fallbackEmail && isAdminEmail(fallbackEmail)) {
-    return 'admin'
-  }
+  // Legacy check for MASTER_EMAIL
   return fallbackEmail === MASTER_EMAIL ? 'admin' : 'passenger'
 }
 

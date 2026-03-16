@@ -29,6 +29,14 @@ export interface Route {
   status: 'ACTIVE' | 'INACTIVE'
   createdAt: string
   updatedAt: string
+  
+  // Driver-created route fields
+  isDriverRoute?: boolean
+  driverId?: string
+  driverName?: string
+  driverPhone?: string
+  validFrom?: string // ISO timestamp
+  validTo?: string // ISO timestamp
 }
 
 // ==================== Shift Types ====================
@@ -38,6 +46,7 @@ export type ShiftStatus = 'SCHEDULED' | 'OPEN' | 'FULL' | 'IN_PROGRESS' | 'COMPL
 export interface Shift {
   id: string
   routeId: string
+  routeName?: string // For display
   departureTime: string // ISO timestamp
   arrivalTime?: string // ISO timestamp
   vehicleId: string

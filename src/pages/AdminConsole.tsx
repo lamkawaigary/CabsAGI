@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
+import { db } from '../firebaseConfig'
 import {
   assignOrderToDriverByAdmin,
   savePricingConfig,
@@ -23,7 +25,7 @@ import type {
 } from '../services/orderService'
 
 type NoticeTone = 'ok' | 'error' | 'info'
-type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing'
+type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing' | 'kyc'
 
 type RouteFormState = {
   id?: string
@@ -134,6 +136,10 @@ export default function AdminConsole() {
   const [pricing, setPricing] = useState<PricingConfigRecord>(DEFAULT_PRICING_FORM)
   const [pricingForm, setPricingForm] = useState<PricingConfigRecord>(DEFAULT_PRICING_FORM)
 
+  // KYC State
+  const [kycDrivers, setKycDrivers] = useState<AdminUserRecord[]>([])
+  const [loadingKyc, setLoadingKyc] = useState(false)
+
   const [loadingOrders, setLoadingOrders] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingRoutes, setLoadingRoutes] = useState(true)
@@ -220,6 +226,18 @@ export default function AdminConsole() {
       unsubRoutes()
       unsubPricing()
     }
+  }, [])
+
+  // Load KYC drivers
+  useEffect(() => {
+    setLoadingKyc(true)
+    const q = query(collection(db, 'users'), where('role', '==', 'driver'))
+    const unsub = onSnapshot(q, (snapshot) => {
+      const drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AdminUserRecord[]
+      setKycDrivers(drivers)
+      setLoadingKyc(false)
+    }, (err) => { console.error('KYC load error:', err); setLoadingKyc(false) })
+    return () => unsub()
   }, [])
 
   const summary = useMemo(() => {
@@ -502,6 +520,21 @@ export default function AdminConsole() {
     } finally {
       setUpdatingRouteId(null)
     }
+  }
+
+  // KYC handlers
+  const handleApproveDriver = async (driverId: string) => {
+    try {
+      await updateDoc(doc(db, 'users', driverId), { kycStatus: 'approved', driverApproved: true, kycApprovedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+      setNotice({ tone: 'ok', text: '✅ 司機 KYC 已批准' })
+    } catch (err) { console.error('Approve error:', err); setNotice({ tone: 'error', text: '批准失敗' }) }
+  }
+
+  const handleRejectDriver = async (driverId: string) => {
+    try {
+      await updateDoc(doc(db, 'users', driverId), { kycStatus: 'rejected', driverApproved: false, updatedAt: new Date().toISOString() })
+      setNotice({ tone: 'ok', text: '❌ 司機 KYC 已拒絕' })
+    } catch (err) { console.error('Reject error:', err); setNotice({ tone: 'error', text: '拒絕失敗' }) }
   }
 
   const handleSavePricing = async () => {
@@ -1342,6 +1375,39 @@ export default function AdminConsole() {
     </div>
   )
 
+  const renderKycTab = () => (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <h3 style={{ margin: 0, color: '#27483f' }}>司機 KYC 審批</h3>
+      {loadingKyc ? <div style={{ fontSize: 13, color: '#6e827c' }}>載入中...</div> : kycDrivers.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#6e827c', background: '#f5f8f5', borderRadius: 12 }}>暫無司機用户</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {kycDrivers.filter(d => d.kycStatus !== 'approved').map(driver => (
+            <div key={driver.id} style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 12, display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div><div style={{ fontWeight: 700, color: '#27483f' }}>{driver.name}</div><div style={{ fontSize: 12, color: '#6e827c' }}>{driver.phone}</div></div>
+                <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: driver.kycStatus === 'pending' ? '#fff3cd' : '#f8d7da', color: driver.kycStatus === 'pending' ? '#856404' : '#721c24' }}>{driver.kycStatus === 'pending' ? '⏳ 審批中' : '❌ 已拒絕'}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => handleApproveDriver(driver.id)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #c3dfcf', background: '#eff9f2', color: '#2c5a4f', fontWeight: 600, cursor: 'pointer' }}>✅ 批准</button>
+                <button onClick={() => handleRejectDriver(driver.id)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #edc2bb', background: '#fff0ec', color: '#9c3d31', fontWeight: 600, cursor: 'pointer' }}>❌ 拒絕</button>
+              </div>
+            </div>
+          ))}
+          {kycDrivers.filter(d => d.kycStatus === 'approved').length > 0 && (
+            <><h4 style={{ margin: '16px 0 8px', color: '#6e827c', fontSize: 13 }}>已批准的司機 ({kycDrivers.filter(d => d.kycStatus === 'approved').length})</h4>
+            {kycDrivers.filter(d => d.kycStatus === 'approved').map(driver => (
+              <div key={driver.id} style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div><div style={{ fontWeight: 700, color: '#27483f' }}>{driver.name}</div><div style={{ fontSize: 12, color: '#6e827c' }}>{driver.phone}</div></div>
+                <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: '#eff9f2', color: '#2c5a4f' }}>✅ 已批准</span>
+              </div>
+            ))}</>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div style={{ minHeight: '100vh', background: '#f4f7f5' }}>
       <header
@@ -1399,6 +1465,7 @@ export default function AdminConsole() {
             { key: 'users', label: '用戶管理' },
             { key: 'routes', label: '官方班次' },
             { key: 'pricing', label: '價格設定' },
+            { key: 'kyc', label: 'KYC審批' },
           ].map((item) => (
             <button
               key={item.key}
@@ -1450,6 +1517,7 @@ export default function AdminConsole() {
         {activeTab === 'users' && renderUsersTab()}
         {activeTab === 'routes' && renderRoutesTab()}
         {activeTab === 'pricing' && renderPricingTab()}
+        {activeTab === 'kyc' && renderKycTab()}
       </main>
     </div>
   )

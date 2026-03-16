@@ -89,6 +89,7 @@ const getErrorMessage = (err: unknown) => (err instanceof Error ? err.message : 
 const normalizeUserRole = (role: unknown, fallbackEmail = ''): UserRole => {
   // First check if email is in admin list (this takes priority)
   if (fallbackEmail && isAdminEmail(fallbackEmail)) {
+    console.log('[DEBUG] Admin email detected:', fallbackEmail, '-> admin')
     return 'admin'
   }
   
@@ -101,6 +102,7 @@ const normalizeUserRole = (role: unknown, fallbackEmail = ''): UserRole => {
     if (normalized === 'passenger' || normalized.startsWith('passenger')) return 'passenger'
   }
   // Legacy check for MASTER_EMAIL
+  console.log('[DEBUG] Role from DB:', role, 'Email:', fallbackEmail)
   return fallbackEmail === MASTER_EMAIL ? 'admin' : 'passenger'
 }
 
@@ -180,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (snap.exists()) {
           const data = snap.data() as Partial<AuthUser>
           const userRole = normalizeUserRole(data.role, data.email || fallbackEmail)
+          console.log('[DEBUG] User data:', data.email, 'role from DB:', data.role, 'calculated role:', userRole)
           
           // Check if user needs to select role (new user without role)
           if (!data.role || (userRole === 'passenger' && !data.kycStatus)) {

@@ -49,8 +49,12 @@ function AppShell() {
     <BrowserRouter>
       <Suspense fallback={<FullscreenLoading text="頁面載入中..." />}>
         <Routes>
-          {/* Public - homepage only */}
-          <Route path="/" element={<ShiftHome />} />
+          {/* Root path - redirect to appropriate dashboard based on role */}
+          <Route path="/" element={
+            currentUser 
+              ? <Navigate to={getDashboardPath(currentUser.role)} replace />
+              : <ShiftHome />
+          } />
           
           {/* Driver page - accessible without login */}
           <Route path="/driver" element={

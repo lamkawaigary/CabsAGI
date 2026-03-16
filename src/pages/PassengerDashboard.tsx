@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { routeService, bookingService } from '../services/shiftService'
-import type { Route, Booking, RouteType } from '../types/shift'
+import { routeService, shiftService, bookingService } from '../services/shiftService'
+import type { Route, Booking, RouteType, Shift } from '../types/shift'
 
 // Icons
 const Icons = {
@@ -57,6 +57,7 @@ export default function PassengerDashboard() {
   const { currentUser, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('home')
   const [routes, setRoutes] = useState<Route[]>([])
+  const [shifts, setShifts] = useState<Shift[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -67,11 +68,13 @@ export default function PassengerDashboard() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [routesData, bookingsData] = await Promise.all([
+      const [routesData, shiftsData, bookingsData] = await Promise.all([
         routeService.getAll(),
+        shiftService.getAll(),
         currentUser ? bookingService.getByUser(currentUser.id) : Promise.resolve([])
       ])
       setRoutes(routesData)
+      setShifts(shiftsData.filter(s => s.status === 'OPEN' || s.status === 'SCHEDULED'))
       setBookings(bookingsData)
     } catch (error) {
       console.error('Failed to load data:', error)
@@ -128,6 +131,26 @@ export default function PassengerDashboard() {
                 ))}
               </div>
             </section>
+
+            {/* Available Shifts */}
+            {shifts.length > 0 && (
+              <section style={styles.section}>
+                <h2 style={styles.sectionTitle}>即將出發班次</h2>
+                <div style={styles.routesList}>
+                  {shifts.slice(0, 5).map(shift => (
+                    <button key={shift.id} style={styles.routeCard} onClick={() => navigate('/')}>
+                      <div style={styles.routeInfo}>
+                        <span style={styles.routePath}>
+                          {shift.routeName || '班次'} • {new Date(shift.departureTime).toLocaleString('zh-HK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span style={styles.routeMeta}>{shift.availableSeats}/{shift.totalSeats} 位</span>
+                      </div>
+                      <span style={styles.routePrice}>${shift.price}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Available Routes */}
             <section style={styles.section}>

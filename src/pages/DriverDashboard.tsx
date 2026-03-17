@@ -206,7 +206,9 @@ export default function DriverDashboard() {
             <h2 style={styles.sectionTitle}>我的訂單</h2>
             {/* Debug: show all in-progress shifts */}
             <div style={{fontSize: 12, color: '#999', marginBottom: 10}}>
-              共 {shifts.length} 班次, {shifts.filter(s => s.status === 'IN_PROGRESS').length} 進行中
+              共 {shifts.length} 班次, 進行中: {shifts.filter(s => s.status === 'IN_PROGRESS').length}
+              <br/>
+              Status values: {shifts.map(s => s.status).join(', ')}
             </div>
             {shifts.filter(s => s.status === 'IN_PROGRESS').length === 0 ? (
               <div style={styles.empty}>暫無進行中的訂單</div>

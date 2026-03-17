@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { shiftService, bookingService } from '../services/shiftService'
-import type { Shift, Booking } from '../types/shift'
+import { shiftService } from '../services/shiftService'
+import type { Shift } from '../types/shift'
 
 // Icons
 const Icons = {
@@ -33,7 +33,7 @@ const Icons = {
   )
 }
 
-type Tab = 'shifts' | 'passengers' | 'profile'
+type Tab = 'shifts' | 'orders' | 'kyc' | 'profile'
 
 const formatTime = (timestamp: string) => {
   const date = new Date(parseInt(timestamp))
@@ -50,8 +50,6 @@ export default function DriverDashboard() {
   const { currentUser, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('shifts')
   const [shifts, setShifts] = useState<Shift[]>([])
-  const [selectedShift, setSelectedShift] = useState<Shift | null>(null)
-  const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
 
   // Check if driver can accept orders
@@ -75,22 +73,19 @@ export default function DriverDashboard() {
     }
   }
 
-  const loadBookings = async (shiftId: string) => {
-    try {
-      const shiftBookings = await bookingService.getByShift(shiftId)
-      setBookings(shiftBookings)
-    } catch (error) {
-      console.error('Failed to load bookings:', error)
-    }
-  }
-
   const handleStartShift = async (shift: Shift) => {
     try {
-      await shiftService.updateStatus(shift.id, 'IN_PROGRESS')
+      // Assign driver to shift and change status
+      await shiftService.update(shift.id, {
+        driverId: currentUser?.id,
+        driverName: currentUser?.name,
+        driverPhone: currentUser?.phone,
+        status: 'IN_PROGRESS'
+      })
       await shiftService.updateSeats(shift.id, shift.availableSeats - 1)
       loadData()
     } catch (error) {
-      console.error('Failed to start shift:', error)
+      console.error('Failed to accept shift:', error)
     }
   }
 
@@ -110,7 +105,8 @@ export default function DriverDashboard() {
 
   const tabs = [
     { id: 'shifts' as Tab, label: '班次', icon: Icons.Orders },
-    { id: 'passengers' as Tab, label: '乘客', icon: Icons.User },
+    { id: 'orders' as Tab, label: '訂單', icon: Icons.Orders },
+    { id: 'kyc' as Tab, label: 'KYC', icon: Icons.User },
     { id: 'profile' as Tab, label: '個人', icon: Icons.User }
   ]
 
@@ -165,7 +161,7 @@ export default function DriverDashboard() {
                         <span>{shift.availableSeats}/{shift.totalSeats} 位</span>
                       </div>
                       <div style={styles.shiftStatus}>
-                        {shift.status === 'SCHEDULED' ? '📅 待開始' : 
+                        {shift.status === 'SCHEDULED' ? '📅 待接單' : 
                          shift.status === 'OPEN' ? '🟢 可接載' :
                          shift.status === 'IN_PROGRESS' ? '🚗 進行中' : '✅ 已完成'}
                       </div>
@@ -181,7 +177,7 @@ export default function DriverDashboard() {
                           onClick={() => canAcceptOrders && handleStartShift(shift)}
                           disabled={!canAcceptOrders}
                         >
-                          開始
+                          接單
                         </button>
                       ) : shift.status === 'IN_PROGRESS' ? (
                         <button 
@@ -193,11 +189,7 @@ export default function DriverDashboard() {
                       ) : null}
                       <button 
                         style={{...styles.actionBtn, background: '#1976D2', marginTop: '8px'}}
-                        onClick={() => {
-                          setSelectedShift(shift)
-                          loadBookings(shift.id)
-                          setActiveTab('passengers')
-                        }}
+                        onClick={() => setActiveTab('orders')}
                       >
                         乘客名單
                       </button>
@@ -209,42 +201,64 @@ export default function DriverDashboard() {
           </section>
         )}
 
-        {activeTab === 'passengers' && (
+        {activeTab === 'orders' && (
           <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>乘客名單</h2>
-            {selectedShift ? (
-              <>
-                <div style={styles.shiftHeader}>
-                  <span style={styles.shiftTime}>{formatTime(selectedShift.departureTime)}</span>
-                  <span style={styles.shiftMeta}>{selectedShift.availableSeats} 位剩餘</span>
-                </div>
-                {bookings.length === 0 ? (
-                  <div style={styles.empty}>暫無乘客預訂</div>
-                ) : (
-                  <div style={styles.passengersList}>
-                    {bookings.map(booking => (
-                      <div key={booking.id} style={styles.passengerCard}>
-                        <div style={styles.passengerInfo}>
-                          <span style={styles.passengerName}>{booking.passengerName}</span>
-                          <span style={styles.passengerPhone}>{booking.passengerPhone}</span>
-                        </div>
-                        <div style={styles.passengerMeta}>
-                          <span>{booking.seatCount} 位</span>
-                          <span style={{
-                            ...styles.statusBadge,
-                            background: booking.status === 'CONFIRMED' ? '#d4edda' : '#fff3cd'
-                          }}>
-                            {booking.status === 'CONFIRMED' ? '✅ 已確認' : '⏳ 處理中'}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
+            <h2 style={styles.sectionTitle}>我的訂單</h2>
+            {/* Show shifts that driver has accepted */}
+            {shifts.filter(s => s.driverId === currentUser?.id || s.status === 'IN_PROGRESS').length === 0 ? (
+              <div style={styles.empty}>暫無進行中的訂單</div>
             ) : (
-              <div style={styles.empty}>請先選擇班次</div>
+              shifts.filter(s => s.driverId === currentUser?.id || s.status === 'IN_PROGRESS').map(shift => (
+                <div key={shift.id} style={styles.shiftCard}>
+                  <div style={styles.shiftHeader}>
+                    <span style={styles.shiftTime}>{shift.routeName}</span>
+                    <span style={styles.shiftStatus}>{shift.status === 'IN_PROGRESS' ? '🚗 進行中' : '✅ 已接單'}</span>
+                  </div>
+                  <div style={styles.shiftDetails}>
+                    <span>出發: {new Date(shift.departureTime).toLocaleString('zh-HK')}</span>
+                    <span>剩餘座位: {shift.availableSeats}</span>
+                  </div>
+                  <button style={{...styles.actionBtn, background: '#4CAF50'}} onClick={() => handleCompleteShift(shift)}>
+                    完成訂單
+                  </button>
+                </div>
+              ))
             )}
+          </section>
+        )}
+
+        {activeTab === 'kyc' && (
+          <section style={styles.section}>
+            <h2 style={styles.sectionTitle}>KYC 身份驗證</h2>
+            <div style={styles.profileCard}>
+              {currentUser?.kycStatus === 'approved' ? (
+                <div style={{textAlign: 'center', padding: 20}}>
+                  <div style={{fontSize: 48, marginBottom: 12}}>✅</div>
+                  <h3 style={{color: '#2e7d32', marginBottom: 8}}>已通過驗證</h3>
+                  <p style={{color: '#666'}}>你可以接單喇！</p>
+                </div>
+              ) : currentUser?.kycStatus === 'pending' ? (
+                <div style={{textAlign: 'center', padding: 20}}>
+                  <div style={{fontSize: 48, marginBottom: 12}}>⏳</div>
+                  <h3 style={{color: '#f57c00', marginBottom: 8}}>審批中</h3>
+                  <p style={{color: '#666'}}>請耐心等待管理員審批</p>
+                </div>
+              ) : (
+                <>
+                  <div style={{marginBottom: 16}}>
+                    <p style={{color: '#666', marginBottom: 12}}>提交以下資料以通過身份驗證：</p>
+                    <ul style={{color: '#666', paddingLeft: 20, lineHeight: 1.8}}>
+                      <li>身份證明文件</li>
+                      <li>駕駛執照</li>
+                      <li>車輛登記文件</li>
+                    </ul>
+                  </div>
+                  <button style={{...styles.actionBtn, width: '100%', padding: 14, fontSize: 16}}>
+                    提交 KYC 資料
+                  </button>
+                </>
+              )}
+            </div>
           </section>
         )}
 

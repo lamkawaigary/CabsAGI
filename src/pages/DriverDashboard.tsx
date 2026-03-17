@@ -97,6 +97,13 @@ export default function DriverDashboard() {
     }
   }
 
+  const handleOpenChat = async (shift: Shift) => {
+    // For demo, create a test conversation ID
+    // In real app, would get passenger info from bookings and create/get conversation
+    const testConversationId = `demo_${shift.id}_${Date.now()}`
+    navigate(`/driver/chat/${testConversationId}`)
+  }
+
   const handleLogout = async () => {
     await logout()
     navigate('/')
@@ -223,7 +230,7 @@ export default function DriverDashboard() {
                     <span>剩餘座位: {shift.availableSeats}</span>
                   </div>
                   <div style={{display: 'flex', gap: 8, marginTop: 8}}>
-                    <button style={{...styles.actionBtn, background: '#2196F3', flex: 1}}>
+                    <button style={{...styles.actionBtn, background: '#2196F3', flex: 1}} onClick={() => handleOpenChat(shift)}>
                       💬 對話
                     </button>
                     <button style={{...styles.actionBtn, background: '#4CAF50', flex: 1}} onClick={() => handleCompleteShift(shift)}>

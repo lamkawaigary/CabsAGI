@@ -190,3 +190,29 @@ export interface PaginatedResponse<T> {
   pageSize: number
   hasMore: boolean
 }
+
+// ==================== Chat Types ====================
+export interface ChatConversation {
+  id: string
+  participants: string[]
+  participantNames: Record<string, string>
+  participantRoles: Record<string, 'driver' | 'passenger' | 'admin'>
+  shiftId?: string
+  routeName?: string
+  lastMessage?: string
+  lastMessageAt?: string
+  createdAt: string
+  updatedAt: string
+  status: 'active' | 'closed'
+}
+
+export interface ChatMessage {
+  id: string
+  conversationId: string
+  senderId: string
+  senderName: string
+  content: string
+  imageUrl?: string
+  createdAt: string
+  readBy: string[]
+}

@@ -222,9 +222,14 @@ export default function DriverDashboard() {
                     <span>出發: {new Date(shift.departureTime).toLocaleString('zh-HK')}</span>
                     <span>剩餘座位: {shift.availableSeats}</span>
                   </div>
-                  <button style={{...styles.actionBtn, background: '#4CAF50'}} onClick={() => handleCompleteShift(shift)}>
-                    完成訂單
-                  </button>
+                  <div style={{display: 'flex', gap: 8, marginTop: 8}}>
+                    <button style={{...styles.actionBtn, background: '#2196F3', flex: 1}}>
+                      💬 對話
+                    </button>
+                    <button style={{...styles.actionBtn, background: '#4CAF50', flex: 1}} onClick={() => handleCompleteShift(shift)}>
+                      完成訂單
+                    </button>
+                  </div>
                 </div>
               ))
             )}

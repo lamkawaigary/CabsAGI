@@ -12,6 +12,7 @@ const ProfilePage = lazy(() => import('./pages/Profile'))
 const AdminConsole = lazy(() => import('./pages/AdminConsole'))
 const DriverDashboard = lazy(() => import('./pages/DriverDashboard'))
 const DriverLanding = lazy(() => import('./pages/DriverLanding'))
+const ChatPage = lazy(() => import('./pages/ChatPage'))
 
 function FullscreenLoading({ text }: { text: string }) {
   return (
@@ -92,6 +93,12 @@ function AppShell() {
                 userRole === 'passenger' 
                   ? <MessagesPage /> 
                   : <Navigate to={getDashboardPath(currentUser.role)} replace />
+              } />
+              <Route path="/chat/:conversationId" element={
+                currentUser ? <ChatPage /> : <Navigate to="/" replace />
+              } />
+              <Route path="/driver/chat/:conversationId" element={
+                currentUser ? <ChatPage /> : <Navigate to="/driver" replace />
               } />
               <Route path="/profile" element={
                 <ProfilePage />

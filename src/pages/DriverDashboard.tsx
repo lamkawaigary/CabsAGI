@@ -204,11 +204,14 @@ export default function DriverDashboard() {
         {activeTab === 'orders' && (
           <section style={styles.section}>
             <h2 style={styles.sectionTitle}>我的訂單</h2>
-            {/* Show shifts that driver has accepted */}
-            {shifts.filter(s => s.driverId && (s.status === 'IN_PROGRESS' || s.status === 'COMPLETED')).length === 0 ? (
+            {/* Debug: show all in-progress shifts */}
+            <div style={{fontSize: 12, color: '#999', marginBottom: 10}}>
+              共 {shifts.length} 班次, {shifts.filter(s => s.status === 'IN_PROGRESS').length} 進行中
+            </div>
+            {shifts.filter(s => s.status === 'IN_PROGRESS').length === 0 ? (
               <div style={styles.empty}>暫無進行中的訂單</div>
             ) : (
-              shifts.filter(s => s.driverId && (s.status === 'IN_PROGRESS' || s.status === 'COMPLETED')).map(shift => (
+              shifts.filter(s => s.status === 'IN_PROGRESS').map(shift => (
                 <div key={shift.id} style={styles.shiftCard}>
                   <div style={styles.shiftHeader}>
                     <span style={styles.shiftTime}>{shift.routeName}</span>

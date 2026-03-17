@@ -210,10 +210,10 @@ export default function DriverDashboard() {
               <br/>
               Status values: {shifts.map(s => s.status).join(', ')}
             </div>
-            {shifts.filter(s => s.status === 'IN_PROGRESS').length === 0 ? (
+            {shifts.length === 0 ? (
               <div style={styles.empty}>暫無進行中的訂單</div>
             ) : (
-              shifts.filter(s => s.status === 'IN_PROGRESS').map(shift => (
+              shifts.map(shift => (
                 <div key={shift.id} style={styles.shiftCard}>
                   <div style={styles.shiftHeader}>
                     <span style={styles.shiftTime}>{shift.routeName}</span>

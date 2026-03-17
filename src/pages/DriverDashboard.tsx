@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { shiftService } from '../services/shiftService'
+import { shiftService, bookingService } from '../services/shiftService'
+import { chatService, systemMessageService } from '../services/chatService'
 import type { Shift } from '../types/shift'
 
 // Icons
@@ -98,10 +99,39 @@ export default function DriverDashboard() {
   }
 
   const handleOpenChat = async (shift: Shift) => {
-    // For demo, create a test conversation ID
-    // In real app, would get passenger info from bookings and create/get conversation
-    const testConversationId = `demo_${shift.id}_${Date.now()}`
-    navigate(`/driver/chat/${testConversationId}`)
+    if (!currentUser) return
+    
+    try {
+      // Get bookings for this shift to find passenger
+      const bookings = await bookingService.getByShift(shift.id)
+      
+      if (bookings.length === 0) {
+        alert('呢個班次暫時未有乘客預訂')
+        return
+      }
+      
+      // Get first passenger's booking
+      const booking = bookings[0]
+      
+      // Get or create conversation between driver and passenger
+      const conversationId = await chatService.getOrCreateShiftConversation(
+        shift.id,
+        currentUser.id,
+        currentUser.name || '司機',
+        booking.userId,  // Use userId as passenger ID
+        booking.passengerName,
+        shift.routeName || '班次'
+      )
+      
+      // Send system message if this is a new conversation
+      await systemMessageService.driverAcceptedShift(conversationId, currentUser.name || '司機')
+      
+      // Navigate to chat
+      navigate(`/driver/chat/${conversationId}`)
+    } catch (error) {
+      console.error('Failed to open chat:', error)
+      alert('無法開啟對話，請再試一次')
+    }
   }
 
   const handleLogout = async () => {

@@ -198,3 +198,39 @@ export const messageService = {
     await Promise.all(updates)
   }
 }
+
+// ==================== System Messages ====================
+
+export const systemMessageService = {
+  // Send a system message (e.g., when driver accepts order)
+  async sendSystemMessage(
+    conversationId: string,
+    message: string
+  ): Promise<void> {
+    const systemMessage = {
+      conversationId,
+      senderId: 'SYSTEM',
+      senderName: '系統',
+      content: message,
+      isSystem: true,
+      createdAt: serverTimestamp(),
+      readBy: []
+    }
+    
+    await addDoc(collection(db, `conversations/${conversationId}/messages`), systemMessage)
+    await chatService.updateLastMessage(conversationId, message)
+  },
+
+  // Pre-defined system messages
+  async driverAcceptedShift(conversationId: string, driverName: string) {
+    await this.sendSystemMessage(conversationId, `🚗 司機 ${driverName} 已接單，請留意對話`)
+  },
+
+  async driverCompletedShift(conversationId: string, driverName: string) {
+    await this.sendSystemMessage(conversationId, `✅ 司機 ${driverName} 已完成行程，感謝使用 CabsAGI`)
+  },
+
+  async passengerBookedShift(conversationId: string, passengerName: string) {
+    await this.sendSystemMessage(conversationId, `👤 乘客 ${passengerName} 已預訂班次`)
+  }
+}

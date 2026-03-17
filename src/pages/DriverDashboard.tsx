@@ -62,10 +62,9 @@ export default function DriverDashboard() {
   const loadData = async () => {
     try {
       setLoading(true)
-      // In real app, filter by driver ID
-      // For now, get all scheduled shifts
+      // Get all shifts - including SCHEDULED, OPEN, and IN_PROGRESS
       const allShifts = await shiftService.getAll()
-      setShifts(allShifts.filter(s => s.status === 'SCHEDULED' || s.status === 'OPEN'))
+      setShifts(allShifts.filter(s => s.status === 'SCHEDULED' || s.status === 'OPEN' || s.status === 'IN_PROGRESS'))
     } catch (error) {
       console.error('Failed to load shifts:', error)
     } finally {
@@ -151,7 +150,7 @@ export default function DriverDashboard() {
               <div style={styles.empty}>今日無班次</div>
             ) : (
               <div style={styles.shiftsList}>
-                {shifts.map(shift => (
+                {shifts.filter(s => s.driverId).map(shift => (
                   <div key={shift.id} style={styles.shiftCard}>
                     <div style={styles.shiftInfo}>
                       <div style={styles.shiftTime}>{formatTime(shift.departureTime)}</div>
@@ -208,12 +207,12 @@ export default function DriverDashboard() {
             <div style={{fontSize: 12, color: '#999', marginBottom: 10}}>
               共 {shifts.length} 班次, 進行中: {shifts.filter(s => s.status === 'IN_PROGRESS').length}
               <br/>
-              Status values: {shifts.map(s => s.status).join(', ')}
+              Status values: {shifts.filter(s => s.driverId).map(s => s.status).join(', ')}
             </div>
             {shifts.length === 0 ? (
-              <div style={styles.empty}>暫無進行中的訂單</div>
+              <div style={styles.empty}>暫無已接的訂單</div>
             ) : (
-              shifts.map(shift => (
+              shifts.filter(s => s.driverId).map(shift => (
                 <div key={shift.id} style={styles.shiftCard}>
                   <div style={styles.shiftHeader}>
                     <span style={styles.shiftTime}>{shift.routeName}</span>

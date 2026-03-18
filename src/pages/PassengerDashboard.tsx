@@ -74,11 +74,8 @@ export default function PassengerDashboard() {
         currentUser ? bookingService.getByUser(currentUser.id) : Promise.resolve([])
       ])
       setRoutes(routesData)
-      // Show all shifts that are OPEN or SCHEDULED, and are public
-      setShifts(shiftsData.filter(s => 
-        (s.status === 'OPEN' || s.status === 'SCHEDULED') && 
-        (s.visibility === 'public' || !s.visibility)
-      ))
+      // Show all shifts for now
+      setShifts(shiftsData)
       setBookings(bookingsData)
     } catch (error) {
       console.error('Failed to load data:', error)

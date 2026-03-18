@@ -54,6 +54,7 @@ export interface Shift {
   driverName?: string
   driverPhone?: string
   status: ShiftStatus
+  visibility: 'public' | 'drivers_only' | 'hidden' // Who can see this shift
   availableSeats: number
   totalSeats: number
   price: number

@@ -29,6 +29,7 @@ export interface AuthUser {
   id: string
   name: string
   phone: string
+  phoneVerified: boolean
   email: string
   role: UserRole
   points: number
@@ -142,6 +143,7 @@ const defaultProfile = (uid: string, email: string): AuthUser => ({
   id: uid,
   name: email.split('@')[0] || 'Cabs User',
   phone: email.endsWith('@p7s.app') ? `+${email.split('@')[0]}` : '',
+  phoneVerified: false,
   email,
   role: normalizeUserRole(undefined, email),
   points: email === MASTER_EMAIL ? 999999 : 0,
@@ -193,6 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             id: fbUser.uid,
             name: data.name || 'Cabs User',
             phone: data.phone || fbUser.phoneNumber || '',
+            phoneVerified: data.phoneVerified || false,
             email: data.email || fallbackEmail,
             role: userRole,
             points: data.points || 0,
@@ -213,8 +216,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             updatedAt: new Date().toISOString(),
             kycStatus: 'n/a',
             driverApproved: false,
+            phoneVerified: false,
           })
-          setCurrentUser({ ...profile, kycStatus: 'n/a', driverApproved: false })
+          setCurrentUser({ ...profile, kycStatus: 'n/a', driverApproved: false, phoneVerified: false })
         }
       } catch (err) {
         console.error('Error fetching user data:', err)
@@ -223,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: fbUser.uid,
           name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cabs User',
           phone: fbUser.phoneNumber || '',
+          phoneVerified: false,
           email: fallbackEmail,
           role: 'passenger',
           points: 0,
@@ -308,10 +313,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: cred.user.uid,
           name: `用戶${otpSession.phone.slice(-4)}`,
           phone: otpSession.phone,
+          phoneVerified: true,
           email: formatEmailFromPhone(otpSession.phone),
           role: 'passenger',
           points: 0,
           createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+      } else {
+        // Update existing user to mark phone as verified
+        await updateDoc(ref, {
+          phone: otpSession.phone,
+          phoneVerified: true,
           updatedAt: new Date().toISOString(),
         })
       }
@@ -343,6 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: cred.user.uid,
         name,
         phone: fullPhone,
+        phoneVerified: true,
         email,
         role: isMaster ? 'admin' : role,
         points: isMaster ? 999999 : 0,

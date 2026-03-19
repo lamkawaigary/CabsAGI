@@ -11,11 +11,7 @@ import type { FirebaseError } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
-  PhoneAuthProvider,
-  RecaptchaVerifier,
-  signInWithCredential,
   signInWithEmailAndPassword,
-  signInWithPhoneNumber,
   signInWithPopup,
   signOut,
 } from 'firebase/auth'
@@ -60,11 +56,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-declare global {
-  interface Window {
-    recaptchaVerifier?: RecaptchaVerifier
-  }
-}
 
 const MASTER_EMAIL = 'lamgary@p7s.app'
 const MASTER_PHONE = '+85269277488'
@@ -278,58 +269,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const getRecaptchaVerifier = () => {
-    if (window.recaptchaVerifier) return window.recaptchaVerifier
-    const container = document.getElementById('recaptcha-container')
-    if (!container) throw new Error('OTP 驗證元件未就緒')
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' })
-    return window.recaptchaVerifier
-  }
-
   const sendOtp: AuthContextValue['sendOtp'] = async (regionCode, phone) => {
     if (!phone) return { ok: false, message: '請輸入手機號碼' }
     try {
       const fullPhone = normalizePhone(regionCode, phone)
-      const verifier = getRecaptchaVerifier()
-      const confirmation = await signInWithPhoneNumber(auth, fullPhone, verifier)
-      setOtpSession({ verificationId: confirmation.verificationId, phone: fullPhone })
-      return { ok: true, message: '驗證碼已發送' }
+      // Use Twilio for sending OTP
+      const success = await TwilioService.sendOtp(fullPhone)
+      if (success) {
+        // Store phone for verification
+        setOtpSession({ verificationId: `twilio_${Date.now()}`, phone: fullPhone })
+        return { ok: true, message: '驗證碼已發送' }
+      }
+      return { ok: false, message: '發送驗證碼失敗，請稍後再試' }
     } catch (err: unknown) {
       return { ok: false, message: `發送失敗: ${getErrorMessage(err)}` }
     }
   }
 
   const verifyOtp: AuthContextValue['verifyOtp'] = async (otpCode) => {
-    if (!otpSession?.verificationId) return { ok: false, message: '請先發送驗證碼' }
+    if (!otpSession?.phone) return { ok: false, message: '請先發送驗證碼' }
     if (!otpCode) return { ok: false, message: '請輸入驗證碼' }
 
     try {
-      const credential = PhoneAuthProvider.credential(otpSession.verificationId, otpCode)
-      const cred = await signInWithCredential(auth, credential)
-      const ref = doc(db, 'users', cred.user.uid)
-      const snap = await getDoc(ref)
-      if (!snap.exists()) {
-        await setDoc(ref, {
-          id: cred.user.uid,
-          name: `用戶${otpSession.phone.slice(-4)}`,
-          phone: otpSession.phone,
+      // Verify OTP via Twilio
+      const valid = await TwilioService.verifyOtp(otpSession.phone, otpCode)
+      if (!valid) {
+        return { ok: false, message: '驗證碼錯誤' }
+      }
+      
+      // Check if user exists in Firestore
+      const q = query(collection(db, 'users'), where('phone', '==', otpSession.phone))
+      const snap = await getDocs(q)
+      
+      if (snap.empty) {
+        // Create new user (first time login)
+        // For now, create a placeholder - user needs to complete registration
+        return { ok: true, message: '電話驗證成功，請繼續註冊' }
+      }
+      
+      // Update existing user to mark phone as verified
+      await updateDoc(snap.docs[0].ref, {
+        phoneVerified: true,
+        updatedAt: new Date().toISOString(),
+      })
+      
+      // Trigger auth state refresh by re-fetching user data
+      const userDoc = await getDoc(snap.docs[0].ref)
+      if (userDoc.exists()) {
+        const data = userDoc.data()
+        setCurrentUser({
+          id: userDoc.id,
+          name: data.name || 'Cabs User',
+          phone: data.phone || otpSession.phone,
           phoneVerified: true,
-          email: formatEmailFromPhone(otpSession.phone),
-          role: 'passenger',
-          points: 0,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-      } else {
-        // Update existing user to mark phone as verified
-        await updateDoc(ref, {
-          phone: otpSession.phone,
-          phoneVerified: true,
-          updatedAt: new Date().toISOString(),
+          email: data.email || formatEmailFromPhone(otpSession.phone),
+          role: data.role || 'passenger',
+          points: data.points || 0,
+          kycStatus: data.kycStatus || 'n/a',
+          driverApproved: data.driverApproved || false,
+          kycSubmittedAt: data.kycSubmittedAt || null,
         })
       }
+      
       setOtpSession(null)
-      return { ok: true, message: 'OTP 登入成功' }
+      return { ok: true, message: '電話驗證成功！' }
     } catch (err: unknown) {
       return { ok: false, message: `驗證失敗: ${getErrorMessage(err)}` }
     }

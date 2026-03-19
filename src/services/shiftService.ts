@@ -7,8 +7,6 @@ import {
   getDocs, 
   query, 
   where, 
-  orderBy, 
-  onSnapshot,
   serverTimestamp,
   deleteDoc
 } from 'firebase/firestore'
@@ -59,6 +57,18 @@ export const routeService = {
 export const shiftService = {
   async getAll(): Promise<Shift[]> {
     const snapshot = await getDocs(collection(db, 'shifts'))
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Shift[]
+  },
+
+  async getByRoute(routeId: string, date?: string): Promise<Shift[]> {
+    let q = query(collection(db, 'shifts'), where('routeId', '==', routeId))
+    if (date) {
+      q = query(q, where('date', '==', date))
+    }
+    const snapshot = await getDocs(q)
     return snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -163,6 +173,14 @@ export const bookingService = {
   async confirm(id: string): Promise<void> {
     await updateDoc(doc(db, 'bookings', id), {
       status: 'CONFIRMED',
+      updatedAt: serverTimestamp()
+    })
+  },
+
+  async confirmPayment(id: string, paymentId: string): Promise<void> {
+    await updateDoc(doc(db, 'bookings', id), {
+      status: 'CONFIRMED',
+      paymentId,
       updatedAt: serverTimestamp()
     })
   },

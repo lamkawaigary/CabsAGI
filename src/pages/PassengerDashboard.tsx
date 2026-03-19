@@ -149,6 +149,9 @@ export default function PassengerDashboard() {
 
   return (
     <div style={styles.container}>
+      {/* Hidden reCAPTCHA container for OTP */}
+      <div id="recaptcha-container" style={{ position: 'absolute', left: -9999, top: -9999 }} />
+      
       {/* Header */}
       <header style={styles.header}>
         <h1 style={styles.logo}>CabsAGI</h1>

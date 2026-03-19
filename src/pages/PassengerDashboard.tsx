@@ -6,12 +6,20 @@ import type { Route, Shift, Booking } from '../types/shift'
 
 export default function PassengerDashboard() {
   const navigate = useNavigate()
-  const { currentUser, logout } = useAuth()
+  const { currentUser, logout, sendOtp, verifyOtp } = useAuth()
   const [routes, setRoutes] = useState<Route[]>([])
   const [shifts, setShifts] = useState<Shift[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'home' | 'bookings' | 'profile'>('home')
+  
+  // Phone verification state
+  const [verifying, setVerifying] = useState(false)
+  const [phone, setPhone] = useState(currentUser?.phone || '')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [verifyingPhone, setVerifyingPhone] = useState(false)
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     loadData()
@@ -38,6 +46,46 @@ export default function PassengerDashboard() {
   const handleLogout = async () => {
     await logout()
     navigate('/')
+  }
+
+  const handleSendOtp = async () => {
+    if (!phone) {
+      setMessage('請輸入手機號碼')
+      return
+    }
+    setVerifying(true)
+    setMessage('')
+    try {
+      const result = await sendOtp('852', phone)
+      if (result.ok) {
+        setOtpSent(true)
+        setMessage('驗證碼已發送')
+      } else {
+        setMessage(result.message)
+      }
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    if (!otp) {
+      setMessage('請輸入驗證碼')
+      return
+    }
+    setVerifyingPhone(true)
+    setMessage('')
+    try {
+      const result = await verifyOtp(otp)
+      if (result.ok) {
+        setMessage('電話驗證成功！')
+        window.location.reload()
+      } else {
+        setMessage(result.message)
+      }
+    } finally {
+      setVerifyingPhone(false)
+    }
   }
 
   if (loading) {
@@ -156,9 +204,133 @@ export default function PassengerDashboard() {
               <div style={styles.profileItem}>
                 <span>電郵:</span> {currentUser?.email || '-'}
               </div>
-              <div style={styles.profileItem}>
-                <span>電話:</span> {currentUser?.phone || '-'}
+              
+              {/* Phone & Verification */}
+              <div style={{ 
+                ...styles.profileItem, 
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                background: currentUser?.phoneVerified ? '#e6f7ed' : '#fff8e6',
+                border: `1px solid ${currentUser?.phoneVerified ? '#b8e6c9' : '#ffe0b2'}`,
+                borderRadius: 10,
+                padding: 12,
+                marginTop: 8,
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span><span>電話:</span> {currentUser?.phone || '-'}</span>
+                  {currentUser?.phoneVerified && (
+                    <span style={{ 
+                      fontSize: 11, 
+                      color: '#1a7a3a', 
+                      background: '#b8e6c9',
+                      padding: '2px 8px',
+                      borderRadius: 10,
+                      fontWeight: 600,
+                    }}>
+                      ✅ 已驗證
+                    </span>
+                  )}
+                </div>
+                
+                {!currentUser?.phoneVerified && (
+                  <>
+                    <input
+                      type="tel"
+                      placeholder="輸入手機號碼"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                      disabled={otpSent}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 6,
+                        border: '1px solid #ddd',
+                        fontSize: 14,
+                        marginBottom: 8,
+                      }}
+                    />
+                    {otpSent && (
+                      <input
+                        type="text"
+                        placeholder="輸入驗證碼"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value)}
+                        maxLength={6}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 6,
+                          border: '1px solid #ddd',
+                          fontSize: 14,
+                          marginBottom: 8,
+                        }}
+                      />
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {!otpSent ? (
+                        <button
+                          onClick={handleSendOtp}
+                          disabled={verifying}
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            borderRadius: 6,
+                            border: '1px solid #1e56a3',
+                            background: '#fff',
+                            color: '#1e56a3',
+                            fontWeight: 600,
+                            cursor: verifying ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {verifying ? '發送中...' : '發送驗證碼'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleVerifyOtp}
+                          disabled={verifyingPhone}
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            borderRadius: 6,
+                            border: '1px solid #1a7a3a',
+                            background: '#1a7a3a',
+                            color: '#fff',
+                            fontWeight: 600,
+                            cursor: verifyingPhone ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {verifyingPhone ? '驗證中...' : '確認'}
+                        </button>
+                      )}
+                      {otpSent && (
+                        <button
+                          onClick={() => { setOtpSent(false); setOtp(''); setMessage(''); }}
+                          style={{
+                            padding: '8px',
+                            borderRadius: 6,
+                            border: '1px solid #999',
+                            background: '#fff',
+                            color: '#666',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          取消
+                        </button>
+                      )}
+                    </div>
+                    {message && (
+                      <div style={{ 
+                        fontSize: 12, 
+                        color: message.includes('成功') ? '#1a7a3a' : '#c62828',
+                        textAlign: 'center',
+                        marginTop: 6,
+                      }}>
+                        {message}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
+              
               <div style={styles.profileItem}>
                 <span>角色:</span> {currentUser?.role || '乘客'}
               </div>

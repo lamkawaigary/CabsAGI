@@ -2,7 +2,21 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { routeService, shiftService, bookingService } from '../services/shiftService'
+import { chatService } from '../services/chatService'
 import type { Route, Shift, Booking } from '../types/shift'
+
+// Status mapping
+const statusLabels: Record<string, { label: string; color: string; bg: string }> = {
+  PENDING: { label: '待確認', color: '#7a5a1a', bg: '#fff3cd' },
+  CONFIRMED: { label: '已確認', color: '#1a7a3a', bg: '#d4edda' },
+  COMPLETED: { label: '已完成', color: '#155724', bg: '#c3e6cb' },
+  CANCELLED: { label: '已取消', color: '#c62828', bg: '#f8d7da' },
+  NO_SHOW: { label: '未到', color: '#6c757d', bg: '#e2e3e5' },
+}
+
+function getStatusDisplay(status: string) {
+  return statusLabels[status] || { label: status, color: '#666', bg: '#f0f0f0' }
+}
 
 export default function PassengerDashboard() {
   const navigate = useNavigate()
@@ -10,6 +24,7 @@ export default function PassengerDashboard() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [shifts, setShifts] = useState<Shift[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [bookingShifts, setBookingShifts] = useState<Record<string, Shift>>({})
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'home' | 'bookings' | 'profile'>('home')
   
@@ -36,6 +51,21 @@ export default function PassengerDashboard() {
       setRoutes(routesData)
       setShifts(shiftsData)
       setBookings(bookingsData)
+      
+      // Load shift details for each booking
+      if (bookingsData.length > 0) {
+        const shiftIds = [...new Set(bookingsData.map(b => b.shiftId))]
+        const shiftDetails: Record<string, Shift> = {}
+        await Promise.all(
+          shiftIds.map(async (shiftId) => {
+            const shift = await shiftService.getById(shiftId)
+            if (shift) {
+              shiftDetails[shiftId] = shift
+            }
+          })
+        )
+        setBookingShifts(shiftDetails)
+      }
     } catch (error) {
       console.error('Load error:', error)
     } finally {
@@ -85,6 +115,27 @@ export default function PassengerDashboard() {
       }
     } finally {
       setVerifyingPhone(false)
+    }
+  }
+
+  const handleOpenChat = async (_booking: Booking, shift: Shift) => {
+    if (!currentUser || !shift.driverId || !shift.driverName) {
+      alert('司機尚未分配，暫時未能開啟對話')
+      return
+    }
+    try {
+      const conversationId = await chatService.getOrCreateShiftConversation(
+        shift.id,
+        shift.driverId,
+        shift.driverName,
+        currentUser.id,
+        currentUser.name,
+        shift.routeName || '旅程對話'
+      )
+      navigate(`/chat/${conversationId}`)
+    } catch (error) {
+      console.error('Failed to open chat:', error)
+      alert('無法開啟對話，請稍後再試')
     }
   }
 
@@ -181,15 +232,86 @@ export default function PassengerDashboard() {
             {bookings.length === 0 ? (
               <div style={styles.empty}>暫無訂單</div>
             ) : (
-              bookings.map(booking => (
-                <div key={booking.id} style={styles.card}>
-                  <div style={styles.cardBody}>
-                    <div>訂單: {booking.id}</div>
-                    <div>座位: {booking.seatCount}</div>
-                    <div>狀態: {booking.status}</div>
+              bookings.map(booking => {
+                const shift = bookingShifts[booking.shiftId]
+                const statusDisplay = getStatusDisplay(booking.status)
+                return (
+                  <div key={booking.id} style={styles.bookingCard}>
+                    {/* Header */}
+                    <div style={styles.bookingHeader}>
+                      <span style={styles.bookingId}>訂單: {booking.id.slice(0, 8)}...</span>
+                      <span style={{ 
+                        ...styles.bookingStatus, 
+                        color: statusDisplay.color, 
+                        background: statusDisplay.bg 
+                      }}>
+                        {statusDisplay.label}
+                      </span>
+                    </div>
+                    
+                    {/* Route Info */}
+                    <div style={styles.bookingRoute}>
+                      <div style={styles.bookingLocation}>
+                        <span style={styles.locationIcon}>📍</span>
+                        <span>{shift?.routeName || '路線'}</span>
+                      </div>
+                      <div style={styles.bookingTime}>
+                        <span style={styles.timeIcon}>🕐</span>
+                        <span>{shift ? new Date(shift.departureTime).toLocaleString('zh-HK', { 
+                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                        }) : '時間待定'}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Trip Details */}
+                    <div style={styles.bookingDetails}>
+                      <div style={styles.detailItem}>
+                        <span>💺 座位:</span>
+                        <span>{booking.seatCount}</span>
+                      </div>
+                      <div style={styles.detailItem}>
+                        <span>💰 價錢:</span>
+                        <span style={styles.priceText}>${booking.totalPrice}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Driver Info (if assigned) */}
+                    {shift?.driverName && (
+                      <div style={styles.driverInfo}>
+                        <div style={styles.driverLabel}>👤 司機</div>
+                        <div style={styles.driverName}>{shift.driverName}</div>
+                        {shift.driverPhone && (
+                          <a href={`tel:${shift.driverPhone}`} style={styles.driverPhone}>
+                            📞 {shift.driverPhone}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Actions */}
+                    <div style={styles.bookingActions}>
+                      {shift?.driverId && (
+                        <button 
+                          onClick={() => handleOpenChat(booking, shift)}
+                          style={{...styles.actionBtn, background: '#e3f2fd', borderColor: '#1e56a3'}}
+                        >
+                          💬 對話
+                        </button>
+                      )}
+                      {shift?.driverPhone && (
+                        <a href={`tel:${shift.driverPhone}`} style={styles.actionBtn}>
+                          📞 聯絡
+                        </a>
+                      )}
+                      {booking.status === 'CONFIRMED' && (
+                        <button style={styles.qrBtn}>
+                          📱 二維碼
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </section>
         )}
@@ -448,6 +570,128 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 12,
     width: '100%',
     padding: '12px',
+    border: 'none',
+    borderRadius: 8,
+    background: '#284a41',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  // Booking card styles
+  bookingCard: {
+    background: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  },
+  bookingHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottom: '1px solid #eee',
+  },
+  bookingId: {
+    fontSize: 13,
+    color: '#666',
+    fontFamily: 'monospace',
+  },
+  bookingStatus: {
+    fontSize: 12,
+    fontWeight: 600,
+    padding: '4px 10px',
+    borderRadius: 12,
+  },
+  bookingRoute: {
+    marginBottom: 12,
+  },
+  bookingLocation: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#333',
+    marginBottom: 6,
+  },
+  locationIcon: {
+    fontSize: 14,
+  },
+  bookingTime: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  timeIcon: {
+    fontSize: 14,
+  },
+  bookingDetails: {
+    display: 'flex',
+    gap: 16,
+    marginBottom: 12,
+    padding: 10,
+    background: '#f8f9fa',
+    borderRadius: 8,
+  },
+  detailItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 14,
+    color: '#555',
+  },
+  priceText: {
+    fontWeight: 700,
+    color: '#284a41',
+  },
+  driverInfo: {
+    padding: 12,
+    background: '#e8f5e9',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  driverLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  driverName: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#333',
+  },
+  driverPhone: {
+    display: 'inline-block',
+    marginTop: 6,
+    fontSize: 14,
+    color: '#1e56a3',
+    textDecoration: 'none',
+  },
+  bookingActions: {
+    display: 'flex',
+    gap: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    padding: '10px 12px',
+    border: '1px solid #284a41',
+    borderRadius: 8,
+    background: '#fff',
+    color: '#284a41',
+    fontSize: 14,
+    fontWeight: 600,
+    textAlign: 'center',
+    textDecoration: 'none',
+    cursor: 'pointer',
+  },
+  qrBtn: {
+    flex: 1,
+    padding: '10px 12px',
     border: 'none',
     borderRadius: 8,
     background: '#284a41',

@@ -4,7 +4,7 @@
 const getTwilioConfig = () => ({
   accountSid: import.meta.env.VITE_TWILIO_ACCOUNT_SID || '',
   authToken: import.meta.env.VITE_TWILIO_AUTH_TOKEN || '',
-  serviceSid: import.meta.env.VITE_TWILIO_SERVICE_SID || '',
+  serviceSid: import.meta.env.VITE_TWILIO_SERVICE_SID || import.meta.env.VITE_TWILIO_VERIFY_SERVICE_SID || '',
 })
 
 export const TwilioService = {
@@ -77,3 +77,4 @@ export const TwilioService = {
     }
   }
 }
+// redeploy trigger Thu Mar 19 17:14:00 HKT 2026

@@ -3,23 +3,53 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { shiftService, bookingService } from '../services/shiftService'
 import { chatService, systemMessageService } from '../services/chatService'
-import type { Shift } from '../types/shift'
+import type { Shift, Booking } from '../types/shift'
 
 // Icons
 const Icons = {
   Home: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
       <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
     </svg>
   ),
+  List: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+      <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+    </svg>
+  ),
   Orders: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
       <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
     </svg>
   ),
+  Wallet: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+      <path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+    </svg>
+  ),
   User: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+    </svg>
+  ),
+  Phone: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+      <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+    </svg>
+  ),
+  Chat: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+      <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+    </svg>
+  ),
+  Clock: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+      <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+    </svg>
+  ),
+  Car: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+      <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
     </svg>
   ),
   Logout: () => (
@@ -27,33 +57,36 @@ const Icons = {
       <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
     </svg>
   ),
-  Check: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-    </svg>
-  )
 }
 
-type Tab = 'shifts' | 'orders' | 'kyc' | 'profile'
+type Tab = 'dashboard' | 'shifts' | 'orders' | 'earnings' | 'profile'
 
-const formatTime = (timestamp: string) => {
+const formatDateTime = (timestamp: string) => {
   const date = new Date(parseInt(timestamp))
-  return date.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleString('zh-HK', { 
+    month: 'short', 
+    day: 'numeric', 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })
 }
 
-const formatDate = (timestamp: string) => {
-  const date = new Date(parseInt(timestamp))
-  return date.toLocaleDateString('zh-HK', { month: 'short', day: 'numeric', weekday: 'short' })
+const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
+  SCHEDULED: { label: '待出發', color: '#7a5a1a', bg: '#fff3cd' },
+  OPEN: { label: '可接單', color: '#1e56a3', bg: '#e3f2fd' },
+  IN_PROGRESS: { label: '進行中', color: '#1a7a3a', bg: '#d4edda' },
+  COMPLETED: { label: '已完成', color: '#155724', bg: '#c3e6cb' },
+  CANCELLED: { label: '已取消', color: '#c62828', bg: '#f8d7da' },
 }
 
 export default function DriverDashboard() {
   const navigate = useNavigate()
   const { currentUser, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<Tab>('shifts')
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [shifts, setShifts] = useState<Shift[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Check if driver can accept orders
   const canAcceptOrders = currentUser?.kycStatus === 'approved' && currentUser?.driverApproved
 
   useEffect(() => {
@@ -63,74 +96,21 @@ export default function DriverDashboard() {
   const loadData = async () => {
     try {
       setLoading(true)
-      // Get all shifts - including SCHEDULED, OPEN, and IN_PROGRESS
-      const allShifts = await shiftService.getAll()
-      setShifts(allShifts.filter(s => s.status === 'SCHEDULED' || s.status === 'OPEN' || s.status === 'IN_PROGRESS'))
+      const [allShifts, userBookings] = await Promise.all([
+        shiftService.getAll(),
+        currentUser ? bookingService.getByUser(currentUser.id) : Promise.resolve([])
+      ])
+      
+      const activeStatuses = ['SCHEDULED', 'OPEN', 'IN_PROGRESS', 'COMPLETED']
+      setShifts(allShifts.filter((s: Shift) => 
+        activeStatuses.includes(s.status) && 
+        (s.driverId === currentUser?.id || s.status === 'OPEN' || s.status === 'SCHEDULED')
+      ))
+      setBookings(userBookings)
     } catch (error) {
-      console.error('Failed to load shifts:', error)
+      console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleStartShift = async (shift: Shift) => {
-    try {
-      // Assign driver to shift and change status
-      await shiftService.update(shift.id, {
-        driverId: currentUser?.id,
-        driverName: currentUser?.name,
-        driverPhone: currentUser?.phone,
-        status: 'IN_PROGRESS'
-      })
-      await shiftService.updateSeats(shift.id, shift.availableSeats - 1)
-      loadData()
-    } catch (error) {
-      console.error('Failed to accept shift:', error)
-    }
-  }
-
-  const handleCompleteShift = async (shift: Shift) => {
-    try {
-      await shiftService.updateStatus(shift.id, 'COMPLETED')
-      loadData()
-    } catch (error) {
-      console.error('Failed to complete shift:', error)
-    }
-  }
-
-  const handleOpenChat = async (shift: Shift) => {
-    if (!currentUser) return
-    
-    try {
-      // Get bookings for this shift to find passenger
-      const bookings = await bookingService.getByShift(shift.id)
-      
-      if (bookings.length === 0) {
-        alert('呢個班次暫時未有乘客預訂')
-        return
-      }
-      
-      // Get first passenger's booking
-      const booking = bookings[0]
-      
-      // Get or create conversation between driver and passenger
-      const conversationId = await chatService.getOrCreateShiftConversation(
-        shift.id,
-        currentUser.id,
-        currentUser.name || '司機',
-        booking.userId,  // Use userId as passenger ID
-        booking.passengerName,
-        shift.routeName || '班次'
-      )
-      
-      // Send system message if this is a new conversation
-      await systemMessageService.driverAcceptedShift(conversationId, currentUser.name || '司機')
-      
-      // Navigate to chat
-      navigate(`/driver/chat/${conversationId}`)
-    } catch (error) {
-      console.error('Failed to open chat:', error)
-      alert('無法開啟對話，請再試一次')
     }
   }
 
@@ -139,202 +119,422 @@ export default function DriverDashboard() {
     navigate('/')
   }
 
-  const tabs = [
-    { id: 'shifts' as Tab, label: '班次', icon: Icons.Orders },
-    { id: 'orders' as Tab, label: '訂單', icon: Icons.Orders },
-    { id: 'kyc' as Tab, label: 'KYC', icon: Icons.User },
-    { id: 'profile' as Tab, label: '個人', icon: Icons.User }
-  ]
+  const handleAcceptShift = async (shift: Shift) => {
+    if (!canAcceptOrders) return
+    try {
+      await shiftService.update(shift.id, {
+        driverId: currentUser?.id,
+        driverName: currentUser?.name,
+        driverPhone: currentUser?.phone,
+        status: 'IN_PROGRESS'
+      })
+      
+      const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+      for (const booking of shiftBookings) {
+        const conversationId = await chatService.getOrCreateShiftConversation(
+          shift.id,
+          currentUser?.id || '',
+          currentUser?.name || '司機',
+          booking.userId,
+          booking.passengerName || '乘客',
+          shift.routeName || '行程對話'
+        )
+        await systemMessageService.driverAcceptedShift(conversationId, currentUser?.name || '司機')
+      }
+      
+      loadData()
+      alert('已接單！')
+    } catch (error) {
+      console.error('Failed to accept shift:', error)
+      alert('接單失敗，請稍後再試')
+    }
+  }
+
+  const handleCompleteShift = async (shift: Shift) => {
+    try {
+      await shiftService.update(shift.id, { status: 'COMPLETED' })
+      loadData()
+      alert('已完成行程！')
+    } catch (error) {
+      console.error('Failed to complete shift:', error)
+    }
+  }
+
+  const handleOpenChat = async (shift: Shift) => {
+    if (!shift.driverId || !shift.driverName) return
+    const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+    if (shiftBookings.length === 0) {
+      alert('暂无乘客')
+      return
+    }
+    const conversationId = await chatService.getOrCreateShiftConversation(
+      shift.id,
+      shift.driverId,
+      shift.driverName,
+      shiftBookings[0].userId,
+      shiftBookings[0].passengerName || '乘客',
+      shift.routeName || '行程對話'
+    )
+    navigate(`/driver/chat/${conversationId}`)
+  }
+
+  const myShifts = shifts.filter(s => s.driverId === currentUser?.id)
+  const completedShifts = myShifts.filter(s => s.status === 'COMPLETED')
+  const todayCompleted = completedShifts.filter(s => {
+    const shiftDate = new Date(parseInt(s.departureTime))
+    const today = new Date()
+    return shiftDate.toDateString() === today.toDateString()
+  })
+  const totalEarnings = completedShifts.reduce((sum, s) => sum + (s.price || 0) * (s.totalSeats - s.availableSeats), 0)
+  const todayEarnings = todayCompleted.reduce((sum, s) => sum + (s.price || 0) * (s.totalSeats - s.availableSeats), 0)
+
+  const availableShifts = shifts.filter(s => (s.status === 'OPEN' || s.status === 'SCHEDULED') && !s.driverId)
+  const activeShifts = myShifts.filter(s => s.status === 'IN_PROGRESS' || s.status === 'SCHEDULED')
+  const orderHistory = myShifts.filter(s => s.status === 'COMPLETED')
+
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loading}>載入中...</div>
+      </div>
+    )
+  }
 
   return (
     <div style={styles.container}>
-      {/* KYC Warning Banner */}
-      {!canAcceptOrders && (
-        <div style={{
-          background: currentUser?.kycStatus === 'pending' ? '#fff3cd' : '#f8d7da',
-          color: currentUser?.kycStatus === 'pending' ? '#856404' : '#721c24',
-          padding: '12px 16px',
-          textAlign: 'center',
-          fontSize: '14px',
-        }}>
-          {currentUser?.kycStatus === 'pending' ? (
-            <>⚠️ 您的KYC申請正在審批中，審批完成後即可接單</>
-          ) : (
-            <>🚫 您需要完成KYC認證並通過審批才能接單 | <a href="/profile" style={{color: '#007bff'}}>前往認證</a></>
-          )}
-        </div>
-      )}
-
       {/* Header */}
       <header style={styles.header}>
         <div>
-          <span style={styles.logoText}>CabsAGI</span>
-          <span style={styles.welcomeText}>，司機</span>
+          <h1 style={styles.logo}>🚗 CabsAGI 司機</h1>
+          <p style={styles.welcome}>歡迎，{currentUser?.name || '司機'} 👋</p>
         </div>
         <button onClick={handleLogout} style={styles.logoutBtn}>
           <Icons.Logout />
         </button>
       </header>
 
-      {/* Content */}
-      <main style={styles.content}>
-        {activeTab === 'shifts' && (
-          <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>今日班次</h2>
-            {loading ? (
-              <div style={styles.loading}>載入中...</div>
-            ) : shifts.length === 0 ? (
-              <div style={styles.empty}>今日無班次</div>
-            ) : (
-              <div style={styles.shiftsList}>
-                {shifts.filter(s => s.driverId).map(shift => (
-                  <div key={shift.id} style={styles.shiftCard}>
-                    <div style={styles.shiftInfo}>
-                      <div style={styles.shiftTime}>{formatTime(shift.departureTime)}</div>
-                      <div style={styles.shiftMeta}>
-                        <span>{formatDate(shift.departureTime)}</span>
-                        <span>•</span>
-                        <span>{shift.availableSeats}/{shift.totalSeats} 位</span>
+      {/* Main Content */}
+      <div style={styles.content}>
+        {activeTab === 'dashboard' && (
+          <div style={styles.dashboard}>
+            {!canAcceptOrders && (
+              <div style={styles.kycWarning}>
+                <span>⚠️ 你需要完成 KYC 認證先可以接單</span>
+                <button onClick={() => setActiveTab('profile')} style={styles.kycBtn}>
+                  前往認證
+                </button>
+              </div>
+            )}
+
+            {/* Stats Cards */}
+            <div style={styles.statsGrid}>
+              <div style={styles.statCard}>
+                <div style={styles.statIcon}>📅</div>
+                <div style={styles.statValue}>{todayCompleted.length}</div>
+                <div style={styles.statLabel}>今日完成</div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={styles.statIcon}>💰</div>
+                <div style={styles.statValue}>${todayEarnings}</div>
+                <div style={styles.statLabel}>今日收入</div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={styles.statIcon}>⭐</div>
+                <div style={styles.statValue}>{completedShifts.length}</div>
+                <div style={styles.statLabel}>總完成</div>
+              </div>
+              <div style={styles.statCard}>
+                <div style={styles.statIcon}>💵</div>
+                <div style={styles.statValue}>${totalEarnings}</div>
+                <div style={styles.statLabel}>總收入</div>
+              </div>
+            </div>
+
+            {/* Current Trip */}
+            {activeShifts.length > 0 && (
+              <div style={styles.section}>
+                <h2 style={styles.sectionTitle}>🚗 當前行程</h2>
+                {activeShifts.map(shift => {
+                  const status = statusConfig[shift.status] || { label: shift.status, color: '#666', bg: '#eee' }
+                  return (
+                    <div key={shift.id} style={styles.currentTripCard}>
+                      <div style={styles.tripHeader}>
+                        <span style={styles.routeName}>{shift.routeName || '路線'}</span>
+                        <span style={{ ...styles.statusBadge, color: status.color, background: status.bg }}>
+                          {status.label}
+                        </span>
                       </div>
-                      <div style={styles.shiftStatus}>
-                        {shift.status === 'SCHEDULED' ? '📅 待接單' : 
-                         shift.status === 'OPEN' ? '🟢 可接載' :
-                         shift.status === 'IN_PROGRESS' ? '🚗 進行中' : '✅ 已完成'}
+                      <div style={styles.tripInfo}>
+                        <div style={styles.tripRow}>
+                          <Icons.Clock />
+                          <span>{formatDateTime(shift.departureTime)}</span>
+                        </div>
+                        <div style={styles.tripRow}>
+                          <Icons.Car />
+                          <span>座位: {shift.totalSeats - shift.availableSeats}/{shift.totalSeats}</span>
+                        </div>
+                      </div>
+                      <div style={styles.tripActions}>
+                        <button onClick={() => handleOpenChat(shift)} style={styles.chatBtn}>
+                          💬 乘客對話
+                        </button>
+                        {shift.status === 'IN_PROGRESS' && (
+                          <button onClick={() => handleCompleteShift(shift)} style={styles.completeBtn}>
+                            ✅ 完成行程
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div style={styles.shiftActions}>
-                      {shift.status === 'SCHEDULED' || shift.status === 'OPEN' ? (
-                        <button 
-                          style={{
-                            ...styles.actionBtn,
-                            opacity: canAcceptOrders ? 1 : 0.5,
-                            cursor: canAcceptOrders ? 'pointer' : 'not-allowed',
-                          }}
-                          onClick={() => canAcceptOrders && handleStartShift(shift)}
-                          disabled={!canAcceptOrders}
-                        >
-                          接單
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Available Shifts Preview */}
+            {availableShifts.length > 0 && (
+              <div style={styles.section}>
+                <div style={styles.sectionHeader}>
+                  <h2 style={styles.sectionTitle}>📋 可接班次</h2>
+                  <button onClick={() => setActiveTab('shifts')} style={styles.viewAllBtn}>
+                    查看全部 →
+                  </button>
+                </div>
+                <div style={styles.shiftList}>
+                  {availableShifts.slice(0, 3).map(shift => (
+                    <div key={shift.id} style={styles.shiftCard}>
+                      <div style={styles.shiftInfo}>
+                        <div style={styles.shiftRoute}>{shift.routeName || '路線'}</div>
+                        <div style={styles.shiftTime}>
+                          <Icons.Clock /> {formatDateTime(shift.departureTime)}
+                        </div>
+                        <div style={styles.shiftSeats}>
+                          💺 {shift.availableSeats}/{shift.totalSeats} 座位
+                        </div>
+                      </div>
+                      <div style={styles.shiftPrice}>
+                        <span style={styles.priceValue}>${shift.price}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'shifts' && (
+          <div style={styles.page}>
+            <h2 style={styles.pageTitle}>📋 可接班次</h2>
+            {!canAcceptOrders ? (
+              <div style={styles.kycWarning}>
+                <span>⚠️ 完成 KYC 認證後先可以接單</span>
+              </div>
+            ) : availableShifts.length === 0 ? (
+              <div style={styles.empty}>暫無可接班次</div>
+            ) : (
+              <div style={styles.shiftList}>
+                {availableShifts.map(shift => (
+                  <div key={shift.id} style={styles.shiftCardLarge}>
+                    <div style={styles.shiftCardHeader}>
+                      <span style={styles.shiftRoute}>{shift.routeName || '路線'}</span>
+                      <span style={styles.shiftPriceLarge}>${shift.price}</span>
+                    </div>
+                    <div style={styles.shiftDetails}>
+                      <div style={styles.shiftDetail}>
+                        <Icons.Clock />
+                        <span>{formatDateTime(shift.departureTime)}</span>
+                      </div>
+                      <div style={styles.shiftDetail}>
+                        <Icons.Car />
+                        <span>剩餘座位: {shift.availableSeats}/{shift.totalSeats}</span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => handleAcceptShift(shift)}
+                      style={styles.acceptBtn}
+                    >
+                      接單
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'orders' && (
+          <div style={styles.page}>
+            <h2 style={styles.pageTitle}>📝 我的訂單</h2>
+            {orderHistory.length === 0 && activeShifts.length === 0 ? (
+              <div style={styles.empty}>暫無訂單</div>
+            ) : (
+              <div style={styles.orderList}>
+                {activeShifts.map(shift => {
+                  const status = statusConfig[shift.status] || { label: shift.status, color: '#666', bg: '#eee' }
+                  return (
+                    <div key={shift.id} style={styles.orderCardActive}>
+                      <div style={styles.orderHeader}>
+                        <span style={styles.orderRoute}>{shift.routeName || '路線'}</span>
+                        <span style={{ ...styles.statusBadge, color: status.color, background: status.bg }}>
+                          {status.label}
+                        </span>
+                      </div>
+                      <div style={styles.orderTime}>
+                        <Icons.Clock /> {formatDateTime(shift.departureTime)}
+                      </div>
+                      <div style={styles.orderActions}>
+                        <button onClick={() => handleOpenChat(shift)} style={styles.orderChatBtn}>
+                          💬 對話
                         </button>
-                      ) : shift.status === 'IN_PROGRESS' ? (
-                        <button 
-                          style={{...styles.actionBtn, background: '#4CAF50'}}
-                          onClick={() => handleCompleteShift(shift)}
-                        >
-                          完成
-                        </button>
-                      ) : null}
-                      <button 
-                        style={{...styles.actionBtn, background: '#1976D2', marginTop: '8px'}}
-                        onClick={() => setActiveTab('orders')}
-                      >
-                        乘客名單
-                      </button>
+                        {shift.status === 'IN_PROGRESS' && (
+                          <button onClick={() => handleCompleteShift(shift)} style={styles.orderCompleteBtn}>
+                            ✅ 完成
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+                {orderHistory.map(shift => (
+                  <div key={shift.id} style={styles.orderCard}>
+                    <div style={styles.orderHeader}>
+                      <span style={styles.orderRoute}>{shift.routeName || '路線'}</span>
+                      <span style={styles.orderPrice}>+${(shift.price || 0) * (shift.totalSeats - shift.availableSeats)}</span>
+                    </div>
+                    <div style={styles.orderTime}>
+                      <Icons.Clock /> {formatDateTime(shift.departureTime)}
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </section>
+          </div>
         )}
 
-        {activeTab === 'orders' && (
-          <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>我的訂單</h2>
-            {/* Debug: show all in-progress shifts */}
-            <div style={{fontSize: 12, color: '#999', marginBottom: 10}}>
-              共 {shifts.length} 班次, 進行中: {shifts.filter(s => s.status === 'IN_PROGRESS').length}
-              <br/>
-              Status values: {shifts.filter(s => s.driverId).map(s => s.status).join(', ')}
+        {activeTab === 'earnings' && (
+          <div style={styles.page}>
+            <h2 style={styles.pageTitle}>💰 收入統計</h2>
+            
+            <div style={styles.earningsSummary}>
+              <div style={styles.earningsCard}>
+                <div style={styles.earningsLabel}>今日收入</div>
+                <div style={styles.earningsValue}>${todayEarnings}</div>
+                <div style={styles.earningsSub}>{todayCompleted.length} 單</div>
+              </div>
+              <div style={styles.earningsCard}>
+                <div style={styles.earningsLabel}>總收入</div>
+                <div style={styles.earningsValue}>${totalEarnings}</div>
+                <div style={styles.earningsSub}>{completedShifts.length} 單</div>
+              </div>
             </div>
-            {shifts.length === 0 ? (
-              <div style={styles.empty}>暫無已接的訂單</div>
-            ) : (
-              shifts.filter(s => s.driverId).map(shift => (
-                <div key={shift.id} style={styles.shiftCard}>
-                  <div style={styles.shiftHeader}>
-                    <span style={styles.shiftTime}>{shift.routeName}</span>
-                    <span style={styles.shiftStatus}>{shift.status === 'IN_PROGRESS' ? '🚗 進行中' : '✅ 已接單'}</span>
-                  </div>
-                  <div style={styles.shiftDetails}>
-                    <span>出發: {new Date(shift.departureTime).toLocaleString('zh-HK')}</span>
-                    <span>剩餘座位: {shift.availableSeats}</span>
-                  </div>
-                  <div style={{display: 'flex', gap: 8, marginTop: 8}}>
-                    <button style={{...styles.actionBtn, background: '#2196F3', flex: 1}} onClick={() => handleOpenChat(shift)}>
-                      💬 對話
-                    </button>
-                    <button style={{...styles.actionBtn, background: '#4CAF50', flex: 1}} onClick={() => handleCompleteShift(shift)}>
-                      完成訂單
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </section>
-        )}
 
-        {activeTab === 'kyc' && (
-          <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>KYC 身份驗證</h2>
-            <div style={styles.profileCard}>
-              {currentUser?.kycStatus === 'approved' ? (
-                <div style={{textAlign: 'center', padding: 20}}>
-                  <div style={{fontSize: 48, marginBottom: 12}}>✅</div>
-                  <h3 style={{color: '#2e7d32', marginBottom: 8}}>已通過驗證</h3>
-                  <p style={{color: '#666'}}>你可以接單喇！</p>
-                </div>
-              ) : currentUser?.kycStatus === 'pending' ? (
-                <div style={{textAlign: 'center', padding: 20}}>
-                  <div style={{fontSize: 48, marginBottom: 12}}>⏳</div>
-                  <h3 style={{color: '#f57c00', marginBottom: 8}}>審批中</h3>
-                  <p style={{color: '#666'}}>請耐心等待管理員審批</p>
-                </div>
+            <div style={styles.section}>
+              <h3 style={styles.sectionTitle}>📊 收入記錄</h3>
+              {orderHistory.length === 0 ? (
+                <div style={styles.empty}>暫無收入記錄</div>
               ) : (
-                <>
-                  <div style={{marginBottom: 16}}>
-                    <p style={{color: '#666', marginBottom: 12}}>提交以下資料以通過身份驗證：</p>
-                    <ul style={{color: '#666', paddingLeft: 20, lineHeight: 1.8}}>
-                      <li>身份證明文件</li>
-                      <li>駕駛執照</li>
-                      <li>車輛登記文件</li>
-                    </ul>
-                  </div>
-                  <button style={{...styles.actionBtn, width: '100%', padding: 14, fontSize: 16}}>
-                    提交 KYC 資料
-                  </button>
-                </>
+                <div style={styles.earningsList}>
+                  {orderHistory.slice().reverse().map(shift => (
+                    <div key={shift.id} style={styles.earningsItem}>
+                      <div style={styles.earningsItemInfo}>
+                        <div style={styles.earningsItemRoute}>{shift.routeName || '路線'}</div>
+                        <div style={styles.earningsItemDate}>{formatDateTime(shift.departureTime)}</div>
+                      </div>
+                      <div style={styles.earningsItemAmount}>
+                        +${(shift.price || 0) * (shift.totalSeats - shift.availableSeats)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          </section>
+          </div>
         )}
 
         {activeTab === 'profile' && (
-          <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>個人資料</h2>
+          <div style={styles.page}>
+            <h2 style={styles.pageTitle}>👤 個人資料</h2>
+            
             <div style={styles.profileCard}>
-              <div style={styles.avatar}>
-                {(currentUser?.name || 'S').charAt(0).toUpperCase()}
+              <div style={styles.profileAvatar}>
+                {currentUser?.name?.charAt(0) || '司'}
               </div>
-              <div style={styles.profileInfo}>
-                <h3 style={styles.profileName}>{currentUser?.name || '司機'}</h3>
-                <p style={styles.profileEmail}>{currentUser?.email || '未綁定電郵'}</p>
-                <p style={styles.profilePhone}>{currentUser?.phone || '未綁定手機'}</p>
+              <div style={styles.profileName}>{currentUser?.name || '司機'}</div>
+              <div style={styles.profilePhone}>
+                <Icons.Phone /> {currentUser?.phone || '未設置'}
               </div>
             </div>
-          </section>
-        )}
-      </main>
 
-      {/* Bottom Nav */}
+            <div style={styles.infoSection}>
+              <h3 style={styles.infoTitle}>帳號資訊</h3>
+              <div style={styles.infoRow}>
+                <span>電郵</span>
+                <span>{currentUser?.email || '-'}</span>
+              </div>
+              <div style={styles.infoRow}>
+                <span>電話</span>
+                <span>{currentUser?.phone || '未設置'}</span>
+              </div>
+              <div style={styles.infoRow}>
+                <span>電話驗證</span>
+                <span style={currentUser?.phoneVerified ? styles.verified : styles.unverified}>
+                  {currentUser?.phoneVerified ? '✅ 已驗證' : '❌ 未驗證'}
+                </span>
+              </div>
+            </div>
+
+            <div style={styles.infoSection}>
+              <h3 style={styles.infoTitle}>KYC 認證</h3>
+              <div style={styles.kycStatusCard}>
+                <div style={styles.kycStatusRow}>
+                  <span>認證狀態</span>
+                  <span style={{
+                    ...styles.kycBadge,
+                    background: currentUser?.kycStatus === 'approved' ? '#d4edda' : '#fff3cd',
+                    color: currentUser?.kycStatus === 'approved' ? '#155724' : '#7a5a1a'
+                  }}>
+                    {currentUser?.kycStatus === 'approved' ? '✅ 已通過' : 
+                     currentUser?.kycStatus === 'pending' ? '⏳ 審批中' : 
+                     currentUser?.kycStatus === 'submitted' ? '📋 已提交' : '❌ 未提交'}
+                  </span>
+                </div>
+                <div style={styles.kycStatusRow}>
+                  <span>接單權限</span>
+                  <span style={{
+                    ...styles.kycBadge,
+                    background: currentUser?.driverApproved ? '#d4edda' : '#f8d7da',
+                    color: currentUser?.driverApproved ? '#155724' : '#c62828'
+                  }}>
+                    {currentUser?.driverApproved ? '✅ 可以接單' : '❌ 不能接單'}
+                  </span>
+                </div>
+              </div>
+              {currentUser?.kycStatus !== 'approved' && (
+                <button style={styles.kycUploadBtn}>
+                  📝 提交認證資料
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Navigation */}
       <nav style={styles.nav}>
-        {tabs.map(tab => (
+        {[
+          { id: 'dashboard', label: '主頁', icon: Icons.Home },
+          { id: 'shifts', label: '班次', icon: Icons.List },
+          { id: 'orders', label: '訂單', icon: Icons.Orders },
+          { id: 'earnings', label: '收入', icon: Icons.Wallet },
+          { id: 'profile', label: '個人', icon: Icons.User },
+        ].map(tab => (
           <button
             key={tab.id}
+            onClick={() => setActiveTab(tab.id as Tab)}
             style={{
               ...styles.navItem,
               ...(activeTab === tab.id ? styles.navItemActive : {})
             }}
-            onClick={() => setActiveTab(tab.id)}
           >
             <tab.icon />
             <span>{tab.label}</span>
@@ -349,185 +549,489 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
     background: '#f5f5f5',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif',
-    paddingBottom: '70px'
+    fontFamily: 'Avenir Next, Noto Sans TC, sans-serif',
+    paddingBottom: 80,
+  },
+  loading: {
+    textAlign: 'center',
+    padding: 40,
+    fontSize: 16,
+    color: '#666',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '16px 20px',
-    background: '#143b34',
-    color: '#fff'
+    background: '#284a41',
+    color: '#fff',
   },
-  logoText: {
-    fontSize: '18px',
-    fontWeight: 700
+  logo: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 700,
   },
-  welcomeText: {
-    fontSize: '14px',
-    opacity: 0.8
+  welcome: {
+    margin: '4px 0 0',
+    fontSize: 13,
+    opacity: 0.9,
   },
   logoutBtn: {
-    background: 'transparent',
+    padding: 10,
     border: 'none',
+    borderRadius: 10,
+    background: 'rgba(255,255,255,0.2)',
     color: '#fff',
     cursor: 'pointer',
-    padding: '8px'
   },
   content: {
-    padding: '16px'
+    padding: 16,
+  },
+  dashboard: {
+    display: 'grid',
+    gap: 16,
+  },
+  kycWarning: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+    background: '#fff3cd',
+    border: '1px solid #ffe0b2',
+    borderRadius: 12,
+    color: '#7a5a1a',
+    fontSize: 14,
+  },
+  kycBtn: {
+    padding: '8px 16px',
+    border: 'none',
+    borderRadius: 8,
+    background: '#284a41',
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: 12,
+  },
+  statCard: {
+    background: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    textAlign: 'center',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+  },
+  statIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: '#284a41',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   section: {
     background: '#fff',
-    borderRadius: '12px',
-    padding: '16px'
+    borderRadius: 14,
+    padding: 16,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+  },
+  sectionHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   sectionTitle: {
-    margin: '0 0 16px',
-    fontSize: '18px',
-    fontWeight: 600
+    margin: '0 0 12px',
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#333',
   },
-  shiftsList: {
+  viewAllBtn: {
+    border: 'none',
+    background: 'none',
+    color: '#1e56a3',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  currentTripCard: {
+    background: '#e8f5e9',
+    borderRadius: 12,
+    padding: 14,
+  },
+  tripHeader: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  routeName: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#333',
+  },
+  statusBadge: {
+    fontSize: 12,
+    fontWeight: 600,
+    padding: '4px 10px',
+    borderRadius: 12,
+  },
+  tripInfo: {
+    display: 'grid',
+    gap: 6,
+    marginBottom: 12,
+  },
+  tripRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    color: '#555',
+  },
+  tripActions: {
+    display: 'flex',
+    gap: 10,
+  },
+  chatBtn: {
+    flex: 1,
+    padding: '10px 12px',
+    border: '1px solid #1e56a3',
+    borderRadius: 8,
+    background: '#fff',
+    color: '#1e56a3',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  completeBtn: {
+    flex: 1,
+    padding: '10px 12px',
+    border: 'none',
+    borderRadius: 8,
+    background: '#1a7a3a',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  shiftList: {
+    display: 'grid',
+    gap: 10,
   },
   shiftCard: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '16px',
-    background: '#f8f9fa',
-    borderRadius: '12px'
+    alignItems: 'center',
+    background: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
   },
   shiftInfo: {
-    flex: 1
+    flex: 1,
+  },
+  shiftRoute: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: '#333',
+    marginBottom: 4,
   },
   shiftTime: {
-    fontSize: '20px',
-    fontWeight: 600,
-    color: '#1a1a1a'
-  },
-  shiftMeta: {
-    display: 'flex',
-    gap: '8px',
-    fontSize: '14px',
+    fontSize: 13,
     color: '#666',
-    marginTop: '4px'
+    marginBottom: 2,
   },
-  shiftStatus: {
-    fontSize: '13px',
-    color: '#1976D2',
-    marginTop: '8px'
+  shiftSeats: {
+    fontSize: 13,
+    color: '#666',
   },
-  shiftActions: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center'
+  shiftPrice: {
+    textAlign: 'right',
   },
-  actionBtn: {
-    padding: '8px 16px',
-    borderRadius: '8px',
-    border: 'none',
-    background: '#143b34',
-    color: '#fff',
-    fontSize: '14px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    minWidth: '70px'
+  priceValue: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: '#284a41',
   },
-  shiftHeader: {
+  page: {
+    paddingBottom: 20,
+  },
+  pageTitle: {
+    margin: '0 0 16px',
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#333',
+  },
+  empty: {
+    textAlign: 'center',
+    padding: 40,
+    color: '#999',
+    background: '#fff',
+    borderRadius: 12,
+  },
+  shiftCardLarge: {
+    background: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+    marginBottom: 12,
+  },
+  shiftCardHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '16px',
-    paddingBottom: '12px',
-    borderBottom: '1px solid #eee'
+    marginBottom: 12,
   },
-  passengersList: {
+  shiftPriceLarge: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: '#284a41',
+  },
+  shiftDetails: {
+    display: 'grid',
+    gap: 8,
+    marginBottom: 14,
+  },
+  shiftDetail: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '8px'
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    color: '#555',
   },
-  passengerCard: {
+  acceptBtn: {
+    width: '100%',
+    padding: '12px',
+    border: 'none',
+    borderRadius: 10,
+    background: '#284a41',
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  orderList: {
+    display: 'grid',
+    gap: 10,
+  },
+  orderCardActive: {
+    background: '#e8f5e9',
+    borderRadius: 12,
+    padding: 14,
+  },
+  orderCard: {
+    background: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+  },
+  orderHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '12px',
-    background: '#f8f9fa',
-    borderRadius: '8px'
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  passengerInfo: {
+  orderRoute: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: '#333',
+  },
+  orderPrice: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#1a7a3a',
+  },
+  orderTime: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 10,
+  },
+  orderActions: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '4px'
+    gap: 10,
   },
-  passengerName: {
-    fontSize: '15px',
-    fontWeight: 500
+  orderChatBtn: {
+    flex: 1,
+    padding: '8px',
+    border: '1px solid #1e56a3',
+    borderRadius: 8,
+    background: '#fff',
+    color: '#1e56a3',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
   },
-  passengerPhone: {
-    fontSize: '13px',
-    color: '#666'
+  orderCompleteBtn: {
+    flex: 1,
+    padding: '8px',
+    border: 'none',
+    borderRadius: 8,
+    background: '#1a7a3a',
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
   },
-  passengerMeta: {
+  earningsSummary: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: 12,
+    marginBottom: 16,
+  },
+  earningsCard: {
+    background: '#fff',
+    borderRadius: 14,
+    padding: 20,
+    textAlign: 'center',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+  },
+  earningsLabel: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 4,
+  },
+  earningsValue: {
+    fontSize: 28,
+    fontWeight: 700,
+    color: '#284a41',
+  },
+  earningsSub: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  earningsList: {
+    display: 'grid',
+    gap: 8,
+  },
+  earningsItem: {
     display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: '4px',
-    fontSize: '13px'
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    background: '#fff',
+    borderRadius: 10,
+    padding: 12,
   },
-  statusBadge: {
-    padding: '2px 8px',
-    borderRadius: '4px',
-    fontSize: '12px'
+  earningsItemInfo: {
+    flex: 1,
+  },
+  earningsItemRoute: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#333',
+  },
+  earningsItemDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  earningsItemAmount: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#1a7a3a',
   },
   profileCard: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    padding: '20px',
-    background: '#f8f9fa',
-    borderRadius: '12px'
+    background: '#fff',
+    borderRadius: 14,
+    padding: 24,
+    textAlign: 'center',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+    marginBottom: 16,
   },
-  avatar: {
-    width: '56px',
-    height: '56px',
+  profileAvatar: {
+    width: 70,
+    height: 70,
     borderRadius: '50%',
-    background: '#143b34',
+    background: '#284a41',
     color: '#fff',
+    fontSize: 28,
+    fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '20px',
-    fontWeight: 600
-  },
-  profileInfo: {
-    flex: 1
+    margin: '0 auto 12px',
   },
   profileName: {
-    margin: '0 0 4px',
-    fontSize: '18px',
-    fontWeight: 600
-  },
-  profileEmail: {
-    margin: 0,
-    fontSize: '14px',
-    color: '#666'
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#333',
+    marginBottom: 4,
   },
   profilePhone: {
-    margin: '4px 0 0',
-    fontSize: '14px',
-    color: '#666'
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    fontSize: 14,
+    color: '#666',
   },
-  loading: {
-    padding: '40px',
-    textAlign: 'center',
-    color: '#888'
+  infoSection: {
+    background: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+    marginBottom: 16,
   },
-  empty: {
-    padding: '40px',
-    textAlign: 'center',
-    color: '#888'
+  infoTitle: {
+    margin: '0 0 12px',
+    fontSize: 15,
+    fontWeight: 700,
+    color: '#333',
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '10px 0',
+    borderBottom: '1px solid #eee',
+    fontSize: 14,
+    color: '#555',
+  },
+  verified: {
+    color: '#1a7a3a',
+    fontWeight: 600,
+  },
+  unverified: {
+    color: '#c62828',
+    fontWeight: 600,
+  },
+  kycStatusCard: {
+    display: 'grid',
+    gap: 10,
+    marginBottom: 12,
+  },
+  kycStatusRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: 14,
+    color: '#555',
+  },
+  kycBadge: {
+    fontSize: 13,
+    fontWeight: 600,
+    padding: '4px 10px',
+    borderRadius: 12,
+  },
+  kycUploadBtn: {
+    width: '100%',
+    padding: '12px',
+    border: '1px solid #284a41',
+    borderRadius: 10,
+    background: '#fff',
+    color: '#284a41',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   nav: {
     position: 'fixed',
@@ -535,24 +1039,26 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     display: 'flex',
+    justifyContent: 'space-around',
     background: '#fff',
     borderTop: '1px solid #eee',
-    padding: '8px 0'
+    padding: '8px 0',
+    zIndex: 100,
   },
   navItem: {
-    flex: 1,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '4px',
-    padding: '8px',
+    gap: 4,
+    padding: '8px 16px',
     border: 'none',
-    background: 'transparent',
-    color: '#888',
-    fontSize: '12px',
-    cursor: 'pointer'
+    background: 'none',
+    color: '#999',
+    fontSize: 11,
+    cursor: 'pointer',
   },
   navItemActive: {
-    color: '#143b34'
-  }
+    color: '#284a41',
+    fontWeight: 600,
+  },
 }

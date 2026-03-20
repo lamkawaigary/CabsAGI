@@ -206,6 +206,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             kycStatus: data.kycStatus || 'n/a',
             driverApproved: data.driverApproved || false,
             kycSubmittedAt: data.kycSubmittedAt || null,
+            // KYC Document URLs
+            idCardFront: data.idCardFront || '',
+            idCardBack: data.idCardBack || '',
+            driverLicense: data.driverLicense || '',
+            vehicleLicense: data.vehicleLicense || '',
+            kycRejectionReason: data.kycRejectionReason || '',
           })
         } else {
           // New user - needs role selection
@@ -235,6 +241,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: fallbackEmail,
           role: 'passenger',
           points: 0,
+          kycStatus: 'n/a',
+          driverApproved: false,
+          kycSubmittedAt: null,
+          idCardFront: '',
+          idCardBack: '',
+          driverLicense: '',
+          vehicleLicense: '',
+          kycRejectionReason: '',
         })
       }
       setLoading(false)

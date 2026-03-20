@@ -97,6 +97,7 @@ export default function DriverDashboard() {
   const [idCardBackFile, setIdCardBackFile] = useState<File | null>(null)
   const [driverLicenseFile, setDriverLicenseFile] = useState<File | null>(null)
   const [vehicleLicenseFile, setVehicleLicenseFile] = useState<File | null>(null)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
   const idCardFrontRef = useRef<HTMLInputElement>(null)
   const idCardBackRef = useRef<HTMLInputElement>(null)
   const driverLicenseRef = useRef<HTMLInputElement>(null)
@@ -626,7 +627,12 @@ export default function DriverDashboard() {
                 {idCardFrontFile ? (
                   <div style={styles.fileSelected}>✅ {idCardFrontFile.name}</div>
                 ) : currentUser?.idCardFront ? (
-                  <div style={styles.docUploaded}>✅ 已上載</div>
+                  <img 
+                    src={currentUser.idCardFront} 
+                    alt="身份證正面" 
+                    style={styles.docPreviewThumb}
+                    onClick={() => setPreviewImage(currentUser.idCardFront || null)}
+                  />
                 ) : (
                   <div style={styles.filePlaceholder}>未上載</div>
                 )}
@@ -647,7 +653,12 @@ export default function DriverDashboard() {
                 {idCardBackFile ? (
                   <div style={styles.fileSelected}>✅ {idCardBackFile.name}</div>
                 ) : currentUser?.idCardBack ? (
-                  <div style={styles.docUploaded}>✅ 已上載</div>
+                  <img 
+                    src={currentUser.idCardBack} 
+                    alt="身份證背面" 
+                    style={styles.docPreviewThumb}
+                    onClick={() => setPreviewImage(currentUser.idCardBack || null)}
+                  />
                 ) : (
                   <div style={styles.filePlaceholder}>未上載</div>
                 )}
@@ -668,7 +679,12 @@ export default function DriverDashboard() {
                 {driverLicenseFile ? (
                   <div style={styles.fileSelected}>✅ {driverLicenseFile.name}</div>
                 ) : currentUser?.driverLicense ? (
-                  <div style={styles.docUploaded}>✅ 已上載</div>
+                  <img 
+                    src={currentUser.driverLicense} 
+                    alt="駕駛執照" 
+                    style={styles.docPreviewThumb}
+                    onClick={() => setPreviewImage(currentUser.driverLicense || null)}
+                  />
                 ) : (
                   <div style={styles.filePlaceholder}>未上載</div>
                 )}
@@ -689,11 +705,24 @@ export default function DriverDashboard() {
                 {vehicleLicenseFile ? (
                   <div style={styles.fileSelected}>✅ {vehicleLicenseFile.name}</div>
                 ) : currentUser?.vehicleLicense ? (
-                  <div style={styles.docUploaded}>✅ 已上載</div>
+                  <img 
+                    src={currentUser.vehicleLicense} 
+                    alt="車輛登記" 
+                    style={styles.docPreviewThumb}
+                    onClick={() => setPreviewImage(currentUser.vehicleLicense || null)}
+                  />
                 ) : (
                   <div style={styles.filePlaceholder}>未上載</div>
                 )}
               </div>
+
+              {/* Preview Modal */}
+              {previewImage && (
+                <div style={styles.previewModal} onClick={() => setPreviewImage(null)}>
+                  <img src={previewImage} alt="預覽" style={styles.previewModalImage} />
+                  <button style={styles.previewCloseBtn} onClick={() => setPreviewImage(null)}>✕ 關閉</button>
+                </div>
+              )}
 
               {/* Upload Message */}
               {uploadMessage && (
@@ -1354,5 +1383,46 @@ const styles: Record<string, React.CSSProperties> = {
   navItemActive: {
     color: '#284a41',
     fontWeight: 600,
+  },
+  // Document Preview
+  docPreviewThumb: {
+    width: 50,
+    height: 50,
+    objectFit: 'cover' as const,
+    borderRadius: 6,
+    cursor: 'pointer',
+    border: '2px solid #284a41',
+  },
+  // Preview Modal
+  previewModal: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.9)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+    padding: 20,
+  },
+  previewModalImage: {
+    maxWidth: '90%',
+    maxHeight: '80vh',
+    objectFit: 'contain' as const,
+    borderRadius: 8,
+  },
+  previewCloseBtn: {
+    marginTop: 20,
+    padding: '10px 30px',
+    borderRadius: 8,
+    border: 'none',
+    background: '#fff',
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 600,
+    cursor: 'pointer',
   },
 }

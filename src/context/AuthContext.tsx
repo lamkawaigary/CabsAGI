@@ -33,6 +33,12 @@ export interface AuthUser {
   kycStatus?: 'pending' | 'submitted' | 'approved' | 'rejected' | 'n/a'
   driverApproved?: boolean
   kycSubmittedAt?: string | null
+  // KYC Documents
+  idCardFront?: string // URL to ID card front image
+  idCardBack?: string // URL to ID card back image
+  driverLicense?: string // URL to driver's license image
+  vehicleLicense?: string // URL to vehicle license image
+  kycRejectionReason?: string // Reason if rejected
 }
 
 interface AuthContextValue {
@@ -138,6 +144,14 @@ const defaultProfile = (uid: string, email: string): AuthUser => ({
   email,
   role: normalizeUserRole(undefined, email),
   points: email === MASTER_EMAIL ? 999999 : 0,
+  kycStatus: 'n/a',
+  driverApproved: false,
+  kycSubmittedAt: null,
+  idCardFront: '',
+  idCardBack: '',
+  driverLicense: '',
+  vehicleLicense: '',
+  kycRejectionReason: '',
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {

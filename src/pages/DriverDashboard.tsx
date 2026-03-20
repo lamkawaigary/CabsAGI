@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { shiftService, bookingService } from '../services/shiftService'
 import { chatService, systemMessageService } from '../services/chatService'
+import { uploadService } from '../services/uploadService'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '../firebaseConfig'
 import type { Shift, Booking } from '../types/shift'
 
 // Icons
@@ -86,6 +89,18 @@ export default function DriverDashboard() {
   const [shifts, setShifts] = useState<Shift[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // KYC Document Upload State
+  const [uploading, setUploading] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState('')
+  const [idCardFrontFile, setIdCardFrontFile] = useState<File | null>(null)
+  const [idCardBackFile, setIdCardBackFile] = useState<File | null>(null)
+  const [driverLicenseFile, setDriverLicenseFile] = useState<File | null>(null)
+  const [vehicleLicenseFile, setVehicleLicenseFile] = useState<File | null>(null)
+  const idCardFrontRef = useRef<HTMLInputElement>(null)
+  const idCardBackRef = useRef<HTMLInputElement>(null)
+  const driverLicenseRef = useRef<HTMLInputElement>(null)
+  const vehicleLicenseRef = useRef<HTMLInputElement>(null)
 
   const canAcceptOrders = currentUser?.kycStatus === 'approved' && currentUser?.driverApproved
 
@@ -117,6 +132,75 @@ export default function DriverDashboard() {
   const handleLogout = async () => {
     await logout()
     navigate('/')
+  }
+
+  const handleUploadDocument = async () => {
+    if (!currentUser?.id) return
+    
+    setUploading(true)
+    setUploadMessage('')
+    
+    try {
+      const filesToUpload: { type: 'idCardFront' | 'idCardBack' | 'driverLicense' | 'vehicleLicense'; file: File }[] = []
+      
+      if (idCardFrontFile) filesToUpload.push({ type: 'idCardFront', file: idCardFrontFile })
+      if (idCardBackFile) filesToUpload.push({ type: 'idCardBack', file: idCardBackFile })
+      if (driverLicenseFile) filesToUpload.push({ type: 'driverLicense', file: driverLicenseFile })
+      if (vehicleLicenseFile) filesToUpload.push({ type: 'vehicleLicense', file: vehicleLicenseFile })
+      
+      if (filesToUpload.length === 0) {
+        setUploadMessage('請選擇至少一個文件上傳')
+        setUploading(false)
+        return
+      }
+      
+      const result = await uploadService.uploadMultipleImages(currentUser.id, filesToUpload)
+      
+      if (result.ok && result.urls) {
+        // Update user document URLs in Firestore
+        const userRef = doc(db, 'users', currentUser.id)
+        await updateDoc(userRef, {
+          ...result.urls,
+          kycStatus: 'submitted',
+          kycSubmittedAt: new Date().toISOString(),
+          driverApproved: false,
+        })
+        setUploadMessage('✅ 文件上傳成功！已提交審批')
+        
+        // Reset file inputs
+        setIdCardFrontFile(null)
+        setIdCardBackFile(null)
+        setDriverLicenseFile(null)
+        setVehicleLicenseFile(null)
+        if (idCardFrontRef.current) idCardFrontRef.current.value = ''
+        if (idCardBackRef.current) idCardBackRef.current.value = ''
+        if (driverLicenseRef.current) driverLicenseRef.current.value = ''
+        if (vehicleLicenseRef.current) vehicleLicenseRef.current.value = ''
+      } else {
+        setUploadMessage(result.message || '上傳失敗')
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      setUploadMessage('上傳失敗，請稍後再試')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleFileChange = (type: 'idCardFront' | 'idCardBack' | 'driverLicense' | 'vehicleLicense') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('文件大小不能超過 5MB')
+        return
+      }
+      switch (type) {
+        case 'idCardFront': setIdCardFrontFile(file); break
+        case 'idCardBack': setIdCardBackFile(file); break
+        case 'driverLicense': setDriverLicenseFile(file); break
+        case 'vehicleLicense': setVehicleLicenseFile(file); break
+      }
+    }
   }
 
   const handleAcceptShift = async (shift: Shift) => {
@@ -509,11 +593,130 @@ export default function DriverDashboard() {
                   </span>
                 </div>
               </div>
-              {currentUser?.kycStatus !== 'approved' && (
-                <button style={styles.kycUploadBtn}>
-                  📝 提交認證資料
+              
+              {/* Rejection Reason */}
+              {currentUser?.kycStatus === 'rejected' && currentUser?.kycRejectionReason && (
+                <div style={styles.rejectionReason}>
+                  <strong>📋 駁回原因：</strong>
+                  <p>{currentUser.kycRejectionReason}</p>
+                </div>
+              )}
+            </div>
+
+            {/* KYC Document Upload Section */}
+            <div style={styles.infoSection}>
+              <h3 style={styles.infoTitle}>📄 證件上載</h3>
+              <p style={styles.docNote}>請上載以下證件以完成認證：</p>
+              
+              {/* ID Card Front */}
+              <div style={styles.uploadItem}>
+                <label style={styles.uploadLabel}>
+                  🪪 身份證正面
+                  <input
+                    ref={idCardFrontRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange('idCardFront')}
+                    style={styles.fileInput}
+                  />
+                </label>
+                {idCardFrontFile ? (
+                  <div style={styles.fileSelected}>✅ {idCardFrontFile.name}</div>
+                ) : currentUser?.idCardFront ? (
+                  <div style={styles.docUploaded}>✅ 已上載</div>
+                ) : (
+                  <div style={styles.filePlaceholder}>未上載</div>
+                )}
+              </div>
+
+              {/* ID Card Back */}
+              <div style={styles.uploadItem}>
+                <label style={styles.uploadLabel}>
+                  🪪 身份證背面
+                  <input
+                    ref={idCardBackRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange('idCardBack')}
+                    style={styles.fileInput}
+                  />
+                </label>
+                {idCardBackFile ? (
+                  <div style={styles.fileSelected}>✅ {idCardBackFile.name}</div>
+                ) : currentUser?.idCardBack ? (
+                  <div style={styles.docUploaded}>✅ 已上載</div>
+                ) : (
+                  <div style={styles.filePlaceholder}>未上載</div>
+                )}
+              </div>
+
+              {/* Driver License */}
+              <div style={styles.uploadItem}>
+                <label style={styles.uploadLabel}>
+                  🚗 駕駛執照
+                  <input
+                    ref={driverLicenseRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange('driverLicense')}
+                    style={styles.fileInput}
+                  />
+                </label>
+                {driverLicenseFile ? (
+                  <div style={styles.fileSelected}>✅ {driverLicenseFile.name}</div>
+                ) : currentUser?.driverLicense ? (
+                  <div style={styles.docUploaded}>✅ 已上載</div>
+                ) : (
+                  <div style={styles.filePlaceholder}>未上載</div>
+                )}
+              </div>
+
+              {/* Vehicle License */}
+              <div style={styles.uploadItem}>
+                <label style={styles.uploadLabel}>
+                  🚙 車輛登記文件
+                  <input
+                    ref={vehicleLicenseRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange('vehicleLicense')}
+                    style={styles.fileInput}
+                  />
+                </label>
+                {vehicleLicenseFile ? (
+                  <div style={styles.fileSelected}>✅ {vehicleLicenseFile.name}</div>
+                ) : currentUser?.vehicleLicense ? (
+                  <div style={styles.docUploaded}>✅ 已上載</div>
+                ) : (
+                  <div style={styles.filePlaceholder}>未上載</div>
+                )}
+              </div>
+
+              {/* Upload Message */}
+              {uploadMessage && (
+                <div style={{
+                  ...styles.uploadMessage,
+                  color: uploadMessage.includes('成功') ? '#155724' : '#c62828'
+                }}>
+                  {uploadMessage}
+                </div>
+              )}
+
+              {/* Upload Button */}
+              {(idCardFrontFile || idCardBackFile || driverLicenseFile || vehicleLicenseFile) && (
+                <button
+                  onClick={handleUploadDocument}
+                  disabled={uploading}
+                  style={styles.uploadBtn}
+                >
+                  {uploading ? '⏳ 上傳中...' : '📤 提交認證資料'}
                 </button>
               )}
+
+              <p style={styles.uploadHint}>
+                * 每個文件大小上限為 5MB<br/>
+                * 提交後需要等待審批
+              </p>
             </div>
           </div>
         )}
@@ -1032,6 +1235,79 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     fontWeight: 600,
     cursor: 'pointer',
+  },
+  // KYC Document Upload Styles
+  rejectionReason: {
+    padding: 12,
+    background: '#fff3cd',
+    border: '1px solid #ffe0b2',
+    borderRadius: 8,
+    marginTop: 10,
+    fontSize: 13,
+    color: '#7a5a1a',
+  },
+  docNote: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 12,
+  },
+  uploadItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 0',
+    borderBottom: '1px solid #eee',
+  },
+  uploadLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    color: '#333',
+    cursor: 'pointer',
+  },
+  fileInput: {
+    display: 'none',
+  },
+  fileSelected: {
+    fontSize: 12,
+    color: '#1a7a3a',
+    fontWeight: 600,
+  },
+  docUploaded: {
+    fontSize: 12,
+    color: '#1a7a3a',
+    fontWeight: 600,
+  },
+  filePlaceholder: {
+    fontSize: 12,
+    color: '#999',
+  },
+  uploadMessage: {
+    padding: 10,
+    borderRadius: 8,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 10,
+    background: '#f5f5f5',
+  },
+  uploadBtn: {
+    width: '100%',
+    padding: '12px',
+    border: 'none',
+    borderRadius: 10,
+    background: '#284a41',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: 'pointer',
+    marginTop: 12,
+  },
+  uploadHint: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 12,
+    lineHeight: 1.5,
   },
   nav: {
     position: 'fixed',

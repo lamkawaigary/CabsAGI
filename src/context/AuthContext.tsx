@@ -70,7 +70,7 @@ const MASTER_PHONE = '+85269277488'
 const ADMIN_EMAILS = [
   'lamgary@p7s.app',
   'gary@zerototendesign.com',
-  'gary@zerototendesign.com'.toLowerCase(),
+  'garylkw1842@gmail.com',
 ]
 
 const isAdminEmail = (email: string): boolean => {

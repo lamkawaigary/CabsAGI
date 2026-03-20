@@ -42,6 +42,12 @@ export interface AdminUserRecord {
   driverApproved?: boolean
   kycSubmittedAt?: string | null
   kycApprovedAt?: string | null
+  // KYC Documents
+  idCardFront?: string
+  idCardBack?: string
+  driverLicense?: string
+  vehicleLicense?: string
+  kycRejectionReason?: string
 }
 
 export interface PricingConfigRecord {

@@ -531,8 +531,14 @@ export default function AdminConsole() {
   }
 
   const handleRejectDriver = async (driverId: string) => {
+    const reason = prompt('請輸入拒絕原因（可選）:')
     try {
-      await updateDoc(doc(db, 'users', driverId), { kycStatus: 'rejected', driverApproved: false, updatedAt: new Date().toISOString() })
+      await updateDoc(doc(db, 'users', driverId), { 
+        kycStatus: 'rejected', 
+        driverApproved: false, 
+        kycRejectionReason: reason || '',
+        updatedAt: new Date().toISOString() 
+      })
       setNotice({ tone: 'ok', text: '❌ 司機 KYC 已拒絕' })
     } catch (err) { console.error('Reject error:', err); setNotice({ tone: 'error', text: '拒絕失敗' }) }
   }
@@ -1388,6 +1394,20 @@ export default function AdminConsole() {
                 <div><div style={{ fontWeight: 700, color: '#27483f' }}>{driver.name}</div><div style={{ fontSize: 12, color: '#6e827c' }}>{driver.phone}</div></div>
                 <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: driver.kycStatus === 'pending' ? '#fff3cd' : '#f8d7da', color: driver.kycStatus === 'pending' ? '#856404' : '#721c24' }}>{driver.kycStatus === 'pending' ? '⏳ 審批中' : '❌ 已拒絕'}</span>
               </div>
+              
+              {/* Document Links */}
+              {(driver.idCardFront || driver.idCardBack || driver.driverLicense || driver.vehicleLicense) && (
+                <div style={{ display: 'grid', gap: 6, padding: 10, background: '#f8f9fa', borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6e827c' }}>📄 已上載證件：</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {driver.idCardFront && <a href={driver.idCardFront} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#e3f2fd', borderRadius: 6, fontSize: 11, color: '#1e56a3', textDecoration: 'none' }}>🪪 身份證正面</a>}
+                    {driver.idCardBack && <a href={driver.idCardBack} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#e3f2fd', borderRadius: 6, fontSize: 11, color: '#1e56a3', textDecoration: 'none' }}>🪪 身份證背面</a>}
+                    {driver.driverLicense && <a href={driver.driverLicense} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#e8f5e9', borderRadius: 6, fontSize: 11, color: '#1a7a3a', textDecoration: 'none' }}>🚗 駕駛執照</a>}
+                    {driver.vehicleLicense && <a href={driver.vehicleLicense} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#fff3e0', borderRadius: 6, fontSize: 11, color: '#e65100', textDecoration: 'none' }}>🚙 車輛登記</a>}
+                  </div>
+                </div>
+              )}
+              
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => handleApproveDriver(driver.id)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #c3dfcf', background: '#eff9f2', color: '#2c5a4f', fontWeight: 600, cursor: 'pointer' }}>✅ 批准</button>
                 <button onClick={() => handleRejectDriver(driver.id)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #edc2bb', background: '#fff0ec', color: '#9c3d31', fontWeight: 600, cursor: 'pointer' }}>❌ 拒絕</button>

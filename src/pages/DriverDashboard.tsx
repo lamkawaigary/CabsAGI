@@ -703,20 +703,33 @@ export default function DriverDashboard() {
               )}
 
               {/* Upload Button - Always visible */}
-              <button
-                onClick={handleUploadDocument}
-                disabled={uploading}
-                style={{
-                  ...styles.uploadBtn,
-                  background: uploading ? '#999' : '#284a41',
-                }}
-              >
-                {uploading ? '⏳ 上傳中...' : '📤 更新認證資料'}
-              </button>
+              <div style={{ marginTop: 16 }}>
+                <button
+                  onClick={handleUploadDocument}
+                  disabled={uploading}
+                  style={{
+                    width: '100%',
+                    padding: '14px 20px',
+                    border: 'none',
+                    borderRadius: 12,
+                    background: uploading ? '#999' : '#284a41',
+                    color: '#fff',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    cursor: uploading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
+                >
+                  {uploading ? '⏳ 上傳中...' : '📤 上載/更新認證資料'}
+                </button>
+              </div>
 
-              <p style={styles.uploadHint}>
+              <p style={{ fontSize: 12, color: '#888', marginTop: 12, lineHeight: 1.6 }}>
                 * 每個文件大小上限為 5MB<br/>
-                * 你可以隨時更新認證資料<br/>
+                * 你可以隨時上載或更新認證資料<br/>
                 * 更新後需要重新審批
               </p>
             </div>

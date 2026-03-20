@@ -167,6 +167,9 @@ export default function DriverDashboard() {
         })
         setUploadMessage('✅ 文件上傳成功！已提交審批')
         
+        // Force refresh to get updated user data with URLs
+        window.location.reload()
+        
         // Reset file inputs
         setIdCardFrontFile(null)
         setIdCardBackFile(null)

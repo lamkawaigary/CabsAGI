@@ -702,20 +702,22 @@ export default function DriverDashboard() {
                 </div>
               )}
 
-              {/* Upload Button */}
-              {(idCardFrontFile || idCardBackFile || driverLicenseFile || vehicleLicenseFile) && (
-                <button
-                  onClick={handleUploadDocument}
-                  disabled={uploading}
-                  style={styles.uploadBtn}
-                >
-                  {uploading ? '⏳ 上傳中...' : '📤 提交認證資料'}
-                </button>
-              )}
+              {/* Upload Button - Always visible */}
+              <button
+                onClick={handleUploadDocument}
+                disabled={uploading}
+                style={{
+                  ...styles.uploadBtn,
+                  background: uploading ? '#999' : '#284a41',
+                }}
+              >
+                {uploading ? '⏳ 上傳中...' : '📤 更新認證資料'}
+              </button>
 
               <p style={styles.uploadHint}>
                 * 每個文件大小上限為 5MB<br/>
-                * 提交後需要等待審批
+                * 你可以隨時更新認證資料<br/>
+                * 更新後需要重新審批
               </p>
             </div>
           </div>

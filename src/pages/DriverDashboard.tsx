@@ -527,6 +527,13 @@ export default function DriverDashboard() {
               <div style={styles.orderList}>
                 {activeShifts.map(shift => {
                   const status = statusConfig[shift.status] || { label: shift.status, color: '#666', bg: '#eee' }
+                  const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+                  const passengers = shiftBookings.map(b => ({
+                    name: b.passengerName || '乘客',
+                    phone: b.passengerPhone || '',
+                    seats: b.seatCount || 1,
+                    status: b.status
+                  }))
                   return (
                     <div key={shift.id} style={styles.orderCardActive}>
                       <div style={styles.orderHeader}>
@@ -536,8 +543,32 @@ export default function DriverDashboard() {
                         </span>
                       </div>
                       <div style={styles.orderTime}>
-                        <Icons.Clock /> {formatDateTime(shift.departureTime)}
+                        <Icons.Clock /> {formatDateTime(shift.departureTime)} • 💺 {shift.totalSeats - shift.availableSeats}/{shift.totalSeats} 位
                       </div>
+                      
+                      {/* Passengers Info */}
+                      {passengers.length > 0 && (
+                        <div style={{ marginTop: 12, padding: 10, background: '#f5f9ff', borderRadius: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#1e56a3', marginBottom: 8 }}>
+                            👥 乘客資料 ({passengers.length} 位)
+                          </div>
+                          {passengers.map((p, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < passengers.length - 1 ? '1px solid #e0e0e0' : 'none' }}>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>{p.name}</div>
+                                {p.phone && <div style={{ fontSize: 11, color: '#666' }}>📞 {p.phone}</div>}
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: 12, color: '#666' }}>{p.seats} 位</div>
+                                <div style={{ fontSize: 10, color: p.status === 'CONFIRMED' ? '#2e7d32' : '#f57c00' }}>
+                                  {p.status === 'CONFIRMED' ? '✅ 已確認' : '⏳ 待確認'}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       <div style={styles.orderActions}>
                         <button onClick={() => handleOpenChat(shift)} style={styles.orderChatBtn}>
                           💬 對話
@@ -551,17 +582,21 @@ export default function DriverDashboard() {
                     </div>
                   )
                 })}
-                {orderHistory.map(shift => (
-                  <div key={shift.id} style={styles.orderCard}>
-                    <div style={styles.orderHeader}>
-                      <span style={styles.orderRoute}>{shift.routeName || '路線'}</span>
-                      <span style={styles.orderPrice}>+${(shift.price || 0) * (shift.totalSeats - shift.availableSeats)}</span>
+                {orderHistory.map(shift => {
+                  const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+                  const passengerCount = shiftBookings.length
+                  return (
+                    <div key={shift.id} style={styles.orderCard}>
+                      <div style={styles.orderHeader}>
+                        <span style={styles.orderRoute}>{shift.routeName || '路線'}</span>
+                        <span style={styles.orderPrice}>+${(shift.price || 0) * (shift.totalSeats - shift.availableSeats)}</span>
+                      </div>
+                      <div style={styles.orderTime}>
+                        <Icons.Clock /> {formatDateTime(shift.departureTime)} • 👥 {passengerCount} 位乘客
+                      </div>
                     </div>
-                    <div style={styles.orderTime}>
-                      <Icons.Clock /> {formatDateTime(shift.departureTime)}
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

@@ -277,6 +277,16 @@ export default function DriverDashboard() {
   const todayEarnings = todayCompleted.reduce((sum, s) => sum + (s.price || 0) * (s.totalSeats - s.availableSeats), 0)
 
   const availableShifts = shifts.filter(s => (s.status === 'OPEN' || s.status === 'SCHEDULED') && !s.driverId)
+  
+  // 已有乘客既班次 - 顯示需求高既班次俾司機鼓勵接單
+  const shiftsWithPassengers = availableShifts
+    .map(shift => ({
+      ...shift,
+      passengerCount: bookings.filter(b => b.shiftId === shift.id).length
+    }))
+    .filter(s => s.passengerCount > 0)
+    .sort((a, b) => b.passengerCount - a.passengerCount) // Sort by most passengers first
+  
   const activeShifts = myShifts.filter(s => s.status === 'IN_PROGRESS' || s.status === 'SCHEDULED')
   const orderHistory = myShifts.filter(s => s.status === 'COMPLETED')
 
@@ -337,6 +347,64 @@ export default function DriverDashboard() {
                 <div style={styles.statLabel}>總收入</div>
               </div>
             </div>
+
+            {/* Hot Shifts - Have Passengers */}
+            {shiftsWithPassengers.length > 0 && (
+              <div style={styles.section}>
+                <div style={styles.sectionHeader}>
+                  <h2 style={styles.sectionTitle}>
+                    🔥 搶手班次 <span style={{ fontSize: 12, color: '#c62828', fontWeight: 600 }}>已有乘客</span>
+                  </h2>
+                  <button onClick={() => setActiveTab('shifts')} style={styles.viewAllBtn}>
+                    搶單 →
+                  </button>
+                </div>
+                <div style={styles.shiftList}>
+                  {shiftsWithPassengers.slice(0, 3).map(shift => (
+                    <div key={shift.id} style={{ ...styles.shiftCard, borderLeft: '4px solid #4caf50' }}>
+                      <div style={styles.shiftInfo}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <span style={styles.shiftRoute}>{shift.routeName || '路線'}</span>
+                          <span style={{ background: '#4caf50', color: '#fff', padding: '2px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700 }}>
+                            {shift.passengerCount} 位乘客
+                          </span>
+                        </div>
+                        <div style={styles.shiftTime}>
+                          <Icons.Clock /> {formatDateTime(shift.departureTime)}
+                        </div>
+                        <div style={styles.shiftSeats}>
+                          💺 剩餘 {shift.availableSeats} 位 / 共 {shift.totalSeats} 位
+                        </div>
+                      </div>
+                      <div style={styles.shiftPrice}>
+                        <span style={styles.priceValue}>${shift.price}</span>
+                        <button 
+                          onClick={() => handleAcceptShift(shift)}
+                          style={{ 
+                            marginTop: 8, 
+                            padding: '8px 16px', 
+                            background: '#4caf50', 
+                            color: '#fff', 
+                            border: 'none', 
+                            borderRadius: 8, 
+                            fontSize: 13, 
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          立即搶單
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {shiftsWithPassengers.length > 3 && (
+                  <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: '#666' }}>
+                    仲有 {shiftsWithPassengers.length - 3} 個班次有乘客等緊你 →
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Current Trip */}
             {activeShifts.length > 0 && (

@@ -478,34 +478,93 @@ export default function PassengerDashboard() {
               bookings.map(booking => {
                 const shift = bookingShifts[booking.shiftId]
                 const statusDisplay = getStatusDisplay(booking.status)
+                const hasDriver = !!(shift?.driverId && shift?.driverName)
+                
                 return (
                   <div key={booking.id} style={styles.bookingCard}>
-                    <div style={styles.bookingHeader}>
-                      <span style={styles.bookingId}>訂單: {booking.id?.slice(0, 8)}...</span>
-                      <span style={{ ...styles.bookingStatus, color: statusDisplay.color, background: statusDisplay.bg }}>
+                    {/* Header: Order ID + Status */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div>
+                        <span style={{ fontSize: 11, color: '#888', fontWeight: 600 }}>訂單編號</span>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#333', fontFamily: 'monospace' }}>{booking.id?.slice(0, 12).toUpperCase()}</div>
+                      </div>
+                      <span style={{ ...styles.bookingStatus, color: statusDisplay.color, background: statusDisplay.bg, fontSize: 12, padding: '4px 10px' }}>
                         {statusDisplay.label}
                       </span>
                     </div>
-                    <div style={styles.bookingRoute}>
-                      <div>📍 {shift?.routeName || '班次'} → {shift?.routeName ? '' : ''}</div>
-                      <div>🕐 {shift ? new Date(shift.departureTime).toLocaleString('zh-HK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : booking.createdAt ? new Date(booking.createdAt).toLocaleString('zh-HK') : '時間待定'}</div>
+                    
+                    {/* Route Info */}
+                    <div style={{ background: '#f8faf9', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 16 }}>🚌</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#1a1a1a' }}>{shift?.routeName || '包車服務'}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#666' }}>
+                        <div>🕐 {shift ? new Date(shift.departureTime).toLocaleString('zh-HK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '時間待定'}</div>
+                        <div>💺 {booking.seatCount} 位</div>
+                      </div>
                     </div>
-                    <div style={styles.bookingDetails}>
-                      <div><span>座位:</span> {booking.seatCount}</div>
-                      <div><span>金額:</span> <strong style={styles.priceText}>${booking.totalPrice}</strong></div>
+                    
+                    {/* Price */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderTop: '1px solid #eee', borderBottom: '1px solid #eee', marginBottom: 12 }}>
+                      <div>
+                        <span style={{ fontSize: 12, color: '#888' }}>總金額</span>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: '#1f4f43' }}>HK${booking.totalPrice}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: 12, color: '#888' }}>狀態</span>
+                        <div style={{ fontSize: 13, color: statusDisplay.color, fontWeight: 600 }}>{statusDisplay.label}</div>
+                      </div>
                     </div>
-                    {shift?.driverName && (
-                      <div style={styles.driverInfo}>
-                        <div>👤 司機: {shift.driverName}</div>
-                        {shift.driverPhone && <a href={`tel:${shift.driverPhone}`} style={styles.driverPhone}>📞 {shift.driverPhone}</a>}
+                    
+                    {/* Driver Info */}
+                    {hasDriver ? (
+                      <div style={{ background: '#e8f5e9', border: '1px solid #c8e6c5', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontSize: 16 }}>✅</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: '#2e7d32' }}>已分配司機</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#333' }}>{shift?.driverName}</div>
+                            {shift?.driverPhone && <div style={{ fontSize: 12, color: '#666' }}>📞 {shift.driverPhone}</div>}
+                          </div>
+                          {shift?.vehicleId && (
+                            <div style={{ fontSize: 12, color: '#666', textAlign: 'right' }}>
+                              <div>🚗 車輛</div>
+                              <div style={{ fontWeight: 600 }}>{shift.vehicleId}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ background: '#fff8e1', border: '1px solid #ffe0b2', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 16 }}>⏳</span>
+                          <span style={{ fontSize: 13, color: '#f57c00' }}>等待司機接單...</span>
+                        </div>
                       </div>
                     )}
-                    <div style={styles.bookingActions}>
-                      {shift?.driverId && (
-                        <button onClick={() => handleOpenChat(booking, shift)} style={{ ...styles.actionBtn, background: '#e3f2fd' }}>💬 對話</button>
+                    
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {shift?.driverId ? (
+                        <button onClick={() => handleOpenChat(booking, shift)} style={{ ...styles.actionBtn, flex: 1, background: '#e3f2fd', color: '#1565c0', border: '1px solid #1e56a3' }}>
+                          💬 與司機對話
+                        </button>
+                      ) : (
+                        <button style={{ ...styles.actionBtn, flex: 1, background: '#f5f5f5', color: '#999', cursor: 'not-allowed' }}>
+                          💬 等待接單
+                        </button>
                       )}
-                      {shift?.driverPhone && (
-                        <a href={`tel:${shift.driverPhone}`} style={styles.actionBtn}>📞 聯絡</a>
+                      {shift?.driverPhone ? (
+                        <a href={`tel:${shift.driverPhone}`} style={{ ...styles.actionBtn, flex: 1, background: '#e8f5e9', color: '#2e7d32', border: '1px solid #a5d6a7', textAlign: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          📞 聯絡司機
+                        </a>
+                      ) : (
+                        <button style={{ ...styles.actionBtn, flex: 1, background: '#f5f5f5', color: '#999', cursor: 'not-allowed' }}>
+                          📞 等待分配
+                        </button>
                       )}
                     </div>
                   </div>

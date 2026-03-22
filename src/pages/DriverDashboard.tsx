@@ -112,17 +112,26 @@ export default function DriverDashboard() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [allShifts, userBookings] = await Promise.all([
+      const [allShifts, allBookings] = await Promise.all([
         shiftService.getAll(),
-        currentUser ? bookingService.getByUser(currentUser.id) : Promise.resolve([])
+        bookingService.getAll()
       ])
+      
+      // For driver: get shifts where driverId matches current user
+      const myShifts = allShifts.filter((s: Shift) => s.driverId === currentUser?.id)
+      const myShiftIds = new Set(myShifts.map(s => s.id))
+      
+      // Get ALL bookings for driver's shifts (from passengers)
+      const driverShiftBookings = allBookings.filter((b: Booking) => myShiftIds.has(b.shiftId))
       
       const activeStatuses = ['SCHEDULED', 'OPEN', 'IN_PROGRESS', 'COMPLETED']
       setShifts(allShifts.filter((s: Shift) => 
         activeStatuses.includes(s.status) && 
         (s.driverId === currentUser?.id || s.status === 'OPEN' || s.status === 'SCHEDULED')
       ))
-      setBookings(userBookings)
+      
+      // Use passenger bookings for driver's view, not driver's own bookings
+      setBookings(driverShiftBookings)
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
@@ -412,6 +421,9 @@ export default function DriverDashboard() {
                 <h2 style={styles.sectionTitle}>🚗 當前行程</h2>
                 {activeShifts.map(shift => {
                   const status = statusConfig[shift.status] || { label: shift.status, color: '#666', bg: '#eee' }
+                  const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+                  const hasPassengers = shiftBookings.length > 0
+                  
                   return (
                     <div key={shift.id} style={styles.currentTripCard}>
                       <div style={styles.tripHeader}>
@@ -430,9 +442,37 @@ export default function DriverDashboard() {
                           <span>座位: {shift.totalSeats - shift.availableSeats}/{shift.totalSeats}</span>
                         </div>
                       </div>
+                      
+                      {/* Passengers in Current Trip */}
+                      {hasPassengers ? (
+                        <div style={{ marginTop: 12, padding: 10, background: '#e3f2fd', borderRadius: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#1565c0', marginBottom: 8 }}>
+                            👥 乘客 ({shiftBookings.length} 位)
+                          </div>
+                          {shiftBookings.map((booking, idx) => (
+                            <div key={booking.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < shiftBookings.length - 1 ? '1px solid #bbdefb' : 'none' }}>
+                              <div style={{ fontSize: 13, color: '#333' }}>{booking.passengerName || '乘客'}</div>
+                              <div style={{ fontSize: 12, color: '#666' }}>{booking.seatCount || 1} 位</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: 12, padding: 10, background: '#fff8e1', borderRadius: 8, textAlign: 'center' }}>
+                          <span style={{ fontSize: 12, color: '#f57c00' }}>⏳ 等待乘客預訂...</span>
+                        </div>
+                      )}
+                      
                       <div style={styles.tripActions}>
-                        <button onClick={() => handleOpenChat(shift)} style={styles.chatBtn}>
-                          💬 乘客對話
+                        <button 
+                          onClick={() => handleOpenChat(shift)} 
+                          disabled={!hasPassengers}
+                          style={{
+                            ...styles.chatBtn,
+                            opacity: hasPassengers ? 1 : 0.5,
+                            cursor: hasPassengers ? 'pointer' : 'not-allowed'
+                          }}
+                        >
+                          {hasPassengers ? '💬 乘客對話' : '💬 等待乘客'}
                         </button>
                         {shift.status === 'IN_PROGRESS' && (
                           <button onClick={() => handleCompleteShift(shift)} style={styles.completeBtn}>

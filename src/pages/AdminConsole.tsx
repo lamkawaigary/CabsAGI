@@ -17,6 +17,7 @@ import {
   type AdminUserRecord,
   type PricingConfigRecord,
 } from '../services/adminService'
+import { pointsService, pointsConfigService } from '../services/pointsService'
 import type {
   OfficialRouteRecord,
   OfficialRouteStatus,
@@ -25,7 +26,7 @@ import type {
 } from '../services/orderService'
 
 type NoticeTone = 'ok' | 'error' | 'info'
-type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing' | 'kyc'
+type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing' | 'kyc' | 'points'
 
 type RouteFormState = {
   id?: string
@@ -1428,6 +1429,224 @@ export default function AdminConsole() {
     </div>
   )
 
+  // Points Management Tab
+  const [pointsConfig, setPointsConfig] = useState({ commissionRate: 0.08 })
+  const [pointsUsers, setPointsUsers] = useState<{id: string; name: string; email: string; phone: string; role: string; points: number}[]>([])
+  const [pointsLoading, setPointsLoading] = useState(false)
+  const [pointsNotice, setPointsNotice] = useState<{text: string; type: 'success' | 'error'} | null>(null)
+  
+  // Points form state
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [pointsAmount, setPointsAmount] = useState('')
+  const [pointsType, setPointsType] = useState<'DRIVER_TOPUP' | 'PASSENGER_BONUS' | 'PASSENGER_COMPENSATION'>('DRIVER_TOPUP')
+  const [pointsDescription, setPointsDescription] = useState('')
+  const [allTransactions, setAllTransactions] = useState<any[]>([])
+
+  useEffect(() => {
+    if (activeTab === 'points') loadPointsData()
+  }, [activeTab])
+
+  const loadPointsData = async () => {
+    setPointsLoading(true)
+    try {
+      const [config, txns] = await Promise.all([
+        pointsConfigService.get(),
+        pointsService.getAllTransactions(50)
+      ])
+      
+      // Subscribe to users for real-time updates
+      subscribeAdminUsers((users) => setPointsUsers(users.map(u => ({
+        id: u.id,
+        name: u.name || '',
+        email: u.email || '',
+        phone: u.phone || '',
+        role: u.role || 'passenger',
+        points: u.points || 0
+      }))))
+      
+      setPointsConfig(config)
+      setAllTransactions(txns)
+    } catch (err) {
+      console.error('Failed to load points data:', err)
+    } finally {
+      setPointsLoading(false)
+    }
+  }
+
+  const handleUpdateCommission = async () => {
+    try {
+      await pointsConfigService.update({ commissionRate: parseFloat(pointsConfig.commissionRate.toString()) })
+      setPointsNotice({ text: '佣金比率已更新', type: 'success' })
+    } catch (err) {
+      setPointsNotice({ text: '更新失敗', type: 'error' })
+    }
+  }
+
+  const handleAddPoints = async () => {
+    if (!selectedUserId || !pointsAmount || !pointsDescription) {
+      setPointsNotice({ text: '請填寫所有欄位', type: 'error' })
+      return
+    }
+    const amount = parseInt(pointsAmount)
+    if (isNaN(amount) || amount <= 0) {
+      setPointsNotice({ text: '請輸入有效金額', type: 'error' })
+      return
+    }
+    try {
+      const user = pointsUsers.find(u => u.id === selectedUserId)
+      if (!user) return
+      
+      await pointsService.addPoints({
+        userId: selectedUserId,
+        userRole: user.role === 'driver' ? 'driver' : 'passenger',
+        type: pointsType,
+        amount,
+        description: pointsDescription,
+        createdBy: currentUser?.id || 'admin'
+      })
+      setPointsNotice({ text: `已成功添加 ${amount} points`, type: 'success' })
+      setSelectedUserId('')
+      setPointsAmount('')
+      setPointsDescription('')
+      loadPointsData()
+    } catch (err) {
+      setPointsNotice({ text: '操作失敗', type: 'error' })
+    }
+  }
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'DRIVER_TOPUP': return '💰 司機充值'
+      case 'COMMISSION': return '💸 佣金'
+      case 'PASSENGER_BONUS': return '🎁 乘客獎勵'
+      case 'PASSENGER_COMPENSATION': return '🎯 乘客賠償'
+      case 'DRIVER_REFUND': return '↩️ 退款'
+      default: return type
+    }
+  }
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'driver': return '🚗 司機'
+      case 'passenger': return '👤 乘客'
+      case 'admin': return '⚙️ 管理員'
+      default: return role
+    }
+  }
+
+  const renderPointsTab = () => (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <h3 style={{ margin: 0, color: '#27483f' }}>💎 點數管理</h3>
+      
+      {/* Notice */}
+      {pointsNotice && (
+        <div style={{
+          padding: '10px 12px',
+          borderRadius: 8,
+          background: pointsNotice.type === 'success' ? '#eff9f2' : '#fff0ec',
+          border: `1px solid ${pointsNotice.type === 'success' ? '#c3dfcf' : '#edc2bb'}`,
+          color: pointsNotice.type === 'success' ? '#2c5a4f' : '#9c3d31',
+          fontSize: 13
+        }}>
+          {pointsNotice.text}
+        </div>
+      )}
+
+      {/* Commission Rate Config */}
+      <div style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 16 }}>
+        <h4 style={{ margin: '0 0 12px', color: '#27483f', fontSize: 14 }}>⚙️ 佣金比率設定</h4>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ fontSize: 13, color: '#666' }}>佣金比率:</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            value={pointsConfig.commissionRate}
+            onChange={(e) => setPointsConfig({ ...pointsConfig, commissionRate: parseFloat(e.target.value) })}
+            style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', width: 80 }}
+          />
+          <span style={{ fontSize: 13, color: '#666' }}>({(pointsConfig.commissionRate * 100).toFixed(0)}%)</span>
+          <button onClick={handleUpdateCommission} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1f4f43', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>儲存</button>
+        </div>
+      </div>
+
+      {/* Add Points Form */}
+      <div style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 16 }}>
+        <h4 style={{ margin: '0 0 12px', color: '#27483f', fontSize: 14 }}>➕ 添加點數</h4>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <select
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          >
+            <option value="">選擇用戶...</option>
+            {pointsUsers.map(u => (
+              <option key={u.id} value={u.id}>
+                {u.name || u.email} ({getRoleLabel(u.role)}) - {u.points || 0} pts
+              </option>
+            ))}
+          </select>
+          
+          <select
+            value={pointsType}
+            onChange={(e) => setPointsType(e.target.value as any)}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          >
+            <option value="DRIVER_TOPUP">💰 司機充值</option>
+            <option value="PASSENGER_BONUS">🎁 乘客獎勵</option>
+            <option value="PASSENGER_COMPENSATION">🎯 乘客賠償</option>
+          </select>
+          
+          <input
+            type="number"
+            placeholder="點數數量"
+            value={pointsAmount}
+            onChange={(e) => setPointsAmount(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          />
+          
+          <input
+            type="text"
+            placeholder="原因說明 (例如: 充值、獎勵、賠償)"
+            value={pointsDescription}
+            onChange={(e) => setPointsDescription(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          />
+          
+          <button onClick={handleAddPoints} style={{ padding: '12px', borderRadius: 8, border: 'none', background: '#1f4f43', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+            確認添加點數
+          </button>
+        </div>
+      </div>
+
+      {/* Transaction History */}
+      <div style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 16 }}>
+        <h4 style={{ margin: '0 0 12px', color: '#27483f', fontSize: 14 }}>📜 點數交易記錄</h4>
+        {pointsLoading ? (
+          <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>載入中...</div>
+        ) : allTransactions.length === 0 ? (
+          <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>暫無交易記錄</div>
+        ) : (
+          <div style={{ display: 'grid', gap: 8, maxHeight: 400, overflow: 'auto' }}>
+            {allTransactions.map(tx => (
+              <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#f8faf9', borderRadius: 8, border: '1px solid #eee' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>{getTypeLabel(tx.type)}</div>
+                  <div style={{ fontSize: 11, color: '#666' }}>{tx.description}</div>
+                  <div style={{ fontSize: 10, color: '#999' }}>{new Date(tx.createdAt).toLocaleString('zh-HK')}</div>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: tx.amount >= 0 ? '#2e7d32' : '#c62828' }}>
+                  {tx.amount >= 0 ? '+' : ''}{tx.amount}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div style={{ minHeight: '100vh', background: '#f4f7f5' }}>
       <header
@@ -1486,6 +1705,7 @@ export default function AdminConsole() {
             { key: 'routes', label: '官方班次' },
             { key: 'pricing', label: '價格設定' },
             { key: 'kyc', label: 'KYC審批' },
+            { key: 'points', label: '💎 點數管理' },
           ].map((item) => (
             <button
               key={item.key}
@@ -1538,6 +1758,7 @@ export default function AdminConsole() {
         {activeTab === 'routes' && renderRoutesTab()}
         {activeTab === 'pricing' && renderPricingTab()}
         {activeTab === 'kyc' && renderKycTab()}
+        {activeTab === 'points' && renderPointsTab()}
       </main>
     </div>
   )

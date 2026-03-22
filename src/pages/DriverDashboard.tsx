@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import { shiftService, bookingService } from '../services/shiftService'
 import { chatService, systemMessageService } from '../services/chatService'
 import { uploadService } from '../services/uploadService'
+import { pointsService } from '../services/pointsService'
+import PointsWallet from '../components/PointsWallet'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
 import type { Shift, Booking } from '../types/shift'
@@ -249,11 +251,41 @@ export default function DriverDashboard() {
 
   const handleCompleteShift = async (shift: Shift) => {
     try {
+      // Calculate commission
+      const passengerCount = bookings.filter(b => b.shiftId === shift.id).length
+      const orderPrice = shift.price * passengerCount
+      const commission = await pointsService.calculateCommission(orderPrice)
+      
+      // Check if driver has enough points
+      if (currentUser) {
+        const balance = await pointsService.getBalance(currentUser.id)
+        if (balance < commission) {
+          alert(`餘額不足！需要 ${commission} points 支付佣金，但您只有 ${balance} points。\n\n請聯繫平台充值後再完成行程。`)
+          return
+        }
+        
+        // Deduct commission
+        const result = await pointsService.deductCommission({
+          driverId: currentUser.id,
+          orderId: shift.id,
+          shiftId: shift.id,
+          orderPrice
+        })
+        
+        if (!result.success) {
+          alert(`扣費失敗: ${result.message}`)
+          return
+        }
+        console.log(`Commission deducted: ${result.commission} points`)
+      }
+      
+      // Update shift status
       await shiftService.update(shift.id, { status: 'COMPLETED' })
       loadData()
-      alert('已完成行程！')
+      alert(`已完成行程！已扣除佣金 ${commission} points`)
     } catch (error) {
       console.error('Failed to complete shift:', error)
+      alert('完成行程失敗，請稍後再試')
     }
   }
 
@@ -330,6 +362,13 @@ export default function DriverDashboard() {
                 <button onClick={() => setActiveTab('profile')} style={styles.kycBtn}>
                   前往認證
                 </button>
+              </div>
+            )}
+
+            {/* Points Wallet */}
+            {canAcceptOrders && currentUser && (
+              <div style={{ marginBottom: 12 }}>
+                <PointsWallet userId={currentUser.id} userRole="driver" />
               </div>
             )}
 

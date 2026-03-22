@@ -5,6 +5,7 @@ import { routeService, shiftService, bookingService } from '../services/shiftSer
 import { createOrder } from '../services/orderService'
 import { chatService } from '../services/chatService'
 import { calculatePrice, calculateRoute, searchLocation, type LocationRecord, type RouteResult } from '../services/mapService'
+import PointsWallet from '../components/PointsWallet'
 import type { Route, Shift, Booking } from '../types/shift'
 
 // ============== Types ==============
@@ -636,6 +637,13 @@ export default function PassengerDashboard() {
                 {message && <div style={{ marginTop: 8, fontSize: 13, color: message.includes('成功') ? '#1a7a3a' : '#c62828' }}>{message}</div>}
               </div>
             </div>
+
+            {/* Points Wallet */}
+            {currentUser && (
+              <div style={{ marginTop: 16 }}>
+                <PointsWallet userId={currentUser.id} userRole="passenger" />
+              </div>
+            )}
           </section>
         )}
       </div>

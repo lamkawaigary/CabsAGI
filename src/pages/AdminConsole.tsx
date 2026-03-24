@@ -1469,14 +1469,22 @@ export default function AdminConsole() {
       ])
       
       // Subscribe to users for real-time updates
-      subscribeAdminUsers((users) => setPointsUsers(users.map(u => ({
-        id: u.id,
-        name: u.name || '',
-        email: u.email || '',
-        phone: u.phone || '',
-        role: u.role || 'passenger',
-        points: u.points || 0
-      }))))
+      subscribeAdminUsers(
+        (users) => {
+          console.log('[Points] Received users:', users.length)
+          setPointsUsers(users.map(u => ({
+            id: u.id,
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phone || '',
+            role: u.role || 'passenger',
+            points: u.points || 0
+          })))
+        },
+        (error) => {
+          console.error('[Points] Users subscription error:', error)
+        }
+      )
       
       setPointsConfig(config)
       setAllTransactions(txns)

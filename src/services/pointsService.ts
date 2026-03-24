@@ -75,10 +75,10 @@ export const pointsConfigService = {
 
   async update(config: Partial<PointsConfig>): Promise<void> {
     const docRef = doc(db, CONFIG_DOC)
-    await updateDoc(docRef, {
+    await setDoc(docRef, {
       ...config,
       updatedAt: new Date().toISOString()
-    })
+    }, { merge: true })
   }
 }
 

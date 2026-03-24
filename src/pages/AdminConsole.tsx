@@ -1532,8 +1532,9 @@ export default function AdminConsole() {
       setPointsDescription('')
       loadPointsData()
     } catch (err) {
-      console.error('[Points] Add points error:', err)
-      setPointsNotice({ text: `操作失敗: ${(err as Error).message}`, type: 'error' })
+      const error = err as Error
+      console.error('[Points] Add points error:', error, 'message:', error.message, 'code:', (error as any).code)
+      setPointsNotice({ text: `操作失敗: ${error.message || JSON.stringify(error)}`, type: 'error' })
     }
   }
 

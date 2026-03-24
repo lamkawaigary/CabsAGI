@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   updateDoc,
+  setDoc,
   query,
   where,
   orderBy,
@@ -67,7 +68,8 @@ export const pointsConfigService = {
       updatedAt: new Date().toISOString()
     }
     
-    await updateDoc(docRef, defaultConfig)
+    // Use setDoc with merge to create the document if it doesn't exist
+    await setDoc(docRef, defaultConfig, { merge: true })
     return { id: CONFIG_DOC, ...defaultConfig }
   },
 

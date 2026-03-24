@@ -1441,10 +1441,24 @@ export default function AdminConsole() {
   const [pointsType, setPointsType] = useState<'DRIVER_TOPUP' | 'PASSENGER_BONUS' | 'PASSENGER_COMPENSATION'>('DRIVER_TOPUP')
   const [pointsDescription, setPointsDescription] = useState('')
   const [allTransactions, setAllTransactions] = useState<any[]>([])
+  const [pointsUserSearch, setPointsUserSearch] = useState('')
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
 
   useEffect(() => {
     if (activeTab === 'points') loadPointsData()
   }, [activeTab])
+
+  // Close user dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.user-search-container')) {
+        setShowUserDropdown(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
 
   const loadPointsData = async () => {
     setPointsLoading(true)
@@ -1575,18 +1589,86 @@ export default function AdminConsole() {
       <div style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 16 }}>
         <h4 style={{ margin: '0 0 12px', color: '#27483f', fontSize: 14 }}>➕ 添加點數</h4>
         <div style={{ display: 'grid', gap: 10 }}>
-          <select
-            value={selectedUserId}
-            onChange={(e) => setSelectedUserId(e.target.value)}
-            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
-          >
-            <option value="">選擇用戶...</option>
-            {pointsUsers.map(u => (
-              <option key={u.id} value={u.id}>
-                {u.name || u.email} ({getRoleLabel(u.role)}) - {u.points || 0} pts
-              </option>
-            ))}
-          </select>
+          {/* User Search */}
+          <div className="user-search-container" style={{ position: 'relative' }}>
+            <label style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>選擇用戶:</label>
+            <input
+              type="text"
+              placeholder="搜尋用戶 (名稱、電郵或電話)..."
+              value={pointsUserSearch}
+              onChange={(e) => {
+                setPointsUserSearch(e.target.value)
+                setShowUserDropdown(true)
+              }}
+              onFocus={() => setShowUserDropdown(true)}
+              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+            />
+            {showUserDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: '#fff',
+                border: '1px solid #ddd',
+                borderRadius: 8,
+                maxHeight: 200,
+                overflow: 'auto',
+                zIndex: 1000,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}>
+                {pointsUsers.filter(u => 
+                  !pointsUserSearch || 
+                  (u.name?.toLowerCase().includes(pointsUserSearch.toLowerCase())) ||
+                  (u.email?.toLowerCase().includes(pointsUserSearch.toLowerCase())) ||
+                  (u.phone?.includes(pointsUserSearch))
+                ).length === 0 ? (
+                  <div style={{ padding: 12, color: '#888', textAlign: 'center' }}>找不到用戶</div>
+                ) : (
+                  pointsUsers.filter(u => 
+                    !pointsUserSearch || 
+                    (u.name?.toLowerCase().includes(pointsUserSearch.toLowerCase())) ||
+                    (u.email?.toLowerCase().includes(pointsUserSearch.toLowerCase())) ||
+                    (u.phone?.includes(pointsUserSearch))
+                  ).map(u => (
+                    <div
+                      key={u.id}
+                      onClick={() => {
+                        setSelectedUserId(u.id)
+                        setPointsUserSearch(u.name || u.email)
+                        setShowUserDropdown(false)
+                      }}
+                      style={{
+                        padding: '10px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #eee',
+                        background: selectedUserId === u.id ? '#f0f7f4' : '#fff'
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: '#333' }}>{u.name || '(無名稱)'}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>
+                        {u.email} | {getRoleLabel(u.role)} | {u.points || 0} pts
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+            {selectedUserId && (
+              <div style={{ marginTop: 4, fontSize: 12, color: '#1f4f43' }}>
+                已選擇: {pointsUsers.find(u => u.id === selectedUserId)?.name || pointsUsers.find(u => u.id === selectedUserId)?.email}
+                <button
+                  onClick={() => {
+                    setSelectedUserId('')
+                    setPointsUserSearch('')
+                  }}
+                  style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 4, border: 'none', background: '#ff4444', color: '#fff', cursor: 'pointer', fontSize: 11 }}
+                >
+                  清除
+                </button>
+              </div>
+            )}
+          </div>
           
           <select
             value={pointsType}

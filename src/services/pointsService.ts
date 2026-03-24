@@ -124,7 +124,7 @@ export const pointsService = {
       updatedAt: new Date().toISOString()
     })
     
-    // Create transaction record
+    // Create transaction record (filter out undefined values)
     const transaction: Omit<PointsTransaction, 'id'> = {
       userId,
       userRole,
@@ -132,12 +132,14 @@ export const pointsService = {
       amount,
       balanceBefore: currentBalance,
       balanceAfter: newBalance,
-      orderId,
-      shiftId,
       description,
       createdAt: new Date().toISOString(),
       createdBy
     }
+    
+    // Only add orderId/shiftId if they exist
+    if (orderId) transaction.orderId = orderId
+    if (shiftId) transaction.shiftId = shiftId
     
     const docRef = await addDoc(collection(db, 'pointsTransactions'), transaction)
     return { id: docRef.id, ...transaction }

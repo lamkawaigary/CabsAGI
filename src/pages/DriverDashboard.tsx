@@ -5,6 +5,7 @@ import { shiftService, bookingService } from '../services/shiftService'
 import { chatService, systemMessageService } from '../services/chatService'
 import { uploadService } from '../services/uploadService'
 import { pointsService } from '../services/pointsService'
+import notificationService from '../services/notificationService'
 import PointsWallet from '../components/PointsWallet'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
@@ -220,6 +221,21 @@ export default function DriverDashboard() {
 
   const handleAcceptShift = async (shift: Shift) => {
     if (!canAcceptOrders) return
+    
+    const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+    const passengerCount = shiftBookings.length
+    
+    // Show confirmation with passenger info
+    const passengerInfo = shiftBookings.length > 0 
+      ? shiftBookings.map(b => `• ${b.passengerName || '乘客'}`).join('\n')
+      : '暫無乘客'
+    
+    const confirm = window.confirm(
+      `🚗 確認接單？\n\n路線: ${shift.routeName}\n時間: ${formatDateTime(shift.departureTime || shift.createdAt)}\n乘客:\n${passengerInfo}\n\n價錢: $${shift.price}/位`
+    )
+    
+    if (!confirm) return
+    
     try {
       await shiftService.update(shift.id, {
         driverId: currentUser?.id,
@@ -228,8 +244,10 @@ export default function DriverDashboard() {
         status: 'IN_PROGRESS'
       })
       
-      const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+      // Notify passengers
       for (const booking of shiftBookings) {
+        notificationService.driver.passengerConfirmed(shift.id, booking.passengerName || '乘客')
+        
         const conversationId = await chatService.getOrCreateShiftConversation(
           shift.id,
           currentUser?.id || '',
@@ -242,7 +260,15 @@ export default function DriverDashboard() {
       }
       
       loadData()
-      alert('已接單！')
+      
+      // Success notification
+      notificationService.showLocalNotification(
+        '✅ 已接單！',
+        `路線: ${shift.routeName}，${passengerCount}位乘客`,
+        { type: 'order_accepted', shiftId: shift.id }
+      )
+      
+      alert(`已接單！\n\n路線: ${shift.routeName}\n乘客: ${passengerCount}人`)
     } catch (error) {
       console.error('Failed to accept shift:', error)
       alert('接單失敗，請稍後再試')
@@ -252,16 +278,25 @@ export default function DriverDashboard() {
   const handleCompleteShift = async (shift: Shift) => {
     try {
       // Calculate commission
-      const passengerCount = bookings.filter(b => b.shiftId === shift.id).length
+      const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+      const passengerCount = shiftBookings.length
       const orderPrice = shift.price * passengerCount
       const commission = await pointsService.calculateCommission(orderPrice)
       
       // Check if driver has enough points
       if (currentUser) {
         const balance = await pointsService.getBalance(currentUser.id)
+        
+        // Low balance warning notification
+        if (balance < commission * 2) {
+          notificationService.driver.lowBalance(commission)
+        }
+        
         if (balance < commission) {
-          alert(`餘額不足！需要 ${commission} points 支付佣金，但您只有 ${balance} points。\n\n請聯繫平台充值後再完成行程。`)
-          return
+          const confirm = window.confirm(
+            `⚠️ 餘額不足！\n\n需要: ${commission} points\n目前餘額: ${balance} points\n\n差額: ${commission - balance} points\n\n請聯繫平台充值後再完成行程。`
+          )
+          if (!confirm) return
         }
         
         // Deduct commission
@@ -276,13 +311,30 @@ export default function DriverDashboard() {
           alert(`扣費失敗: ${result.message}`)
           return
         }
-        console.log(`Commission deducted: ${result.commission} points`)
+        
+        // Success notification
+        const newBalance = balance - commission
+        notificationService.driver.commissionDeducted(commission, newBalance)
       }
       
       // Update shift status
       await shiftService.update(shift.id, { status: 'COMPLETED' })
+      
+      // Notify passengers that trip is completed
+      if (shiftBookings.length > 0) {
+        notificationService.showLocalNotification(
+          '✅ 行程已完成',
+          `司機已完成行程 ${shift.routeName}`,
+          { type: 'trip_completed', shiftId: shift.id }
+        )
+      }
+      
       loadData()
-      alert(`已完成行程！已扣除佣金 ${commission} points`)
+      
+      // Show success dialog
+      window.confirm(
+        `✅ 行程已完成！\n\n路線: ${shift.routeName}\n乘客: ${passengerCount}人\n佣金: ${commission} points`
+      )
     } catch (error) {
       console.error('Failed to complete shift:', error)
       alert('完成行程失敗，請稍後再試')

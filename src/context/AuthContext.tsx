@@ -329,9 +329,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const snap = await getDocs(q)
       
       if (snap.empty) {
-        // Create new user (first time login)
-        // For now, create a placeholder - user needs to complete registration
-        return { ok: true, message: '電話驗證成功，請繼續註冊' }
+        // Create new user document in Firestore (first time login via OTP)
+        // For OTP login, we use phone as identifier
+        const newUserId = `otp_${otpSession.phone.replace('+', '')}`
+        
+        await setDoc(doc(db, 'users', newUserId), {
+          id: newUserId,
+          name: 'Cabs User',
+          phone: otpSession.phone,
+          phoneVerified: true,
+          email: formatEmailFromPhone(otpSession.phone),
+          role: 'passenger',
+          points: 0,
+          kycStatus: 'n/a',
+          driverApproved: false,
+          kycSubmittedAt: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        
+        // Set as current user
+        setCurrentUser({
+          id: newUserId,
+          name: 'Cabs User',
+          phone: otpSession.phone,
+          phoneVerified: true,
+          email: formatEmailFromPhone(otpSession.phone),
+          role: 'passenger',
+          points: 0,
+          kycStatus: 'n/a',
+          driverApproved: false,
+          kycSubmittedAt: null,
+        })
+        
+        setOtpSession(null)
+        return { ok: true, message: '電話驗證成功！請完善您的個人資料。' }
       }
       
       // Update existing user to mark phone as verified AND save phone number

@@ -334,8 +334,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: true, message: '電話驗證成功，請繼續註冊' }
       }
       
-      // Update existing user to mark phone as verified
+      // Update existing user to mark phone as verified AND save phone number
       await updateDoc(snap.docs[0].ref, {
+        phone: otpSession.phone,
         phoneVerified: true,
         updatedAt: new Date().toISOString(),
       })

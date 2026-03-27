@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import TencentMap from '../components/map/TencentMap'
-import { calculatePrice, calculateRoute, searchLocation, type LocationRecord, type RouteResult } from '../services/mapService'
+import {
+  calculatePrice,
+  getDistanceFromLatLonInKm,
+  STATIC_LOCATIONS,
+  type LocationRecord,
+} from '../services/mapService'
 import { useAuth } from '../context/AuthContext'
 import {
   createOrder,
@@ -11,15 +15,40 @@ import {
   type OfficialRouteStatus,
 } from '../services/orderService'
 
+const MAP_FEATURE_ENABLED = false
+
 type QuoteView = {
   total: number
   distance: string
   duration: number
   tollsTotal: number
+  routeSource: 'local-estimate'
+}
+
+type NoticeTone = 'ok' | 'error' | 'info'
+
+const noticeClassByTone = (tone: NoticeTone) => {
+  if (tone === 'error') return 'ui-notice ui-notice-error'
+  if (tone === 'ok') return 'ui-notice ui-notice-ok'
+  return 'ui-notice ui-notice-info'
 }
 
 type BookingMode = 'charter' | 'official_route'
 type CharterVehicleType = 'standard' | 'luxury' | 'van'
+type CharterRoutePreset = {
+  id: string
+  label: string
+  pickupLocationId: string
+  dropoffLocationId: string
+  note: string
+}
+
+type SearchState = {
+  query: string
+  items: LocationRecord[]
+  open: boolean
+  searched: boolean
+}
 
 const CHARTER_VEHICLES: {
   id: CharterVehicleType
@@ -55,47 +84,96 @@ const toBookingDateTimeISO = (dateStr: string, timeStr: string) => {
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
 }
 
+const CHARTER_STEPS = ['選擇服務與路線', '計算預估車資', '確認下單']
+
+const CHARTER_ROUTE_PRESETS: CharterRoutePreset[] = [
+  {
+    id: 'central-hkg',
+    label: '中環 -> 機場',
+    pickupLocationId: 'central',
+    dropoffLocationId: 'hkg',
+    note: '商務客常用',
+  },
+  {
+    id: 'hkg-szw',
+    label: '機場 -> 深圳灣口岸',
+    pickupLocationId: 'hkg',
+    dropoffLocationId: 'szw',
+    note: '跨境熱門',
+  },
+  {
+    id: 'tst-lmg',
+    label: '尖沙咀 -> 落馬洲',
+    pickupLocationId: 'tst',
+    dropoffLocationId: 'lmg',
+    note: '拼商務行程',
+  },
+]
+
+const getStaticLocation = (id: string): LocationRecord | null => {
+  const found = STATIC_LOCATIONS.find((location) => location.id === id)
+  if (!found) return null
+  return { ...found, source: 'local' }
+}
+
+const buildLocalQuote = (
+  pickup: LocationRecord,
+  dropoff: LocationRecord,
+): QuoteView => {
+  const distance = getDistanceFromLatLonInKm(
+    pickup.lat,
+    pickup.lng,
+    dropoff.lat,
+    dropoff.lng,
+  )
+  const roundedDistance = Math.max(1, Math.round(distance * 10) / 10)
+  const estimatedDuration = Math.max(15, Math.round((roundedDistance / 35) * 60))
+  const pricing = calculatePrice({
+    distance: roundedDistance,
+    duration: estimatedDuration,
+    tolls: [],
+    hasCrossBorder: false,
+    checkpoints: [],
+    path: [],
+    hasRealPath: false,
+  })
+  return {
+    ...pricing,
+    routeSource: 'local-estimate',
+  }
+}
+
 function LocationInput({
   label,
   accent,
-  value,
+  state,
+  onQueryChange,
+  onOpen,
+  onClose,
   onPick,
 }: {
   label: string
   accent: string
-  value: LocationRecord | null
+  state: SearchState
+  onQueryChange: (query: string) => void
+  onOpen: () => void
+  onClose: () => void
   onPick: (v: LocationRecord | null) => void
 }) {
-  const [query, setQuery] = useState(() => value?.name || '')
-  const [items, setItems] = useState<LocationRecord[]>([])
-  const [open, setOpen] = useState(false)
-  const [searched, setSearched] = useState(false)
-
-  const runSearch = async (q: string) => {
-    setQuery(q)
-    setSearched(true)
-    if (!q.trim()) {
-      setItems([])
-      setOpen(false)
-      onPick(null)
-      return
-    }
-    const result = await searchLocation(q)
-    setItems(result)
-    setOpen(true)
-  }
+  const { query, items, open, searched } = state
 
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#4b665f', marginBottom: 6 }}>{label}</div>
+      <div className="ui-section-title" style={{ marginBottom: 6 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #dce6dd', background: '#fbfdfb', borderRadius: 12, padding: '12px 12px' }}>
         <span style={{ width: 11, height: 11, borderRadius: '50%', background: accent }} />
         <input
           value={query}
-          onChange={(e) => void runSearch(e.target.value)}
-          onFocus={() => setOpen(items.length > 0)}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onFocus={onOpen}
           placeholder="請輸入地點（AI建議）"
-          style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', fontSize: 14 }}
+          className="ui-input"
+          style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', minHeight: 'unset', padding: 0 }}
         />
       </div>
       {open && (
@@ -106,8 +184,8 @@ function LocationInput({
                 key={`${item.id}-${item.lat}`}
                 onClick={() => {
                   onPick(item)
-                  setQuery(item.name)
-                  setOpen(false)
+                  onQueryChange(item.name)
+                  onClose()
                 }}
                 style={{ width: '100%', textAlign: 'left', border: 0, background: 'transparent', cursor: 'pointer', padding: '10px 12px', borderBottom: '1px solid #f2f4f2' }}
               >
@@ -149,7 +227,6 @@ export default function PassengerHome() {
   const [pickup, setPickup] = useState<LocationRecord | null>(null)
   const [dropoff, setDropoff] = useState<LocationRecord | null>(null)
   const [quote, setQuote] = useState<QuoteView | null>(null)
-  const [routeInfo, setRouteInfo] = useState<RouteResult | null>(null)
   const [calculating, setCalculating] = useState(false)
   const [placingOrder, setPlacingOrder] = useState(false)
   const [bookingDate, setBookingDate] = useState('')
@@ -162,7 +239,22 @@ export default function PassengerHome() {
   const [officialError, setOfficialError] = useState<string | null>(null)
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [officialSeats, setOfficialSeats] = useState(1)
-  const [notice, setNotice] = useState<{ text: string; tone: 'ok' | 'error' | 'info' } | null>(null)
+  const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null)
+  const [pickupSearch, setPickupSearch] = useState<SearchState>({
+    query: '',
+    items: [],
+    open: false,
+    searched: false,
+  })
+  const [dropoffSearch, setDropoffSearch] = useState<SearchState>({
+    query: '',
+    items: [],
+    open: false,
+    searched: false,
+  })
+  const searchCacheRef = useRef<Map<string, LocationRecord[]>>(new Map())
+  const pickupSearchRequestIdRef = useRef(0)
+  const dropoffSearchRequestIdRef = useRef(0)
 
   const bookingReady = useMemo(() => !!pickup && !!dropoff, [pickup, dropoff])
   const selectedVehicle = useMemo(
@@ -189,34 +281,21 @@ export default function PassengerHome() {
       total: Math.round(quote.total * selectedVehicle.multiplier),
     }
   }, [quote, selectedVehicle.multiplier])
-
-  const officialPickup = useMemo<LocationRecord | null>(() => {
-    if (!selectedOfficialRoute) return null
-    if (!selectedOfficialRoute.pickupLat || !selectedOfficialRoute.pickupLng) return null
-    return {
-      id: `official-${selectedOfficialRoute.id}-pickup`,
-      name: selectedOfficialRoute.pickup,
-      address: selectedOfficialRoute.pickup,
-      lat: selectedOfficialRoute.pickupLat,
-      lng: selectedOfficialRoute.pickupLng,
-      keywords: ['official'],
-      source: 'local',
-    }
-  }, [selectedOfficialRoute])
-
-  const officialDropoff = useMemo<LocationRecord | null>(() => {
-    if (!selectedOfficialRoute) return null
-    if (!selectedOfficialRoute.dropoffLat || !selectedOfficialRoute.dropoffLng) return null
-    return {
-      id: `official-${selectedOfficialRoute.id}-dropoff`,
-      name: selectedOfficialRoute.dropoff,
-      address: selectedOfficialRoute.dropoff,
-      lat: selectedOfficialRoute.dropoffLat,
-      lng: selectedOfficialRoute.dropoffLng,
-      keywords: ['official'],
-      source: 'local',
-    }
-  }, [selectedOfficialRoute])
+  const charterStep = useMemo(() => {
+    if (!pickup || !dropoff) return 1
+    if (!quoteWithVehicle) return 2
+    return 3
+  }, [pickup, dropoff, quoteWithVehicle])
+  const activePresetId = useMemo(() => {
+    if (!pickup || !dropoff) return null
+    return (
+      CHARTER_ROUTE_PRESETS.find(
+        (preset) =>
+          preset.pickupLocationId === pickup.id &&
+          preset.dropoffLocationId === dropoff.id,
+      )?.id || null
+    )
+  }, [pickup, dropoff])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -240,13 +319,113 @@ export default function PassengerHome() {
     return () => unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (!notice || notice.tone === 'error') return undefined
+    const timeoutId = window.setTimeout(() => {
+      setNotice((current) => (current?.text === notice.text ? null : current))
+    }, 3600)
+    return () => window.clearTimeout(timeoutId)
+  }, [notice])
+
+  useEffect(() => {
+    if (!pickup && pickupSearch.query) {
+      setPickupSearch((prev) => ({ ...prev, query: '' }))
+    }
+  }, [pickup, pickupSearch.query])
+
+  useEffect(() => {
+    if (!dropoff && dropoffSearch.query) {
+      setDropoffSearch((prev) => ({ ...prev, query: '' }))
+    }
+  }, [dropoff, dropoffSearch.query])
+
+  const runLocationSearch = useCallback(async (
+    rawQuery: string,
+    setState: React.Dispatch<React.SetStateAction<SearchState>>,
+    requestRef: React.MutableRefObject<number>,
+  ) => {
+    const query = rawQuery.trim()
+    if (!query) {
+      setState((prev) => ({ ...prev, items: [], open: false, searched: false }))
+      return
+    }
+
+    setState((prev) => ({ ...prev, searched: true }))
+
+    if (searchCacheRef.current.has(query)) {
+      const cached = searchCacheRef.current.get(query) || []
+      setState((prev) => ({ ...prev, items: cached, open: true }))
+      return
+    }
+
+    const requestId = ++requestRef.current
+    const normalized = query.toLowerCase()
+    const result = STATIC_LOCATIONS.filter(
+      (location) =>
+        location.name.toLowerCase().includes(normalized) ||
+        location.address.toLowerCase().includes(normalized) ||
+        location.keywords.some((keyword) => keyword.toLowerCase().includes(normalized)),
+    )
+      .slice(0, 10)
+      .map((location) => ({ ...location, source: 'local' as const }))
+    if (requestId !== requestRef.current) return
+    searchCacheRef.current.set(query, result)
+    setState((prev) => ({ ...prev, items: result, open: true }))
+  }, [])
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void runLocationSearch(
+        pickupSearch.query,
+        setPickupSearch,
+        pickupSearchRequestIdRef,
+      )
+    }, 240)
+    return () => window.clearTimeout(timerId)
+  }, [pickupSearch.query, runLocationSearch])
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void runLocationSearch(
+        dropoffSearch.query,
+        setDropoffSearch,
+        dropoffSearchRequestIdRef,
+      )
+    }, 240)
+    return () => window.clearTimeout(timerId)
+  }, [dropoffSearch.query, runLocationSearch])
+
+  const clearCharterEstimate = () => {
+    setQuote(null)
+  }
+
+  const applyRoutePreset = (preset: CharterRoutePreset) => {
+    const nextPickup = getStaticLocation(preset.pickupLocationId)
+    const nextDropoff = getStaticLocation(preset.dropoffLocationId)
+    if (!nextPickup || !nextDropoff) {
+      setNotice({ text: '熱門路線資料不完整，請手動選擇地點。', tone: 'error' })
+      return
+    }
+
+    setPickup(nextPickup)
+    setDropoff(nextDropoff)
+    clearCharterEstimate()
+    setNotice({ text: `已套用熱門路線：${preset.label}`, tone: 'info' })
+  }
+
+  const swapStops = () => {
+    if (!pickup || !dropoff) return
+    setPickup(dropoff)
+    setDropoff(pickup)
+    clearCharterEstimate()
+    setNotice({ text: '已交換上車與目的地，請重新計算車資。', tone: 'info' })
+  }
+
   const refreshQuote = async () => {
     if (!pickup || !dropoff) return
     setCalculating(true)
     try {
-      const route = await calculateRoute(pickup, dropoff)
-      const pricing = calculatePrice(route)
-      setRouteInfo(route)
+      const pricing = buildLocalQuote(pickup, dropoff)
       setQuote(pricing)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '未知錯誤'
@@ -288,8 +467,7 @@ export default function PassengerHome() {
     })
     setPickup(null)
     setDropoff(null)
-    setQuote(null)
-    setRouteInfo(null)
+    clearCharterEstimate()
   }
 
   const placeCharterOrder = async () => {
@@ -297,17 +475,14 @@ export default function PassengerHome() {
     setPlacingOrder(true)
 
     try {
-      let nextRoute = routeInfo
       let nextQuote = quoteWithVehicle
 
-      if (!nextRoute || !nextQuote) {
-        nextRoute = await calculateRoute(pickup, dropoff)
-        const baseQuote = calculatePrice(nextRoute)
+      if (!nextQuote) {
+        const baseQuote = buildLocalQuote(pickup, dropoff)
         nextQuote = {
           ...baseQuote,
           total: Math.round(baseQuote.total * selectedVehicle.multiplier),
         }
-        setRouteInfo(nextRoute)
         setQuote(baseQuote)
       }
 
@@ -358,12 +533,10 @@ export default function PassengerHome() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 14, maxWidth: 960, margin: '0 auto' }}>
+    <div className="ui-page" style={{ gap: 14 }}>
       <div
+        className="ui-card"
         style={{
-          background: '#fff',
-          border: '1px solid #dce6dd',
-          borderRadius: 14,
           padding: 8,
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
@@ -372,122 +545,139 @@ export default function PassengerHome() {
       >
         <button
           onClick={() => setBookingMode('charter')}
-          style={{
-            border: 0,
-            borderRadius: 10,
-            padding: '10px 12px',
-            fontWeight: 800,
-            background: bookingMode === 'charter' ? '#1f4f43' : '#eef4f1',
-            color: bookingMode === 'charter' ? '#f2fff7' : '#32584d',
-            cursor: 'pointer',
-          }}
+          className={`ui-btn ui-btn-tab ${bookingMode === 'charter' ? 'active' : ''}`}
         >
           包車點對點
         </button>
         <button
           onClick={() => setBookingMode('official_route')}
-          style={{
-            border: 0,
-            borderRadius: 10,
-            padding: '10px 12px',
-            fontWeight: 800,
-            background: bookingMode === 'official_route' ? '#1f4f43' : '#eef4f1',
-            color: bookingMode === 'official_route' ? '#f2fff7' : '#32584d',
-            cursor: 'pointer',
-          }}
+          className={`ui-btn ui-btn-tab ${bookingMode === 'official_route' ? 'active' : ''}`}
         >
           官方班次
         </button>
       </div>
 
-      {notice && (
+      {bookingMode === 'charter' && (
         <div
           style={{
-            borderRadius: 10,
-            padding: '10px 12px',
-            border:
-              notice.tone === 'error'
-                ? '1px solid #edc2bb'
-                : notice.tone === 'ok'
-                  ? '1px solid #c3dfcf'
-                  : '1px solid #d8e2da',
-            background:
-              notice.tone === 'error'
-                ? '#fff0ec'
-                : notice.tone === 'ok'
-                  ? '#eff9f2'
-                  : '#f5f8f5',
-            color: notice.tone === 'error' ? '#9c3d31' : '#2c5a4f',
+            borderRadius: 14,
+            border: '1px solid #d7e4db',
+            background: 'linear-gradient(145deg, #f9fcfa 0%, #f3f8f5 100%)',
+            padding: 12,
+            display: 'grid',
+            gap: 8,
           }}
         >
-          {notice.text}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <strong style={{ color: '#1f4f43', fontSize: 14 }}>包車預約流程</strong>
+            <span style={{ fontSize: 12, color: '#5a746d' }}>目前步驟 {charterStep}/3</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+            {CHARTER_STEPS.map((step, index) => {
+              const reached = index + 1 <= charterStep
+              return (
+                <div
+                  key={step}
+                  style={{
+                    borderRadius: 10,
+                    border: reached ? '1px solid #bfdccf' : '1px solid #dde9e2',
+                    background: reached ? '#eaf6f0' : '#fff',
+                    color: reached ? '#1f4f43' : '#688079',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '8px 10px',
+                  }}
+                >
+                  {index + 1}. {step}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      <div style={{ borderRadius: 18, overflow: 'hidden', border: '1px solid #dce6dd', background: '#fff', marginBottom: 12, minHeight: '60vh' }}>
-        <TencentMap
-          pickup={bookingMode === 'charter' ? pickup : officialPickup}
-          dropoff={bookingMode === 'charter' ? dropoff : officialDropoff}
-          routePath={
-            bookingMode === 'charter'
-              ? routeInfo?.path
-              : officialPickup && officialDropoff
-                ? [
-                    { lat: officialPickup.lat, lng: officialPickup.lng },
-                    { lat: officialDropoff.lat, lng: officialDropoff.lng },
-                  ]
-                : undefined
-          }
-          height="60vh"
-        />
+      {notice && (
+        <div
+          className={noticeClassByTone(notice.tone)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}
+        >
+          <span>{notice.text}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="ui-btn ui-btn-outline"
+            style={{ borderRadius: 8, padding: '5px 9px', fontSize: 12, background: 'rgba(255,255,255,0.7)' }}
+          >
+            關閉
+          </button>
+        </div>
+      )}
+
+      <div
+        style={{
+          borderRadius: 18,
+          overflow: 'hidden',
+          border: '1px solid #dce6dd',
+          background: '#fff',
+          marginBottom: 12,
+          minHeight: 'clamp(260px, 50vh, 540px)',
+        }}
+      >
+        {!MAP_FEATURE_ENABLED ? (
+          <div
+            style={{
+              height: 'clamp(260px, 50vh, 540px)',
+              display: 'grid',
+              placeItems: 'center',
+              color: '#5f7770',
+              fontSize: 13,
+              background: '#f8fbf9',
+              textAlign: 'center',
+              padding: 20,
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 800, color: '#2f5449', marginBottom: 6 }}>
+                地圖模組已封存
+              </div>
+              <div>目前採用文字地址與本地估算模式，稍後可隨時恢復地圖連接。</div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {bookingMode === 'charter' ? (
         <div
+          className="ui-card"
           style={{
-            background: '#fff',
-            border: '1px solid #dce6dd',
-            borderRadius: 16,
             padding: 14,
             display: 'grid',
             gap: 10,
           }}
         >
           <div
+            className="ui-card-muted"
             style={{
-              borderRadius: 10,
-              background: '#f7faf8',
-              border: '1px solid #dce6dd',
               padding: 10,
               display: 'grid',
               gap: 8,
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#36534b' }}>包車選項</div>
+            <div className="ui-section-title">包車選項</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <input
                 type="date"
                 value={bookingDate}
                 onChange={(event) => setBookingDate(event.target.value)}
-                style={{
-                  border: '1px solid #dce6dd',
-                  borderRadius: 10,
-                  padding: '9px 10px',
-                  outline: 'none',
-                  fontSize: 13,
-                }}
+                className="ui-input"
+                style={{ fontSize: 13 }}
               />
               <input
                 type="time"
                 value={bookingTime}
                 onChange={(event) => setBookingTime(event.target.value)}
-                style={{
-                  border: '1px solid #dce6dd',
-                  borderRadius: 10,
-                  padding: '9px 10px',
-                  outline: 'none',
-                  fontSize: 13,
-                }}
+                className="ui-input"
+                style={{ fontSize: 13 }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -495,30 +685,16 @@ export default function PassengerHome() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button
                   onClick={() => setCharterPassengers((prev) => Math.max(1, prev - 1))}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    border: '1px solid #cfddd4',
-                    borderRadius: 8,
-                    background: '#fff',
-                    cursor: 'pointer',
-                    fontWeight: 800,
-                  }}
+                  className="ui-btn ui-btn-outline"
+                  style={{ width: 30, height: 30, borderRadius: 8, padding: 0, fontWeight: 800 }}
                 >
                   -
                 </button>
                 <strong style={{ minWidth: 28, textAlign: 'center' }}>{charterPassengers}</strong>
                 <button
                   onClick={() => setCharterPassengers((prev) => Math.min(6, prev + 1))}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    border: '1px solid #cfddd4',
-                    borderRadius: 8,
-                    background: '#fff',
-                    cursor: 'pointer',
-                    fontWeight: 800,
-                  }}
+                  className="ui-btn ui-btn-outline"
+                  style={{ width: 30, height: 30, borderRadius: 8, padding: 0, fontWeight: 800 }}
                 >
                   +
                 </button>
@@ -546,35 +722,120 @@ export default function PassengerHome() {
             </div>
           </div>
 
+          <div
+            className="ui-card-muted"
+            style={{
+              padding: 10,
+              display: 'grid',
+              gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#36534b' }}>熱門快速路線</div>
+              <span style={{ fontSize: 11, color: '#638079' }}>一鍵帶入上車/目的地</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+              {CHARTER_ROUTE_PRESETS.map((preset) => {
+                const selected = activePresetId === preset.id
+                return (
+                  <button
+                    type="button"
+                    key={preset.id}
+                    onClick={() => applyRoutePreset(preset)}
+                    style={{
+                      border: selected ? '1px solid #1f4f43' : '1px solid #dce6dd',
+                      borderRadius: 10,
+                      background: selected ? '#eaf4ef' : '#fff',
+                      padding: '9px 10px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      color: '#2f4f46',
+                      display: 'grid',
+                      gap: 3,
+                    }}
+                  >
+                    <strong style={{ fontSize: 13 }}>{preset.label}</strong>
+                    <span style={{ fontSize: 11, color: '#678079' }}>{preset.note}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <LocationInput
-            key={pickup?.id ?? 'pickup-empty'}
             label="上車地點"
             accent="#2e8b6d"
-            value={pickup}
+            state={pickupSearch}
+            onQueryChange={(query) => {
+              setPickupSearch((prev) => ({ ...prev, query }))
+              if (!query.trim()) {
+                setPickup(null)
+                clearCharterEstimate()
+              }
+            }}
+            onOpen={() => {
+              setPickupSearch((prev) => ({
+                ...prev,
+                open: prev.items.length > 0,
+              }))
+            }}
+            onClose={() => {
+              setPickupSearch((prev) => ({ ...prev, open: false }))
+            }}
             onPick={(v) => {
               setPickup(v)
-              setQuote(null)
-              setRouteInfo(null)
+              setPickupSearch((prev) => ({
+                ...prev,
+                query: v?.name || '',
+              }))
+              clearCharterEstimate()
             }}
           />
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={swapStops}
+              disabled={!pickup || !dropoff}
+              className="ui-btn ui-btn-outline"
+              style={{ borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 700 }}
+            >
+              交換上下車地點
+            </button>
+          </div>
           <LocationInput
-            key={dropoff?.id ?? 'dropoff-empty'}
             label="目的地"
             accent="#df5f4a"
-            value={dropoff}
+            state={dropoffSearch}
+            onQueryChange={(query) => {
+              setDropoffSearch((prev) => ({ ...prev, query }))
+              if (!query.trim()) {
+                setDropoff(null)
+                clearCharterEstimate()
+              }
+            }}
+            onOpen={() => {
+              setDropoffSearch((prev) => ({
+                ...prev,
+                open: prev.items.length > 0,
+              }))
+            }}
+            onClose={() => {
+              setDropoffSearch((prev) => ({ ...prev, open: false }))
+            }}
             onPick={(v) => {
               setDropoff(v)
-              setQuote(null)
-              setRouteInfo(null)
+              setDropoffSearch((prev) => ({
+                ...prev,
+                query: v?.name || '',
+              }))
+              clearCharterEstimate()
             }}
           />
 
           {(pickup || dropoff) && (
             <div
+              className="ui-card-muted"
               style={{
-                borderRadius: 10,
-                background: '#f7faf8',
-                border: '1px solid #dce6dd',
                 padding: '10px 11px',
                 display: 'grid',
                 gap: 6,
@@ -597,15 +858,13 @@ export default function PassengerHome() {
             <button
               onClick={() => void refreshQuote()}
               disabled={!bookingReady || calculating}
+              className="ui-btn ui-btn-accent"
               style={{
                 flex: 1,
-                border: 0,
-                borderRadius: 12,
                 padding: '12px 12px',
                 fontWeight: 800,
                 background: bookingReady ? '#f0bf2a' : '#e9e8e1',
                 color: bookingReady ? '#2e2a12' : '#8a8679',
-                cursor: bookingReady ? 'pointer' : 'not-allowed',
               }}
             >
               {calculating ? '計算中...' : '計算包車路線與車資'}
@@ -613,27 +872,23 @@ export default function PassengerHome() {
             <button
               onClick={() => void placeCharterOrder()}
               disabled={!bookingReady || placingOrder}
+              className="ui-btn ui-btn-primary"
               style={{
                 flex: 1,
-                border: 0,
-                borderRadius: 12,
                 padding: '12px 12px',
                 fontWeight: 800,
                 background: bookingReady ? '#1e4f43' : '#e9e8e1',
                 color: bookingReady ? '#effff7' : '#8a8679',
-                cursor: bookingReady ? 'pointer' : 'not-allowed',
               }}
             >
               {placingOrder ? '建立中...' : '確認包車'}
             </button>
           </div>
 
-          {quoteWithVehicle && routeInfo && (
+          {quoteWithVehicle && (
             <div
+              className="ui-card-muted"
               style={{
-                borderRadius: 12,
-                background: '#f5f9f6',
-                border: '1px solid #dde8df',
                 padding: 12,
                 display: 'grid',
                 gap: 6,
@@ -657,7 +912,7 @@ export default function PassengerHome() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: '#5c7068' }}>路徑來源</span>
-                <strong>{routeInfo.hasRealPath ? 'Tencent Driving API' : 'Fallback 估算'}</strong>
+                <strong>Local 估算模式</strong>
               </div>
               <div
                 style={{
@@ -676,20 +931,16 @@ export default function PassengerHome() {
         </div>
       ) : (
         <div
+          className="ui-card"
           style={{
-            background: '#fff',
-            border: '1px solid #dce6dd',
-            borderRadius: 16,
             padding: 14,
             display: 'grid',
             gap: 10,
           }}
         >
           <div
+            className="ui-card-muted"
             style={{
-              borderRadius: 10,
-              background: '#f7faf8',
-              border: '1px solid #dce6dd',
               padding: 10,
               fontSize: 12,
               color: '#41625a',
@@ -699,22 +950,13 @@ export default function PassengerHome() {
           </div>
 
           {loadingOfficialRoutes ? (
-            <div style={{ fontSize: 13, color: '#688079' }}>讀取官方班次中...</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取官方班次中...</div>
           ) : officialError ? (
-            <div
-              style={{
-                borderRadius: 10,
-                border: '1px solid #edc2bb',
-                background: '#fff0ec',
-                padding: '10px 12px',
-                color: '#9c3d31',
-                fontSize: 13,
-              }}
-            >
+            <div className="ui-notice ui-notice-error" style={{ fontSize: 13 }}>
               官方班次讀取失敗: {officialError}
             </div>
           ) : officialRoutes.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#688079' }}>目前未有可預訂官方班次，請稍後再試。</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>目前未有可預訂官方班次，請稍後再試。</div>
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
               {officialRoutes.map((route) => {
@@ -767,10 +1009,8 @@ export default function PassengerHome() {
 
           {selectedOfficialRoute && (
             <div
+              className="ui-card-muted"
               style={{
-                borderRadius: 12,
-                border: '1px solid #dce6dd',
-                background: '#f7faf8',
                 padding: 12,
                 display: 'grid',
                 gap: 10,
@@ -789,14 +1029,14 @@ export default function PassengerHome() {
                   <button
                     onClick={() => setOfficialSeats((prev) => Math.max(1, prev - 1))}
                     disabled={selectedOfficialSeats <= 1}
+                    className="ui-btn ui-btn-outline"
                     style={{
                       width: 30,
                       height: 30,
-                      border: '1px solid #cfddd4',
                       borderRadius: 8,
                       background: selectedOfficialSeats <= 1 ? '#eef2ef' : '#fff',
                       color: selectedOfficialSeats <= 1 ? '#9ca9a3' : '#2e4c43',
-                      cursor: selectedOfficialSeats <= 1 ? 'not-allowed' : 'pointer',
+                      padding: 0,
                       fontWeight: 800,
                     }}
                   >
@@ -813,10 +1053,10 @@ export default function PassengerHome() {
                       selectedOfficialAvailableSeats === 0 ||
                       selectedOfficialSeats >= selectedOfficialAvailableSeats
                     }
+                    className="ui-btn ui-btn-outline"
                     style={{
                       width: 30,
                       height: 30,
-                      border: '1px solid #cfddd4',
                       borderRadius: 8,
                       background:
                         selectedOfficialAvailableSeats === 0 ||
@@ -828,11 +1068,7 @@ export default function PassengerHome() {
                         selectedOfficialSeats >= selectedOfficialAvailableSeats
                           ? '#9ca9a3'
                           : '#2e4c43',
-                      cursor:
-                        selectedOfficialAvailableSeats === 0 ||
-                        selectedOfficialSeats >= selectedOfficialAvailableSeats
-                          ? 'not-allowed'
-                          : 'pointer',
+                      padding: 0,
                       fontWeight: 800,
                     }}
                   >
@@ -849,14 +1085,12 @@ export default function PassengerHome() {
               <button
                 onClick={() => void placeOfficialRouteOrder()}
                 disabled={placingOrder || selectedOfficialSeats < 1}
+                className="ui-btn ui-btn-primary"
                 style={{
-                  border: 0,
-                  borderRadius: 12,
                   padding: '12px 12px',
                   fontWeight: 800,
                   background: placingOrder || selectedOfficialSeats < 1 ? '#e9e8e1' : '#1e4f43',
                   color: placingOrder || selectedOfficialSeats < 1 ? '#8a8679' : '#effff7',
-                  cursor: placingOrder || selectedOfficialSeats < 1 ? 'not-allowed' : 'pointer',
                 }}
               >
                 {placingOrder ? '建立中...' : '確認預訂官方班次'}

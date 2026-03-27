@@ -6,6 +6,12 @@ type Mode = 'login' | 'register'
 type LoginMethod = 'password' | 'otp'
 type MessageType = 'success' | 'error' | 'neutral'
 
+const messageClassByType = (messageType: MessageType) => {
+  if (messageType === 'success') return 'ui-notice ui-notice-ok'
+  if (messageType === 'error') return 'ui-notice ui-notice-error'
+  return 'ui-notice'
+}
+
 const regionOptions = [
   { label: '+852', value: '852' },
   { label: '+86', value: '86' },
@@ -50,9 +56,10 @@ const panel: CSSProperties = { padding: '32px 28px', background: '#fffefb' }
 
 const inputStyle: CSSProperties = {
   width: '100%',
-  padding: '13px 14px',
-  borderRadius: '12px',
-  border: '1px solid #d6dfd6',
+  minHeight: 42,
+  padding: '10px 12px',
+  borderRadius: 'var(--ui-radius-md)',
+  border: '1px solid var(--ui-border)',
   outline: 'none',
   fontSize: '14px',
   boxSizing: 'border-box',
@@ -202,10 +209,10 @@ export default function Landing() {
           <div style={{ letterSpacing: '0.18em', fontSize: 12, opacity: 0.7, fontWeight: 700 }}>CABS MOBILITY CLOUD</div>
           <h1 style={{ marginTop: 18, marginBottom: 14, fontSize: 40, lineHeight: 1.1 }}>跨境商務出行<br />身份入口</h1>
           <p style={{ margin: 0, opacity: 0.86, fontSize: 15, lineHeight: 1.7 }}>
-            沿用 P7S 核心認證流程，登入支援密碼與 OTP。可透過手機映射帳號執行重設密碼。
+            沿用 P7S 核心認證流程，登入支援密碼與 OTP。重設密碼改為發送安全郵件連結。
           </p>
           <div style={{ marginTop: 36, display: 'grid', gap: 10 }}>
-            {['密碼登入: 電郵 / 手機號 / admin 別名', 'OTP 登入: 手機驗證碼', 'Reset Password: 手機映射 email 發送重設信'].map((item) => (
+            {['密碼登入: 電郵 / 手機號 / admin 別名', 'OTP 登入: 手機驗證碼', 'Reset Password: 手機映射 email 發送重設信（安全流程）'].map((item) => (
               <div key={item} style={{ fontSize: 13, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 12, padding: '10px 12px' }}>
                 {item}
               </div>
@@ -217,30 +224,18 @@ export default function Landing() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
             <button
               onClick={() => setMode('login')}
+              className={`ui-btn ui-btn-tab ${mode === 'login' ? 'active' : ''}`}
               style={{
                 flex: 1,
-                border: 0,
-                borderRadius: 12,
-                padding: '10px 12px',
-                fontWeight: 700,
-                background: mode === 'login' ? '#143b34' : '#eef2ee',
-                color: mode === 'login' ? '#ecfff9' : '#355149',
-                cursor: 'pointer',
               }}
             >
               登入
             </button>
             <button
               onClick={() => setMode('register')}
+              className={`ui-btn ui-btn-tab ${mode === 'register' ? 'active' : ''}`}
               style={{
                 flex: 1,
-                border: 0,
-                borderRadius: 12,
-                padding: '10px 12px',
-                fontWeight: 700,
-                background: mode === 'register' ? '#143b34' : '#eef2ee',
-                color: mode === 'register' ? '#ecfff9' : '#355149',
-                cursor: 'pointer',
               }}
             >
               註冊
@@ -252,30 +247,26 @@ export default function Landing() {
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 <button
                   onClick={() => setLoginMethod('password')}
+                  className="ui-btn ui-btn-outline"
                   style={{
                     flex: 1,
-                    border: '1px solid #d2dfd4',
-                    borderRadius: 10,
                     padding: '8px 10px',
                     fontWeight: 700,
                     background: loginMethod === 'password' ? '#e8f0eb' : '#fff',
                     color: '#284a41',
-                    cursor: 'pointer',
                   }}
                 >
                   密碼登入
                 </button>
                 <button
                   onClick={() => setLoginMethod('otp')}
+                  className="ui-btn ui-btn-outline"
                   style={{
                     flex: 1,
-                    border: '1px solid #d2dfd4',
-                    borderRadius: 10,
                     padding: '8px 10px',
                     fontWeight: 700,
                     background: loginMethod === 'otp' ? '#e8f0eb' : '#fff',
                     color: '#284a41',
-                    cursor: 'pointer',
                   }}
                 >
                   OTP 登入
@@ -351,15 +342,13 @@ export default function Landing() {
                   <button
                     onClick={handleLogin}
                     disabled={!canLogin}
+                    className="ui-btn ui-btn-accent"
                     style={{
                       marginTop: 4,
-                      border: 0,
-                      borderRadius: 12,
                       padding: '13px 14px',
                       fontWeight: 700,
                       background: canLogin ? '#f1b91f' : '#ece9de',
                       color: canLogin ? '#2f2a10' : '#8f8a7a',
-                      cursor: canLogin ? 'pointer' : 'not-allowed',
                     }}
                   >
                     {loading ? '登入中...' : '登入 Cabs'}
@@ -381,14 +370,12 @@ export default function Landing() {
                     <button
                       onClick={handleSendOtp}
                       disabled={!canSendOtp}
+                      className="ui-btn ui-btn-primary"
                       style={{
-                        border: 0,
-                        borderRadius: 12,
                         padding: '13px 14px',
                         fontWeight: 700,
                         background: canSendOtp ? '#2b5d53' : '#ece9de',
                         color: canSendOtp ? '#ecfff9' : '#8f8a7a',
-                        cursor: canSendOtp ? 'pointer' : 'not-allowed',
                       }}
                     >
                       {loading ? '發送中...' : '發送驗證碼'}
@@ -399,14 +386,12 @@ export default function Landing() {
                       <button
                         onClick={handleVerifyOtp}
                         disabled={!canVerifyOtp}
+                        className="ui-btn ui-btn-accent"
                         style={{
-                          border: 0,
-                          borderRadius: 12,
                           padding: '13px 14px',
                           fontWeight: 700,
                           background: canVerifyOtp ? '#f1b91f' : '#ece9de',
                           color: canVerifyOtp ? '#2f2a10' : '#8f8a7a',
-                          cursor: canVerifyOtp ? 'pointer' : 'not-allowed',
                         }}
                       >
                         {loading ? '驗證中...' : '確認 OTP 登入'}
@@ -431,15 +416,13 @@ export default function Landing() {
                 <button
                   onClick={handleResetPassword}
                   disabled={!resetPhone || loading}
+                  className="ui-btn ui-btn-primary"
                   style={{
                     width: '100%',
-                    border: 0,
-                    borderRadius: 10,
                     padding: '11px 12px',
                     fontWeight: 700,
                     background: !resetPhone || loading ? '#ece9de' : '#173d36',
                     color: !resetPhone || loading ? '#8f8a7a' : '#ecfff9',
-                    cursor: !resetPhone || loading ? 'not-allowed' : 'pointer',
                   }}
                 >
                   {loading ? '提交中...' : '發送重設密碼郵件'}
@@ -470,15 +453,13 @@ export default function Landing() {
               <button
                 onClick={handleRegister}
                 disabled={!canRegister}
+                className="ui-btn ui-btn-primary"
                 style={{
                   marginTop: 4,
-                  border: 0,
-                  borderRadius: 12,
                   padding: '13px 14px',
                   fontWeight: 700,
                   background: canRegister ? '#2b5d53' : '#ece9de',
                   color: canRegister ? '#ecfff9' : '#8f8a7a',
-                  cursor: canRegister ? 'pointer' : 'not-allowed',
                 }}
               >
                 {loading ? '建立中...' : '建立帳號'}
@@ -486,15 +467,12 @@ export default function Landing() {
             </div>
           )}
 
-          <div
-            style={{
-              minHeight: 24,
-              marginTop: 12,
-              color: messageType === 'success' ? '#1c7d57' : messageType === 'error' ? '#a5483c' : '#5d6e65',
-              fontSize: 13,
-            }}
-          >
-            {message}
+          <div style={{ minHeight: 24, marginTop: 12 }}>
+            {message ? (
+              <div className={messageClassByType(messageType)} style={{ fontSize: 13 }}>
+                {message}
+              </div>
+            ) : null}
           </div>
 
           <div style={{ marginTop: 8, fontSize: 12, color: '#5d6e65' }}>

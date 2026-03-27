@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useMessage } from '../context/MessageContext'
 import type { OrderRecord } from '../services/orderService'
+import { UI_TEXT } from '../constants/uiText'
 
 interface MessagesProps {
   orders?: OrderRecord[]
@@ -18,6 +19,8 @@ type ConversationItem = {
 }
 
 const SUPPORT_ID = 'SYSTEM_ADMIN'
+
+const alertClass = 'ui-notice ui-notice-error'
 
 export default function Messages({ orders = [] }: MessagesProps) {
   const { currentUser } = useAuth()
@@ -182,48 +185,43 @@ export default function Messages({ orders = [] }: MessagesProps) {
   }, [activePartnerId, activeOrderId, conversations, orders])
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', display: 'grid', gap: 10 }}>
-      <h2 style={{ margin: 0, color: '#1e4038' }}>訊息中心</h2>
+    <div className="ui-page" style={{ gap: 10 }}>
+      <h2 className="ui-title">訊息中心</h2>
 
       {error && (
-        <div style={{ background: '#fff2ef', border: '1px solid #edc2bb', borderRadius: 12, padding: 12, color: '#9c3d31' }}>
-          Firebase 訊息讀取失敗: {error}
+        <div className={alertClass}>
+          {UI_TEXT.error.readMessages}: {error}
         </div>
       )}
       {uploadError && (
-        <div style={{ background: '#fff2ef', border: '1px solid #edc2bb', borderRadius: 12, padding: 12, color: '#9c3d31' }}>
-          圖片上傳失敗: {uploadError}
+        <div className={alertClass}>
+          {UI_TEXT.error.uploadImage}: {uploadError}
         </div>
       )}
 
       {!activePartnerId ? (
-        <section
-          style={{
-            background: '#fff',
-            border: '1px solid #dce6dd',
-            borderRadius: 14,
-            padding: 12,
-          }}
-        >
+        <section className="ui-card" style={{ padding: 12 }}>
           <button
             onClick={() => void openConversation(SUPPORT_ID, null)}
-            style={{ width: '100%', border: '1px solid #d4e2d8', background: '#f3faf6', borderRadius: 10, padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: '#244a3f', cursor: 'pointer' }}
+            className="ui-btn ui-btn-secondary"
+            style={{ width: '100%', textAlign: 'left' }}
           >
             + 聯絡客服
           </button>
 
           <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
             {loading ? (
-              <div style={{ color: '#6f847d', fontSize: 13 }}>載入訊息中...</div>
+              <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.messages}</div>
             ) : conversations.length === 0 ? (
-              <div style={{ color: '#6f847d', fontSize: 13 }}>暫時無對話</div>
+              <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.messages}</div>
             ) : (
               conversations.map((conv) => {
                 return (
                   <button
                     key={conv.key}
                     onClick={() => void openConversation(conv.partnerId, conv.orderId)}
-                    style={{ border: '1px solid #dce6dd', background: '#fff', borderRadius: 10, padding: 10, textAlign: 'left', cursor: 'pointer' }}
+                    className="ui-card-muted ui-clickable-surface"
+                    style={{ textAlign: 'left', cursor: 'pointer', padding: 10 }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                       <strong style={{ color: '#214239', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{conv.title}</strong>
@@ -243,10 +241,8 @@ export default function Messages({ orders = [] }: MessagesProps) {
         </section>
       ) : (
         <section
+          className="ui-card"
           style={{
-            background: '#fff',
-            border: '1px solid #dce6dd',
-            borderRadius: 14,
             padding: 12,
             minHeight: 420,
             display: 'grid',
@@ -260,15 +256,8 @@ export default function Messages({ orders = [] }: MessagesProps) {
                   closeConversation()
                   setInput('')
                 }}
-                style={{
-                  border: '1px solid #d5e2d8',
-                  background: '#fff',
-                  color: '#244a3f',
-                  borderRadius: 10,
-                  padding: '6px 10px',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                }}
+                className="ui-btn ui-btn-outline"
+                style={{ padding: '6px 10px' }}
               >
                 返回
               </button>
@@ -277,7 +266,9 @@ export default function Messages({ orders = [] }: MessagesProps) {
 
           <div style={{ overflow: 'auto', display: 'grid', gap: 8 }}>
             {activeMessages.length === 0 ? (
-              <div style={{ color: '#6f847d', fontSize: 13 }}>尚未有訊息，開始發送第一句。</div>
+              <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>
+                目前尚無訊息，開始發送第一句吧。
+              </div>
             ) : (
               activeMessages.map((m) => {
                 const mine = m.senderId === currentUser?.id
@@ -333,16 +324,8 @@ export default function Messages({ orders = [] }: MessagesProps) {
             <button
               onClick={handlePickImage}
               disabled={uploadingImage || sending}
-              style={{
-                border: '1px solid #d6dfd6',
-                borderRadius: 10,
-                padding: '10px 12px',
-                background: uploadingImage || sending ? '#eef1ee' : '#fff',
-                color: uploadingImage || sending ? '#8d8a80' : '#1f4f43',
-                fontWeight: 700,
-                cursor: uploadingImage || sending ? 'not-allowed' : 'pointer',
-                whiteSpace: 'nowrap',
-              }}
+              className="ui-btn ui-btn-outline"
+              style={{ whiteSpace: 'nowrap' }}
             >
               {uploadingImage ? '上傳中...' : '圖片'}
             </button>
@@ -351,12 +334,14 @@ export default function Messages({ orders = [] }: MessagesProps) {
               onChange={(e) => setInput(e.target.value)}
               disabled={sending || uploadingImage}
               placeholder="輸入訊息..."
-              style={{ flex: 1, border: '1px solid #d6dfd6', borderRadius: 10, padding: '10px 12px', outline: 'none', fontSize: 13 }}
+              className="ui-input"
+              style={{ flex: 1, fontSize: 13 }}
             />
             <button
               onClick={() => void handleSend()}
               disabled={!input.trim() || sending || uploadingImage}
-              style={{ border: 0, borderRadius: 10, padding: '10px 14px', background: !input.trim() || sending || uploadingImage ? '#e8e8e4' : '#1f4f43', color: !input.trim() || sending || uploadingImage ? '#8d8a80' : '#effff7', fontWeight: 700, cursor: !input.trim() || sending || uploadingImage ? 'not-allowed' : 'pointer' }}
+              className="ui-btn ui-btn-primary"
+              style={{ padding: '10px 14px' }}
             >
               發送
             </button>

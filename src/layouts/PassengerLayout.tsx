@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import Icons from '../components/Icons'
 import { useAuth } from '../context/AuthContext'
@@ -16,6 +16,16 @@ const navItems: NavItem[] = [
   { path: '/profile', label: '我的', icon: <Icons.User /> },
 ]
 
+const normalizeRole = (role: string | undefined) => {
+  if (!role) return 'passenger'
+  const normalized = role.trim().toLowerCase()
+  if (normalized === 'driver' || normalized.startsWith('driver')) return 'driver'
+  if (normalized === 'admin' || normalized.startsWith('admin') || normalized.includes('admin_')) {
+    return 'admin'
+  }
+  return 'passenger'
+}
+
 export default function PassengerLayout() {
   const { currentUser, logout } = useAuth()
   const navigate = useNavigate()
@@ -27,6 +37,23 @@ export default function PassengerLayout() {
     const active = navItems.find((item) => location.pathname.startsWith(item.path))
     return active?.label || '乘客中心'
   }, [location.pathname])
+  const userRole = normalizeRole(currentUser?.role)
+
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const previousOverflow = document.body.style.overflow
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeydown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeydown)
+    }
+  }, [menuOpen])
 
   const handleLogout = async () => {
     if (loggingOut) return
@@ -44,7 +71,7 @@ export default function PassengerLayout() {
     minHeight: '100vh',
     background: 'linear-gradient(160deg, #f6faf7 0%, #eef5f4 50%, #f8f6ef 100%)',
     fontFamily: 'Avenir Next, SF Pro Display, Noto Sans TC, PingFang TC, sans-serif',
-    paddingBottom: 86,
+    paddingBottom: 'calc(86px + env(safe-area-inset-bottom, 0px))',
   } as const
 
   return (
@@ -58,6 +85,7 @@ export default function PassengerLayout() {
           background: 'rgba(246,250,247,0.85)',
           borderBottom: '1px solid #dce6dd',
           padding: '14px 18px',
+          paddingTop: 'max(14px, env(safe-area-inset-top, 0px))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -68,6 +96,8 @@ export default function PassengerLayout() {
           <div style={{ fontSize: 19, fontWeight: 800, color: '#1f4038' }}>{pageTitle} · {currentUser?.name}</div>
         </div>
         <button
+          type="button"
+          aria-label="開啟功能菜單"
           onClick={() => setMenuOpen(true)}
           style={{
             border: '1px solid #d3e0d6',
@@ -87,10 +117,15 @@ export default function PassengerLayout() {
 
       {menuOpen && (
         <div
+          role="presentation"
+          aria-label="關閉功能菜單遮罩"
           style={{ position: 'fixed', inset: 0, zIndex: 30, background: 'rgba(10,20,16,0.34)' }}
           onClick={() => setMenuOpen(false)}
         >
           <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="乘客功能菜單"
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'absolute',
@@ -105,15 +140,36 @@ export default function PassengerLayout() {
               gridTemplateRows: 'auto 1fr auto',
             }}
           >
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#25473f' }}>功能菜單</div>
-              <div style={{ fontSize: 12, color: '#6c7f79' }}>快速切換頁面與帳戶動作</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#25473f' }}>功能菜單</div>
+                <div style={{ fontSize: 12, color: '#6c7f79' }}>快速切換頁面與帳戶動作</div>
+              </div>
+              <button
+                type="button"
+                aria-label="關閉功能菜單"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  border: '1px solid #d8e3da',
+                  background: '#fff',
+                  color: '#45645a',
+                  display: 'grid',
+                  placeItems: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Icons.X />
+              </button>
             </div>
             <div style={{ marginTop: 18, display: 'grid', gap: 8, alignContent: 'start' }}>
               {navItems.map((item) => {
                 const active = location.pathname.startsWith(item.path)
                 return (
                   <button
+                    type="button"
                     key={item.path}
                     onClick={() => {
                       navigate(item.path)
@@ -134,8 +190,9 @@ export default function PassengerLayout() {
                   </button>
                 )
               })}
-              {currentUser?.role === 'admin' && (
+              {userRole === 'admin' && (
                 <button
+                  type="button"
                   onClick={() => {
                     navigate('/admin')
                     setMenuOpen(false)
@@ -154,8 +211,9 @@ export default function PassengerLayout() {
                   管理後台
                 </button>
               )}
-              {currentUser?.role === 'driver' && (
+              {userRole === 'driver' && (
                 <button
+                  type="button"
                   onClick={() => {
                     navigate('/driver')
                     setMenuOpen(false)
@@ -176,6 +234,7 @@ export default function PassengerLayout() {
               )}
             </div>
             <button
+              type="button"
               onClick={() => void handleLogout()}
               disabled={loggingOut}
               style={{
@@ -204,12 +263,12 @@ export default function PassengerLayout() {
           position: 'fixed',
           left: 10,
           right: 10,
-          bottom: 10,
+          bottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
           borderRadius: 16,
           border: '1px solid #d6e0d8',
           background: 'rgba(255,255,255,0.94)',
           backdropFilter: 'blur(8px)',
-          padding: '8px 10px',
+          padding: '8px 10px calc(8px + env(safe-area-inset-bottom, 0px))',
           display: 'grid',
           gridTemplateColumns: 'repeat(4,1fr)',
           gap: 4,

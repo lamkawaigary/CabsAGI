@@ -1,582 +1,442 @@
+// Map Service - Tencent Map Integration
 
-import type { LocationData } from "../types";
-import { STATIC_LOCATIONS } from "../data/staticLocations";
+export interface LocationRecord {
+  id: string
+  name: string
+  address: string
+  lat: number
+  lng: number
+  keywords: string[]
+  source?: 'ai' | 'local'
+}
 
-// --- GLOBAL TYPES & DECLARATIONS ---
-declare global {
-  interface Window {
-    AMap: any;
-    _AMapSecurityConfig: any;
-    _amapLoaderPromise?: Promise<boolean>;
-    google: any; // Google Maps Global
-    _googleLoaderPromise?: Promise<boolean>;
-    gm_authFailure?: () => void;
-    TMap: any; // Tencent Maps Global
-    _tmapLoaderPromise?: Promise<boolean>;
+export interface RouteCheckpoint {
+  id: string
+  name: string
+  type: 'toll' | 'border'
+  fee?: number
+}
+
+export interface RoutePathPoint {
+  lat: number
+  lng: number
+}
+
+const TENCENT_MAP_KEY = 'D42BZ-JZFCL-A2QPT-E2EKZ-D2WX5-VPFWY'
+const JSONP_TIMEOUT_MS = 5000
+
+// Static popular locations with coordinates
+export const STATIC_LOCATIONS: LocationRecord[] = [
+  { id: 'hkg', name: '香港國際機場', address: '香港赤鱲角', lat: 22.308, lng: 113.9185, keywords: ['機場', 'airport', 'hkg'] },
+  { id: 'szw', name: '深圳灣口岸', address: '深圳南山區', lat: 22.4908, lng: 113.9436, keywords: ['深圳灣', 'szb', '口岸'] },
+  { id: 'hg', name: '皇崗口岸', address: '深圳福田區', lat: 22.5104, lng: 114.0743, keywords: ['皇崗', 'hgg', '口岸'] },
+  { id: 'lohu', name: '羅湖口岸', address: '深圳羅湖區', lat: 22.5283, lng: 114.1253, keywords: ['羅湖', 'lhg', '口岸'] },
+  { id: 'lmg', name: '落馬洲口岸', address: '深圳福田區', lat: 22.5145, lng: 114.0614, keywords: ['落馬洲', 'lmg', '口岸'] },
+  { id: 'hzmb', name: '港珠澳大橋', address: '珠海香洲區', lat: 22.3155, lng: 113.9372, keywords: ['港珠澳', 'hzmb', '大橋'] },
+  { id: 'central', name: '中環', address: '香港中環', lat: 22.2823, lng: 114.1586, keywords: ['中環', 'central'] },
+  { id: 'mongkok', name: '旺角', address: '香港旺角', lat: 22.3178, lng: 114.1734, keywords: ['旺角', 'mk', 'mongkok'] },
+  { id: 'tst', name: '尖沙咀', address: '香港尖沙咀', lat: 22.2964, lng: 114.1619, keywords: ['尖沙咀', 'tst', 'tsim sha tsui'] },
+  { id: 'sha-tin', name: '沙田', address: '香港沙田', lat: 22.3879, lng: 114.2036, keywords: ['沙田', 'st', 'shatin'] },
+  { id: 'tuen-mun', name: '屯門', address: '香港屯門', lat: 22.3934, lng: 113.9768, keywords: ['屯門', 'tm', 'tuenmun'] },
+  { id: 'sheung-shui', name: '上水', address: '香港上水', lat: 22.4965, lng: 114.1342, keywords: ['上水', 'ss', 'sheungshui'] },
+  { id: 'sz', name: '深圳市區', address: '深圳', lat: 22.5431, lng: 114.0579, keywords: ['深圳', 'sz', 'shenzhen'] },
+  { id: 'gz', name: '廣州市區', address: '廣州', lat: 23.1291, lng: 113.2644, keywords: ['廣州', 'gz', 'guangzhou'] },
+]
+
+// Tunnel/Crossing fees
+export const TOLL_LOCATIONS = [
+  { id: 'sz_bay', name: '深圳灣口岸', fee: 0, lat: 22.4908, lng: 113.9436 },
+  { id: 'hzmb', name: '港珠澳大橋', fee: 200, lat: 22.3155, lng: 113.9372 },
+  { id: 'west', name: '西區海底隧道', fee: 100, lat: 22.2985, lng: 114.1542 },
+  { id: 'cross', name: '紅磡海底隧道', fee: 50, lat: 22.3025, lng: 114.1802 },
+  { id: 'east', name: '東區海底隧道', fee: 50, lat: 22.2965, lng: 114.2345 },
+  { id: 'tailam', name: '大欖隧道', fee: 64, lat: 22.4228, lng: 114.0628 },
+  { id: 'lion', name: '獅子山隧道', fee: 8, lat: 22.3551, lng: 114.1822 },
+  { id: 'tates', name: '大老山隧道', fee: 20, lat: 22.3582, lng: 114.2185 },
+]
+
+const BORDER_CHECKPOINTS = [
+  { id: 'szw', name: '深圳灣口岸', lat: 22.4908, lng: 113.9436 },
+  { id: 'hg', name: '皇崗口岸', lat: 22.5104, lng: 114.0743 },
+  { id: 'lohu', name: '羅湖口岸', lat: 22.5283, lng: 114.1253 },
+  { id: 'lmg', name: '落馬洲口岸', lat: 22.5145, lng: 114.0614 },
+]
+
+const normalize = (v: string) => v.trim().toLowerCase()
+
+interface TencentSuggestionItem {
+  id?: string | number
+  title?: string
+  address?: string
+  location?: {
+    lat?: number | string
+    lng?: number | string
   }
 }
 
-export type MapProvider = 'GOOGLE' | 'TENCENT' | 'AMAP' | 'OSM' | 'AUTO';
-export type CoordsSystem = 'WGS84' | 'GCJ02';
-
-// Type aliases for PassengerHome compatibility
-export type LocationRecord = LocationData;
-export type RouteResult = {
-  distance: number;
-  duration: number;
-  polyline: string;
-  tolls: number;
-  path?: Array<{ lat: number; lng: number }>;
-  hasRealPath?: boolean;
-};
-
-let isGoogleMapsBroken = false;
-
-export interface SearchOptions {
-    radius?: number; // meters
-    center?: { lat: number; lng: number };
-    strictBounds?: boolean;
+interface TencentSuggestionResponse {
+  data?: TencentSuggestionItem[]
 }
 
-// ============================================================================
-// PART 1: MATH & COORDINATE UTILITIES (The Foundation)
-// ============================================================================
-
-const PI = 3.1415926535897932384626;
-const a = 6378245.0;
-const ee = 0.00669342162296594323;
-
-function transformLat(x: number, y: number) {
-    let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
-    ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0;
-    ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0;
-    ret += (160.0 * Math.sin(y / 12.0 * PI) + 320 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0;
-    return ret;
+interface TencentDrivingRoute {
+  distance?: number
+  duration?: number
+  polyline?: number[]
 }
 
-function transformLon(x: number, y: number) {
-    let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
-    ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0;
-    ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0;
-    ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0;
-    return ret;
+interface TencentDrivingResponse {
+  status?: number
+  result?: {
+    routes?: TencentDrivingRoute[]
+  }
 }
 
-function out_of_china(lng: number, lat: number) {
-    // HK & Macau are considered "Inside China" for map shifting purposes relative to global standards
-    return (lng < 72.004 || lng > 137.8347) || ((lat < 0.8293 || lat > 55.8271));
+interface OSMNominatimItem {
+  place_id: number | string
+  display_name: string
+  lat: string
+  lon: string
 }
 
-/**
- * GCJ-02 (Mars Coordinates) to WGS-84 (Global Standard)
- * Use this when receiving data FROM Tencent/AMap API before storing in DB.
- */
-export const gcj02_to_wgs84 = (lng: number, lat: number) => {
-    if (out_of_china(lng, lat)) return { lat, lng };
-    let dlat = transformLat(lng - 105.0, lat - 35.0);
-    let dlng = transformLon(lng - 105.0, lat - 35.0);
-    let radlat = lat / 180.0 * PI;
-    let magic = Math.sin(radlat);
-    magic = 1 - ee * magic * magic;
-    let sqrtmagic = Math.sqrt(magic);
-    dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI);
-    dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * PI);
-    return { lat: lat * 2 - (lat + dlat), lng: lng * 2 - (lng + dlng) };
-};
+const staticSearch = (query: string): LocationRecord[] => {
+  const q = normalize(query)
+  if (!q) return []
 
-/**
- * WGS-84 to GCJ-02
- * Use this when sending App data (WGS84) TO Tencent/AMap API.
- */
-export const wgs84_to_gcj02 = (lng: number, lat: number) => {
-    if (out_of_china(lng, lat)) return { lat, lng };
-    let dlat = transformLat(lng - 105.0, lat - 35.0);
-    let dlng = transformLon(lng - 105.0, lat - 35.0);
-    let radlat = lat / 180.0 * PI;
-    let magic = Math.sin(radlat);
-    magic = 1 - ee * magic * magic;
-    let sqrtmagic = Math.sqrt(magic);
-    dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI);
-    dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * PI);
-    return { lat: lat + dlat, lng: lng + dlng };
-};
-
-// Standard Haversine Distance
-function deg2rad(deg: number) { return deg * (Math.PI/180); }
-export function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-    var R = 6371; 
-    var dLat = deg2rad(lat2-lat1);
-    var dLon = deg2rad(lon2-lon1); 
-    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    return R * c;
+  return STATIC_LOCATIONS.filter(
+    (l) => l.name.toLowerCase().includes(q) || l.address.toLowerCase().includes(q) || l.keywords.some((k) => q.includes(normalize(k))),
+  )
+    .slice(0, 10)
+    .map((l) => ({ ...l, source: 'local' as const }))
 }
 
-// ============================================================================
-// PART 2: SDK LOADERS (Initialization)
-// ============================================================================
-
-export const loadTencentSDK = (key: string): Promise<boolean> => {
-    if (typeof window === 'undefined') return Promise.resolve(false);
-    if (window.TMap && window.TMap.service) return Promise.resolve(true);
-    if (window._tmapLoaderPromise) return window._tmapLoaderPromise;
-
-    const loaderPromise = new Promise<boolean>((resolve) => {
-        // console.log("[MapService] Loading Tencent Maps SDK...");
-        const script = document.createElement('script');
-        script.src = `https://map.qq.com/api/gljs?v=1.exp&key=${key}&libraries=service`;
-        script.async = true;
-        script.onload = () => {
-            // console.log("[MapService] Tencent SDK Loaded.");
-            resolve(true);
-        };
-        script.onerror = () => { 
-            console.warn("[MapService] Tencent SDK Failed.");
-            window._tmapLoaderPromise = undefined; 
-            resolve(false); 
-        };
-        document.head.appendChild(script);
-    });
-    window._tmapLoaderPromise = loaderPromise;
-    return loaderPromise;
-};
-
-export const loadGoogleMapsSDK = (key: string): Promise<boolean> => {
-    if (isGoogleMapsBroken || !key) return Promise.resolve(false);
-    if (typeof window === 'undefined') return Promise.resolve(false);
-    if (window.google && window.google.maps && window.google.maps.places) return Promise.resolve(true);
-    if (window._googleLoaderPromise) return window._googleLoaderPromise;
-
-    if (!(window as any).gm_authFailure) {
-        (window as any).gm_authFailure = () => {
-            console.error("Google Maps Auth Failed");
-            isGoogleMapsBroken = true;
-        };
-    }
-
-    const loaderPromise = new Promise<boolean>((resolve) => {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places,geometry&language=zh-HK`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => resolve(true);
-        script.onerror = () => { 
-            window._googleLoaderPromise = undefined; 
-            isGoogleMapsBroken = true; 
-            resolve(false); 
-        };
-        document.head.appendChild(script);
-    });
-    window._googleLoaderPromise = loaderPromise;
-    return loaderPromise;
-};
-
-export const loadAMapSDK = (key: string, securityCode?: string): Promise<boolean> => {
-    if (typeof window === 'undefined') return Promise.resolve(false);
-    try {
-        if (!(window as any)._AMapSecurityConfig) {
-            (window as any)._AMapSecurityConfig = { securityJsCode: securityCode || '' };
-        }
-    } catch(e) {}
+// Fallback: OpenStreetMap Nominatim (free, reliable)
+const fetchOSMSuggestions = async (query: string): Promise<LocationRecord[]> => {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&countrycodes=hk,cn`,
+      { headers: { 'Accept-Language': 'zh-HK,zh,en' } },
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    if (!Array.isArray(data)) return []
     
-    if (window.AMap && window.AMap.Driving && window.AMap.AutoComplete) return Promise.resolve(true);
-    if (window._amapLoaderPromise) return window._amapLoaderPromise;
+    return data
+      .filter(
+        (item: unknown): item is OSMNominatimItem =>
+          typeof item === 'object' &&
+          item !== null &&
+          'place_id' in item &&
+          'display_name' in item &&
+          'lat' in item &&
+          'lon' in item &&
+          typeof (item as OSMNominatimItem).display_name === 'string' &&
+          typeof (item as OSMNominatimItem).lat === 'string' &&
+          typeof (item as OSMNominatimItem).lon === 'string',
+      )
+      .map((item) => ({
+        id: `osm-${item.place_id}`,
+        name: item.display_name.split(',')[0] || item.display_name,
+        address: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+        keywords: [],
+        source: 'ai' as const,
+      }))
+  } catch {
+    return []
+  }
+}
 
-    const loaderPromise = new Promise<boolean>((resolve) => {
-        const callbackName = `_amap_init_${Math.random().toString(36).slice(2)}`;
-        (window as any)[callbackName] = () => { delete (window as any)[callbackName]; resolve(true); };
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = `https://webapi.amap.com/maps?v=2.0&key=${key}&plugin=AMap.Driving,AMap.AutoComplete&callback=${callbackName}`;
-        script.onerror = () => { 
-            window._amapLoaderPromise = undefined; 
-            resolve(false); 
-        };
-        document.head.appendChild(script);
-    });
-    window._amapLoaderPromise = loaderPromise;
-    return loaderPromise;
-};
+const fetchTencentSuggestions = async (query: string): Promise<LocationRecord[]> => {
+  const q = query.trim()
+  if (q.length < 2) return []
 
-// ============================================================================
-// PART 3: URL GENERATORS (Iframe Visualization)
-// ============================================================================
+  const boundary = q.includes('深圳') || q.includes('廣州') || q.includes('珠海') ? 'region(深圳,0)' : 'region(香港,0)'
+  const baseUrl = `https://apis.map.qq.com/ws/place/v1/suggestion?keyword=${encodeURIComponent(q)}&boundary=${encodeURIComponent(boundary)}&region_fix=0&output=jsonp&key=${TENCENT_MAP_KEY}`
 
-export const generateOSMUrl = (lat: number, lng: number, _popupText?: string, coordsType: CoordsSystem = 'WGS84') => {
-    let wgs = { lat, lng };
-    if (coordsType === 'GCJ02') wgs = gcj02_to_wgs84(lng, lat);
-    const delta = 0.008; 
-    const bbox = `${wgs.lng - delta},${wgs.lat - delta},${wgs.lng + delta},${wgs.lat + delta}`;
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${wgs.lat},${wgs.lng}`;
-};
+  try {
+    const data = await new Promise<TencentSuggestionResponse>((resolve, reject) => {
+      const callbackName = `tmapJsonp_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+      const scopedWindow = window as unknown as Record<string, unknown>
+      const script = document.createElement('script')
+      const timer = window.setTimeout(() => {
+        cleanup()
+        reject(new Error('JSONP timeout'))
+      }, JSONP_TIMEOUT_MS)
 
-export const generateGoogleMapUrl = (lat: number, lng: number, apiKey: string, coordsType: CoordsSystem = 'WGS84') => {
-    if (isGoogleMapsBroken) return generateOSMUrl(lat, lng, undefined, coordsType);
-    let wgs = { lat, lng };
-    if (coordsType === 'GCJ02') wgs = gcj02_to_wgs84(lng, lat);
-    return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${wgs.lat},${wgs.lng}&zoom=15&language=zh-HK`;
-};
+      const cleanup = () => {
+        window.clearTimeout(timer)
+        if (script.parentNode) script.parentNode.removeChild(script)
+        Reflect.deleteProperty(scopedWindow, callbackName)
+      }
 
-export const generateTencentMapUrl = (lat: number, lng: number, apiKey: string, label: string = 'Location', coordsType: CoordsSystem = 'WGS84') => {
-    let gcj = { lat, lng };
-    if (coordsType === 'WGS84') gcj = wgs84_to_gcj02(lng, lat);
-    return `https://apis.map.qq.com/tools/poimarker?type=0&marker=coord:${gcj.lat},${gcj.lng};title:${encodeURIComponent(label)};addr:${encodeURIComponent(label)}&key=${apiKey}&referer=P7S`;
-};
+      scopedWindow[callbackName] = (payload: TencentSuggestionResponse) => {
+        cleanup()
+        resolve(payload)
+      }
 
-export const generateTencentRouteUrl = (
-    start: { lat: number, lng: number, name?: string },
-    end: { lat: number, lng: number, name?: string },
-    apiKey: string,
-    coordsType: CoordsSystem = 'WGS84'
-) => {
-    let s = { lat: start.lat, lng: start.lng };
-    let e = { lat: end.lat, lng: end.lng };
-    if (coordsType === 'WGS84') {
-        s = wgs84_to_gcj02(start.lng, start.lat);
-        e = wgs84_to_gcj02(end.lng, end.lat);
+      script.src = `${baseUrl}&callback=${callbackName}`
+      script.onerror = () => {
+        cleanup()
+        reject(new Error('JSONP request failed'))
+      }
+
+      document.body.appendChild(script)
+    })
+
+    if (!data?.data || !Array.isArray(data.data)) return []
+
+    const suggestions: LocationRecord[] = []
+    for (let idx = 0; idx < data.data.length && suggestions.length < 8; idx += 1) {
+      const item = data.data[idx]
+      const lat = Number(item.location?.lat)
+      const lng = Number(item.location?.lng)
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+
+      const title = item.title || item.address || q
+      const address = item.address || item.title || '未知地址'
+      const keywords = [item.title, item.address]
+        .filter((keyword): keyword is string => typeof keyword === 'string' && keyword.length > 0)
+        .map((keyword) => keyword.toLowerCase())
+
+      suggestions.push({
+        id: `tx-${item.id || idx}`,
+        name: title,
+        address,
+        lat,
+        lng,
+        keywords,
+        source: 'ai',
+      })
     }
-    return `https://apis.map.qq.com/tools/routeplan?type=drive&from=${encodeURIComponent(start.name||'Start')}&fromcoord=${s.lat},${s.lng}&to=${encodeURIComponent(end.name||'End')}&tocoord=${e.lat},${e.lng}&policy=1&coord_type=5&referer=P7S&key=${apiKey}`;
-};
+    return suggestions
+  } catch {
+    return []
+  }
+}
 
-export const generateAMapRouteUrl = (
-    start: { lat: number, lng: number, name?: string },
-    end: { lat: number, lng: number, name?: string },
-    coordsType: CoordsSystem = 'WGS84'
-) => {
-    let s = { lat: start.lat, lng: start.lng };
-    let e = { lat: end.lat, lng: end.lng };
-    if (coordsType === 'WGS84') {
-        s = wgs84_to_gcj02(start.lng, start.lat);
-        e = wgs84_to_gcj02(end.lng, end.lat);
+// Search locations with online suggestions + static fallback
+export const searchLocation = async (query: string): Promise<LocationRecord[]> => {
+  // Try static first (fast)
+  const local = staticSearch(query)
+  
+  // Try Tencent API
+  let online: LocationRecord[] = []
+  try {
+    online = await fetchTencentSuggestions(query)
+  } catch (e) {
+    console.warn('Tencent search failed, trying OSM fallback:', e)
+    // Fallback to OpenStreetMap if Tencent fails
+    try {
+      online = await fetchOSMSuggestions(query)
+    } catch (e2) {
+      console.warn('OSM fallback also failed:', e2)
     }
-    return `https://uri.amap.com/navigation?from=${s.lng},${s.lat},${encodeURIComponent(start.name||'Start')}&to=${e.lng},${e.lat},${encodeURIComponent(end.name||'End')}&mode=car&policy=1&src=P7S&coordinate=gaode&callnative=0`;
-};
+  }
 
-export const generateAMapMarkerUrl = (lat: number, lng: number, name: string = 'Location', coordsType: CoordsSystem = 'WGS84') => {
-    let gcj = { lat, lng };
-    if (coordsType === 'WGS84') gcj = wgs84_to_gcj02(lng, lat);
-    return `https://uri.amap.com/marker?position=${gcj.lng},${gcj.lat}&name=${encodeURIComponent(name)}&src=P7S&coordinate=gaode&callnative=0`;
-};
+  const merged = [...local, ...online]
 
-// Legacy Generator (Backward Compatibility)
-export const generateMapUrl = (arg1: any, arg2: any, arg3: any = 'GOOGLE', arg4: any = {}): string => {
-    try {
-        if (typeof arg1 === 'number' && typeof arg2 === 'number') {
-            return generateGoogleMapUrl(arg1, arg2, typeof arg3 === 'string' ? arg3 : '', typeof arg4 === 'string' ? arg4 as CoordsSystem : 'WGS84');
-        }
-        // Fallback for legacy signature
-        const apiKey = String(arg2);
-        const params = arg4 || {};
-        if (arg3 === 'TENCENT' && params.center) return generateTencentMapUrl(params.center.lat, params.center.lng, apiKey, 'Location', 'WGS84');
-        return generateGoogleMapUrl(params.center?.lat || 22.3, params.center?.lng || 114.1, apiKey);
-    } catch (e) { return ""; }
-};
+  const seen = new Set<string>()
+  const deduped: LocationRecord[] = []
 
-// ============================================================================
-// PART 4: INTERNAL IMPLEMENTATIONS (Specific Providers)
-// ============================================================================
+  for (const item of merged) {
+    const key = `${item.name}-${item.lat.toFixed(4)}-${item.lng.toFixed(4)}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(item)
+    if (deduped.length >= 10) break
+  }
 
-// Internal: Google Search
-const _searchGoogle = async (query: string, key: string, options?: SearchOptions): Promise<LocationData[]> => {
-    try {
-        if (isGoogleMapsBroken) return [];
-        await loadGoogleMapsSDK(key);
-        if (!window.google?.maps?.places) return [];
+  return deduped
+}
 
-        return new Promise((resolve) => {
-            const service = new window.google.maps.places.PlacesService(document.createElement('div'));
-            const request: any = { query: query };
-            if (options?.center && options?.radius) {
-                request.location = new window.google.maps.LatLng(options.center.lat, options.center.lng);
-                request.radius = options.radius;
-            } else {
-                request.bounds = new window.google.maps.LatLngBounds(
-                    new window.google.maps.LatLng(21.8, 112.5),
-                    new window.google.maps.LatLng(23.5, 115.0)
-                );
-            }
-            service.textSearch(request, (results: any[], status: any) => {
-                if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-                    // Google returns WGS84 by default, no conversion needed
-                    resolve(results.map(place => ({
-                        placeName: place.name || 'Unknown',
-                        address: place.formatted_address || '',
-                        latitude: typeof place.geometry.location.lat === 'function' ? place.geometry.location.lat() : place.geometry.location.lat,
-                        longitude: typeof place.geometry.location.lng === 'function' ? place.geometry.location.lng() : place.geometry.location.lng,
-                        uri: "",
-                        provider: 'GOOGLE'
-                    })));
-                } else resolve([]);
-            });
-        });
-    } catch (e) { return []; }
-};
+const deg2rad = (deg: number) => deg * (Math.PI / 180)
 
-// Internal: Tencent Search (Auto-converts GCJ02 -> WGS84 for App)
-const _searchTencent = async (query: string, key: string): Promise<LocationData[]> => {
-    try {
-        await loadTencentSDK(key);
-        if (!window.TMap || !window.TMap.service) return [];
-        
-        return new Promise((resolve) => {
-            const suggest = new window.TMap.service.Suggestion({ pageSize: 10, region: '深圳' });
-            suggest.getSuggestions({ keyword: query })
-                .then((res: any) => {
-                    if (res && res.data) {
-                        const locs = res.data.map((item: any) => {
-                            // Tencent returns GCJ02. Convert to WGS84 for app storage.
-                            const wgs = gcj02_to_wgs84(item.location.lng, item.location.lat);
-                            return {
-                                placeName: item.title,
-                                address: item.address,
-                                latitude: wgs.lat,
-                                longitude: wgs.lng,
-                                uri: ""
-                            };
-                        });
-                        resolve(locs);
-                    } else resolve([]);
-                })
-                .catch(() => resolve([]));
-        });
-    } catch (e) { return []; }
-};
+export const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371
+  const dLat = deg2rad(lat2 - lat1)
+  const dLon = deg2rad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
 
-// Internal: AMap Search (Auto-converts GCJ02 -> WGS84 for App)
-const _searchAMap = async (query: string, key: string, securityCode?: string): Promise<LocationData[]> => {
-    try {
-        await loadAMapSDK(key, securityCode);
-        if (!window.AMap?.AutoComplete) return [];
-        
-        return new Promise((resolve) => {
-            new window.AMap.AutoComplete({ city: '全国' }).search(query, (status: string, result: any) => {
-                if (status === 'complete' && result.tips) {
-                    const locs = result.tips.filter((t: any) => t.id && t.location).map((t: any) => {
-                        // AMap returns GCJ02. Convert to WGS84.
-                        const wgs = gcj02_to_wgs84(t.location.lng, t.location.lat);
-                        return {
-                            placeName: t.name,
-                            address: t.district || t.name,
-                            latitude: wgs.lat,
-                            longitude: wgs.lng,
-                            uri: ""
-                        };
-                    });
-                    resolve(locs);
-                } else resolve([]);
-            });
-        });
-    } catch (e) { return []; }
-};
+const inferMainland = (p: LocationRecord) => {
+  const text = `${p.id} ${p.name} ${p.address}`.toLowerCase()
+  if (text.includes('深圳') || text.includes('廣州') || text.includes('珠海') || text.includes('sz') || text.includes('gz')) return true
+  return p.lat > 22.48
+}
 
-// Internal: Tencent Route (Inputs WGS84 -> Converts to GCJ02 for API)
-const _calculateTencentRoute = async (origin: {lat: number, lng: number}, dest: {lat: number, lng: number}, key: string): Promise<{distanceKm: number, duration: string}> => {
-    try {
-        await loadTencentSDK(key);
-        if (!window.TMap || !window.TMap.service) return { distanceKm: 0, duration: '' };
-        
-        // App coordinates are WGS84. Convert to GCJ02 for Tencent API.
-        const startGCJ = wgs84_to_gcj02(origin.lng, origin.lat);
-        const endGCJ = wgs84_to_gcj02(dest.lng, dest.lat);
+const detectTolls = (pickup: LocationRecord, dropoff: LocationRecord): typeof TOLL_LOCATIONS => {
+  const detected: typeof TOLL_LOCATIONS = []
+  const isCrossBorder = inferMainland(pickup) !== inferMainland(dropoff)
 
-        return new Promise((resolve) => {
-            const driving = new window.TMap.service.Driving();
-            driving.search({ 
-                from: new window.TMap.LatLng(startGCJ.lat, startGCJ.lng), 
-                to: new window.TMap.LatLng(endGCJ.lat, endGCJ.lng) 
-            }).then((result: any) => {
-                if (result && result.result?.routes?.length > 0) {
-                    const route = result.result.routes[0];
-                    resolve({ 
-                        distanceKm: parseFloat((route.distance / 1000).toFixed(1)), 
-                        duration: `${Math.ceil(route.duration / 60)} mins`
-                    });
-                } else resolve({ distanceKm: 0, duration: '' });
-            }).catch(() => resolve({ distanceKm: 0, duration: '' }));
-        });
-    } catch (e) { return { distanceKm: 0, duration: '' }; }
-};
+  if (isCrossBorder) {
+    const viaHZMB = `${pickup.name}${dropoff.name}`.includes('港珠澳')
+    if (viaHZMB) {
+      detected.push(TOLL_LOCATIONS.find((t) => t.id === 'hzmb')!)
+    } else {
+      detected.push(TOLL_LOCATIONS.find((t) => t.id === 'sz_bay')!)
+    }
+  }
 
-// Internal: AMap Route (Inputs WGS84 -> Converts to GCJ02 for API)
-const _calculateAMapRoute = async (origin: {lat: number, lng: number}, dest: {lat: number, lng: number}, key: string, securityCode?: string): Promise<{distanceKm: number, duration: string}> => {
-    try {
-        await loadAMapSDK(key, securityCode);
-        if (!window.AMap || !window.AMap.Driving) return { distanceKm: 0, duration: '' };
+  const needsHarborTunnel =
+    (pickup.name.includes('中環') && (dropoff.name.includes('旺角') || dropoff.name.includes('尖沙咀'))) ||
+    (dropoff.name.includes('中環') && (pickup.name.includes('旺角') || pickup.name.includes('尖沙咀')))
 
-        // App coordinates are WGS84. Convert to GCJ02 for AMap API.
-        const startGCJ = wgs84_to_gcj02(origin.lng, origin.lat);
-        const endGCJ = wgs84_to_gcj02(dest.lng, dest.lat);
+  if (needsHarborTunnel) detected.push(TOLL_LOCATIONS.find((t) => t.id === 'cross')!)
 
-        return new Promise((resolve) => {
-            window.AMap.plugin('AMap.Driving', function() {
-                const driving = new window.AMap.Driving({ policy: 0 });
-                driving.search(
-                    new window.AMap.LngLat(startGCJ.lng, startGCJ.lat),
-                    new window.AMap.LngLat(endGCJ.lng, endGCJ.lat),
-                    function(status: string, result: any) {
-                        if (status === 'complete' && result.routes?.length > 0) {
-                            const r = result.routes[0];
-                            const mins = Math.ceil(r.time / 60);
-                            resolve({ 
-                                distanceKm: parseFloat((r.distance / 1000).toFixed(1)), 
-                                duration: mins >= 60 ? `${Math.floor(mins/60)} hr ${mins%60} min` : `${mins} mins`
-                            });
-                        } else resolve({ distanceKm: 0, duration: '' });
-                    }
-                );
-            });
-        });
-    } catch (e) { return { distanceKm: 0, duration: '' }; }
-};
+  return detected.filter(Boolean)
+}
 
-// ============================================================================
-// PART 5: UNIFIED PUBLIC API (The Interface)
-// ============================================================================
+const detectCheckpoints = (pickup: LocationRecord, dropoff: LocationRecord, tolls: typeof TOLL_LOCATIONS): RouteCheckpoint[] => {
+  const checkpoints: RouteCheckpoint[] = tolls.map((t) => ({ id: t.id, name: t.name, type: 'toll', fee: t.fee }))
 
-export const preloadMapSDKs = (tencentKey?: string) => {
-    if (tencentKey) loadTencentSDK(tencentKey);
-};
+  const isCrossBorder = inferMainland(pickup) !== inferMainland(dropoff)
+  if (isCrossBorder) {
+    const preferred = BORDER_CHECKPOINTS
+      .map((b) => ({ b, d: getDistanceFromLatLonInKm(dropoff.lat, dropoff.lng, b.lat, b.lng) }))
+      .sort((a, b) => a.d - b.d)[0]?.b
 
-export const calculateTencentRoute = _calculateTencentRoute; // Export specific implementation if needed directly
-export const calculateAMapRoute = _calculateAMapRoute; // Export specific implementation if needed directly
+    const border = preferred || BORDER_CHECKPOINTS[0]
+    checkpoints.push({ id: border.id, name: border.name, type: 'border' })
+  }
 
-/**
- * Unified Search Function
- * Defaults to TENCENT. Handles all coordinate conversions transparently.
- * Returns WGS84 coordinates regardless of provider.
- */
-export const searchLocation = async (
-    query: string, 
-    provider: MapProvider = 'TENCENT', // Default changed to Tencent
-    amapKey?: string,
-    amapSecurityCode?: string,
-    googleKey?: string,
-    options?: SearchOptions, 
-    tencentKey?: string 
-): Promise<LocationData[]> => {
-    const q = query.toLowerCase().trim();
-    if (!q) return [];
-    
-    // Check Static Matches (Always fast)
-    const staticMatches = STATIC_LOCATIONS.filter(l => l.keywords.some(k => q.includes(k)) || l.placeName.toLowerCase().includes(q))
-        .map(l => ({ placeName: l.placeName, address: l.address, latitude: l.lat, longitude: l.lng, uri: "" }));
-    if (staticMatches.length > 0) return staticMatches.slice(0, 5);
+  const seen = new Set<string>()
+  return checkpoints.filter((c) => {
+    if (seen.has(c.id)) return false
+    seen.add(c.id)
+    return true
+  })
+}
 
-    // Tencent (Primary)
-    if (provider === 'TENCENT' && tencentKey) {
-        return await _searchTencent(q, tencentKey);
+export interface RouteResult {
+  distance: number
+  duration: number
+  tolls: typeof TOLL_LOCATIONS
+  hasCrossBorder: boolean
+  checkpoints: RouteCheckpoint[]
+  path: RoutePathPoint[]
+  hasRealPath: boolean
+}
+
+const decodeTencentPolyline = (raw: number[]): RoutePathPoint[] => {
+  const coors = raw.map((n) => Number(n))
+  if (coors.length < 2) return []
+
+  for (let i = 2; i < coors.length; i += 1) {
+    coors[i] = coors[i - 2] + coors[i] / 1000000
+  }
+
+  const points: RoutePathPoint[] = []
+  for (let i = 0; i < coors.length - 1; i += 2) {
+    const lat = coors[i]
+    const lng = coors[i + 1]
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      points.push({ lat, lng })
+    }
+  }
+  return points
+}
+
+const fetchTencentDrivingRoute = async (
+  pickup: LocationRecord,
+  dropoff: LocationRecord,
+): Promise<{ distanceKm: number; durationMin: number; path: RoutePathPoint[] } | null> => {
+  const from = `${pickup.lat},${pickup.lng}`
+  const to = `${dropoff.lat},${dropoff.lng}`
+  const url = `https://apis.map.qq.com/ws/direction/v1/driving/?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&output=json&key=${TENCENT_MAP_KEY}`
+
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = (await res.json()) as TencentDrivingResponse
+    if (data?.status !== 0) return null
+
+    const route = data?.result?.routes?.[0]
+    if (!route) return null
+
+    const polylineRaw: number[] = Array.isArray(route.polyline) ? route.polyline : []
+    const decoded = decodeTencentPolyline(polylineRaw)
+    const path = decoded.length >= 2 ? decoded : [{ lat: pickup.lat, lng: pickup.lng }, { lat: dropoff.lat, lng: dropoff.lng }]
+
+    const distanceKm = Number(route.distance || 0) / 1000
+    const durationMin = Number(route.duration || 0) / 60
+
+    if (!Number.isFinite(distanceKm) || !Number.isFinite(durationMin) || distanceKm <= 0 || durationMin <= 0) {
+      return null
     }
 
-    // Google
-    if (provider === 'GOOGLE' && googleKey && !isGoogleMapsBroken) {
-        const res = await _searchGoogle(q, googleKey, options);
-        if (res.length > 0) return res;
-    }
-
-    // AMap
-    if (provider === 'AMAP' && amapKey) {
-        return await _searchAMap(q, amapKey, amapSecurityCode);
-    }
-
-    // OSM Fallback (Returns WGS84)
-    try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
-        if (res.ok) {
-            const data = await res.json();
-            return data.map((i: any) => ({ placeName: i.name || i.display_name.split(',')[0], address: i.display_name, latitude: parseFloat(i.lat), longitude: parseFloat(i.lon), uri: "" }));
-        }
-    } catch(e) {}
-    
-    return [];
-};
-
-/**
- * Unified Trip Estimator
- * Defaults to TENCENT. Handles all coordinate conversions transparently.
- * Input coordinates MUST be WGS84 (standard app format).
- */
-export const estimateTripDetails = async (
-    origin: string | LocationData, 
-    destination: string | LocationData, 
-    provider: MapProvider = 'TENCENT', // Default changed to Tencent
-    amapKey?: string,
-    amapSecurityCode?: string,
-    tencentKey?: string
-): Promise<{distanceKm: number, duration: string}> => {
-    const p1 = typeof origin === 'object' && origin.latitude ? origin : null;
-    const p2 = typeof destination === 'object' && destination.latitude ? destination : null;
-
-    if (p1 && p2 && p1.latitude && p1.longitude && p2.latitude && p2.longitude) {
-        // Tencent Route
-        if (provider === 'TENCENT' && tencentKey) {
-            return _calculateTencentRoute(
-                {lat: p1.latitude, lng: p1.longitude}, 
-                {lat: p2.latitude, lng: p2.longitude}, 
-                tencentKey
-            );
-        }
-        
-        // AMap Route
-        if (provider === 'AMAP' && amapKey) {
-            return _calculateAMapRoute(
-                {lat: p1.latitude, lng: p1.longitude}, 
-                {lat: p2.latitude, lng: p2.longitude}, 
-                amapKey, amapSecurityCode
-            );
-        }
-    }
-    
-    // Fallback: Haversine (WGS84 direct calc)
-    if (p1 && p2 && p1.latitude && p1.longitude && p2.latitude && p2.longitude) {
-        const d = getDistanceFromLatLonInKm(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
-        const estDist = parseFloat((d * 1.4).toFixed(1)); 
-        const estMins = Math.ceil(estDist * 1.8); 
-        return { distanceKm: estDist, duration: estMins >= 60 ? `~${Math.floor(estMins/60)}h` : `~${estMins}m` };
-    }
-    return { distanceKm: 0, duration: '' };
-};
-
-export const getAMapDiagnostics = () => {
-    if (typeof window === 'undefined') return { status: 'SSR', details: 'Server Side' };
-    const isLoaded = !!window.AMap;
     return {
-        status: isLoaded ? 'LOADED' : 'NOT_LOADED',
-        version: window.AMap?.v || 'N/A',
-        plugins: isLoaded && window.AMap.Driving ? ['Driving'] : [],
-        securityConfig: !!(window as any)._AMapSecurityConfig
-    };
-};
+      distanceKm,
+      durationMin,
+      path,
+    }
+  } catch {
+    return null
+  }
+}
 
-// Stub functions for PassengerHome compatibility - TODO: implement properly
-export const calculatePrice = (route: RouteResult): {
-  total: number;
-  distance: string;
-  duration: number;
-  tollsTotal: number;
-} => {
-  const distanceKm = route.distance;
-  const baseRate = 25; // HKD
-  const perKm = 8;
-  const total = baseRate + (distanceKm * perKm);
-  return {
-    total: Math.round(total),
-    distance: `${distanceKm.toFixed(1)} km`,
-    duration: route.duration,
-    tollsTotal: route.tolls
-  };
-};
+export const calculateRoute = async (pickup: LocationRecord, dropoff: LocationRecord): Promise<RouteResult> => {
+  const driving = await fetchTencentDrivingRoute(pickup, dropoff)
+  const hasCrossBorder = inferMainland(pickup) !== inferMainland(dropoff)
 
-export const calculateRoute = async (pickup: LocationData, dropoff: LocationData): Promise<RouteResult> => {
-  const distanceKm = getDistanceFromLatLonInKm(
-    pickup.latitude ?? pickup.lat ?? 0,
-    pickup.longitude ?? pickup.lng ?? 0,
-    dropoff.latitude ?? dropoff.lat ?? 0,
-    dropoff.longitude ?? dropoff.lng ?? 0
-  );
+  const fallbackDistance = getDistanceFromLatLonInKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng)
+  const fallbackDuration = Math.round((fallbackDistance / (hasCrossBorder ? 60 : 40)) * 60)
+
+  const distance = driving ? Math.round(driving.distanceKm * 10) / 10 : Math.round(fallbackDistance * 10) / 10
+  const duration = driving ? Math.round(driving.durationMin) : fallbackDuration
+  const path = driving?.path || [{ lat: pickup.lat, lng: pickup.lng }, { lat: dropoff.lat, lng: dropoff.lng }]
+
+  const tolls = detectTolls(pickup, dropoff)
+  const checkpoints = detectCheckpoints(pickup, dropoff, tolls)
+
   return {
-    distance: distanceKm,
-    duration: Math.ceil(distanceKm * 2),
-    polyline: '',
-    tolls: 0
-  };
-};
+    distance,
+    duration,
+    tolls,
+    hasCrossBorder,
+    checkpoints,
+    path,
+    hasRealPath: !!driving,
+  }
+}
+
+export interface PricingResult {
+  total: number
+  distance: string
+  duration: number
+  tollsTotal: number
+}
+
+export const calculatePrice = (route: RouteResult): PricingResult => {
+  const { distance, duration, tolls } = route
+  const baseRate = 80
+
+  let mileageCost = 0
+  if (distance > 10) {
+    if (distance <= 50) mileageCost = (distance - 10) * 10
+    else if (distance <= 100) mileageCost = 40 * 10 + (distance - 50) * 8
+    else mileageCost = 40 * 10 + 50 * 8 + (distance - 100) * 6
+  }
+
+  const tollsTotal = tolls.reduce((sum, t) => sum + t.fee, 0)
+  const total = Math.ceil(Math.max(baseRate, mileageCost) + tollsTotal)
+
+  return {
+    total,
+    distance: distance.toFixed(1),
+    duration,
+    tollsTotal,
+  }
+}
+
+export default {
+  STATIC_LOCATIONS,
+  TOLL_LOCATIONS,
+  searchLocation,
+  calculateRoute,
+  calculatePrice,
+}

@@ -24,9 +24,16 @@ import type {
   OrderRecord,
   OrderStatus,
 } from '../services/orderService'
+import { UI_TEXT } from '../constants/uiText'
 
 type NoticeTone = 'ok' | 'error' | 'info'
 type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing' | 'kyc' | 'points'
+
+const noticeClassByTone = (tone: NoticeTone) => {
+  if (tone === 'error') return 'ui-notice ui-notice-error'
+  if (tone === 'ok') return 'ui-notice ui-notice-ok'
+  return 'ui-notice ui-notice-info'
+}
 
 type RouteFormState = {
   id?: string
@@ -158,10 +165,6 @@ export default function AdminConsole() {
   const [userStatusDrafts, setUserStatusDrafts] = useState<Record<string, string>>({})
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
   const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null)
-  const [otpCode, setOtpCode] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [resetStep, setResetStep] = useState<1 | 2>(1)
-  const [editingPasswordUserId, setEditingPasswordUserId] = useState<string | null>(null)
 
   const [routeForm, setRouteForm] = useState<RouteFormState>(EMPTY_ROUTE_FORM)
   const [routeStatusDrafts, setRouteStatusDrafts] = useState<Record<string, OfficialRouteStatus>>({})
@@ -185,7 +188,7 @@ export default function AdminConsole() {
         setLoadingOrders(false)
       },
       (error) => {
-        setNotice({ text: `讀取訂單失敗: ${error.message}`, tone: 'error' })
+        setNotice({ text: `${UI_TEXT.error.readOrders}: ${error.message}`, tone: 'error' })
         setLoadingOrders(false)
       },
     )
@@ -195,7 +198,7 @@ export default function AdminConsole() {
         setLoadingUsers(false)
       },
       (error) => {
-        setNotice({ text: `讀取用戶失敗: ${error.message}`, tone: 'error' })
+        setNotice({ text: `${UI_TEXT.error.readUsers}: ${error.message}`, tone: 'error' })
         setLoadingUsers(false)
       },
     )
@@ -205,7 +208,7 @@ export default function AdminConsole() {
         setLoadingRoutes(false)
       },
       (error) => {
-        setNotice({ text: `讀取官方班次失敗: ${error.message}`, tone: 'error' })
+        setNotice({ text: `${UI_TEXT.error.readRoutes}: ${error.message}`, tone: 'error' })
         setLoadingRoutes(false)
       },
     )
@@ -216,7 +219,7 @@ export default function AdminConsole() {
         setLoadingPricing(false)
       },
       (error) => {
-        setNotice({ text: `讀取定價設定失敗: ${error.message}`, tone: 'error' })
+        setNotice({ text: `${UI_TEXT.error.readPricing}: ${error.message}`, tone: 'error' })
         setLoadingPricing(false)
       },
     )
@@ -390,51 +393,19 @@ export default function AdminConsole() {
   }
 
   const handleResetPassword = async (user: AdminUserRecord) => {
-    if (resetStep === 1) {
-      // Step 1: Send OTP (test v3)
-      if (!user.phone) {
-        setNotice({ text: '該用戶沒有電話', tone: 'error' })
-        return
-      }
-      setResettingPasswordId(user.id)
-      try {
-        const result = await resetPasswordByPhone('852', user.phone)
-        if (result.ok) {
-          setNotice({ text: '驗證碼已發送到用戶手機', tone: 'ok' })
-          setResetStep(2)
-        } else {
-          setNotice({ text: result.message, tone: 'error' })
-        }
-      } catch (error: any) {
-        const message = error?.message || '未知錯誤'
-        setNotice({ text: `發送失敗: ${message}`, tone: 'error' })
-      } finally {
-        setResettingPasswordId(null)
-      }
-    } else {
-      // Step 2: Verify OTP and set new password
-      if (!otpCode || !newPassword) {
-        setNotice({ text: '請填寫驗證碼和新密碼', tone: 'error' })
-        return
-      }
-      setResettingPasswordId(user.id)
-      try {
-        const result = await resetPasswordByPhone('852', user.phone, newPassword, otpCode)
-        if (result.ok) {
-          setNotice({ text: '密碼重設成功', tone: 'ok' })
-          setResetStep(1)
-          setOtpCode('')
-          setNewPassword('')
-          setEditingPasswordUserId(null)
-        } else {
-          setNotice({ text: result.message, tone: 'error' })
-        }
-      } catch (error: any) {
-        const message = error?.message || '未知錯誤'
-        setNotice({ text: `重設失敗: ${message}`, tone: 'error' })
-      } finally {
-        setResettingPasswordId(null)
-      }
+    if (!user.phone) {
+      setNotice({ text: '該用戶沒有電話', tone: 'error' })
+      return
+    }
+    setResettingPasswordId(user.id)
+    try {
+      const result = await resetPasswordByPhone('852', user.phone)
+      setNotice({ text: result.message, tone: result.ok ? 'ok' : 'error' })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤'
+      setNotice({ text: `重設密碼失敗: ${message}`, tone: 'error' })
+    } finally {
+      setResettingPasswordId(null)
     }
   }
 
@@ -585,14 +556,8 @@ export default function AdminConsole() {
         ].map((card) => (
           <article
             key={card.label}
-            style={{
-              background: '#fff',
-              border: '1px solid #dce6dd',
-              borderRadius: 14,
-              padding: '12px 14px',
-              display: 'grid',
-              gap: 6,
-            }}
+            className="ui-card"
+            style={{ padding: '12px 14px', display: 'grid', gap: 6 }}
           >
             <div style={{ fontSize: 12, color: '#647a73', fontWeight: 700 }}>{card.label}</div>
             <div style={{ fontSize: 24, fontWeight: 900, color: card.tone }}>{card.value}</div>
@@ -601,19 +566,14 @@ export default function AdminConsole() {
       </div>
 
       <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))' }}>
-        <section style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 14, padding: 12 }}>
+        <section className="ui-card" style={{ padding: 12 }}>
           <h3 style={{ margin: '0 0 8px', color: '#27483f' }}>最新訂單</h3>
           <div style={{ display: 'grid', gap: 8 }}>
             {orders.slice(0, 5).map((order) => (
               <div
                 key={order.id || `${order.passengerId}-${order.createdAt}`}
-                style={{
-                  border: '1px solid #e3ebe4',
-                  borderRadius: 10,
-                  padding: '8px 9px',
-                  display: 'grid',
-                  gap: 4,
-                }}
+                className="ui-card-muted"
+                style={{ padding: '8px 9px', display: 'grid', gap: 4 }}
               >
                 <strong style={{ fontSize: 12 }}>{order.id}</strong>
                 <div style={{ fontSize: 12, color: '#3d5c54' }}>
@@ -628,19 +588,14 @@ export default function AdminConsole() {
           </div>
         </section>
 
-        <section style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 14, padding: 12 }}>
+        <section className="ui-card" style={{ padding: 12 }}>
           <h3 style={{ margin: '0 0 8px', color: '#27483f' }}>最新官方班次</h3>
           <div style={{ display: 'grid', gap: 8 }}>
             {routes.slice(0, 5).map((route) => (
               <div
                 key={route.id}
-                style={{
-                  border: '1px solid #e3ebe4',
-                  borderRadius: 10,
-                  padding: '8px 9px',
-                  display: 'grid',
-                  gap: 4,
-                }}
+                className="ui-card-muted"
+                style={{ padding: '8px 9px', display: 'grid', gap: 4 }}
               >
                 <strong style={{ fontSize: 12 }}>{route.id}</strong>
                 <div style={{ fontSize: 12, color: '#3d5c54' }}>
@@ -662,11 +617,12 @@ export default function AdminConsole() {
 
   const renderOrdersTab = () => (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="ui-row">
         <select
           value={orderFilter}
           onChange={(event) => setOrderFilter(event.target.value as 'all' | OrderStatus)}
-          style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '8px 10px', background: '#fff' }}
+          className="ui-input"
+          style={{ minHeight: 36, width: 'auto', padding: '8px 10px' }}
         >
           <option value="all">全部狀態</option>
           {ORDER_STATUS_OPTIONS.map((status) => (
@@ -680,7 +636,8 @@ export default function AdminConsole() {
           onChange={(event) =>
             setOrderTypeFilter(event.target.value as 'all' | 'charter' | 'official_route')
           }
-          style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '8px 10px', background: '#fff' }}
+          className="ui-input"
+          style={{ minHeight: 36, width: 'auto', padding: '8px 10px' }}
         >
           <option value="all">全部類型</option>
           <option value="charter">包車點對點</option>
@@ -689,9 +646,9 @@ export default function AdminConsole() {
       </div>
 
       {loadingOrders ? (
-        <div style={{ fontSize: 13, color: '#6e827c' }}>讀取訂單中...</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.orders}</div>
       ) : filteredOrders.length === 0 ? (
-        <div style={{ fontSize: 13, color: '#6e827c' }}>沒有符合條件的訂單</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.orders}</div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {filteredOrders.map((order) => {
@@ -701,22 +658,16 @@ export default function AdminConsole() {
             return (
               <article
                 key={order.id || `${order.passengerId}-${order.createdAt}`}
-                style={{
-                  background: '#fff',
-                  border: '1px solid #dce6dd',
-                  borderRadius: 14,
-                  padding: 12,
-                  display: 'grid',
-                  gap: 6,
-                }}
+                className="ui-card ui-clickable-surface"
+                style={{ padding: 12, display: 'grid', gap: 6 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <strong style={{ color: '#27483f' }}>{order.id}</strong>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <span style={{ border: '1px solid #d9e5dc', borderRadius: 999, padding: '2px 8px', fontSize: 11, color: '#31564b', background: '#f2f8f4' }}>
+                    <span className="ui-pill" style={{ fontSize: 11, padding: '2px 8px', background: '#f2f8f4' }}>
                       {orderType === 'official_route' ? '官方班次' : '包車點對點'}
                     </span>
-                    <span style={{ border: '1px solid #d9e5dc', borderRadius: 999, padding: '2px 8px', fontSize: 11, color: '#31564b', background: '#f8fbf9' }}>
+                    <span className="ui-pill" style={{ fontSize: 11, padding: '2px 8px' }}>
                       {STATUS_LABELS[order.status]}
                     </span>
                   </div>
@@ -749,7 +700,8 @@ export default function AdminConsole() {
                         [order.id as string]: event.target.value as OrderStatus,
                       }))
                     }}
-                    style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px', background: '#fff' }}
+                    className="ui-input"
+                    style={{ minHeight: 34, width: 'auto', padding: '7px 10px' }}
                   >
                     {ORDER_STATUS_OPTIONS.map((status) => (
                       <option key={status} value={status}>
@@ -760,15 +712,8 @@ export default function AdminConsole() {
                   <button
                     onClick={() => void handleUpdateOrderStatus(order)}
                     disabled={!order.id || updatingOrderId === order.id}
-                    style={{
-                      border: 0,
-                      borderRadius: 10,
-                      padding: '8px 12px',
-                      fontWeight: 700,
-                      background: !order.id || updatingOrderId === order.id ? '#e8e8e4' : '#1f4f43',
-                      color: !order.id || updatingOrderId === order.id ? '#8d8a80' : '#effff7',
-                      cursor: !order.id || updatingOrderId === order.id ? 'not-allowed' : 'pointer',
-                    }}
+                    className="ui-btn ui-btn-primary"
+                    style={{ padding: '8px 12px' }}
                   >
                     {updatingOrderId === order.id ? '更新中...' : '更新狀態'}
                   </button>
@@ -781,12 +726,8 @@ export default function AdminConsole() {
                         [order.id as string]: event.target.value,
                       }))
                     }}
-                    style={{
-                      border: '1px solid #dce6dd',
-                      borderRadius: 10,
-                      padding: '7px 10px',
-                      background: '#fff',
-                    }}
+                    className="ui-input"
+                    style={{ minHeight: 34, width: 'auto', padding: '7px 10px' }}
                   >
                     <option value="">選擇司機</option>
                     {driverUsers.map((driver) => (
@@ -803,33 +744,8 @@ export default function AdminConsole() {
                       updatingOrderId === order.id ||
                       order.status !== 'pending'
                     }
-                    style={{
-                      border: 0,
-                      borderRadius: 10,
-                      padding: '8px 12px',
-                      fontWeight: 700,
-                      background:
-                        !order.id ||
-                        !draftDriverId ||
-                        updatingOrderId === order.id ||
-                        order.status !== 'pending'
-                          ? '#e8e8e4'
-                          : '#355f9e',
-                      color:
-                        !order.id ||
-                        !draftDriverId ||
-                        updatingOrderId === order.id ||
-                        order.status !== 'pending'
-                          ? '#8d8a80'
-                          : '#f2f7ff',
-                      cursor:
-                        !order.id ||
-                        !draftDriverId ||
-                        updatingOrderId === order.id ||
-                        order.status !== 'pending'
-                          ? 'not-allowed'
-                          : 'pointer',
-                    }}
+                    className="ui-btn ui-btn-secondary"
+                    style={{ padding: '8px 12px' }}
                   >
                     {updatingOrderId === order.id ? '派單中...' : '派單給司機'}
                   </button>
@@ -848,19 +764,13 @@ export default function AdminConsole() {
         value={userSearch}
         onChange={(event) => setUserSearch(event.target.value)}
         placeholder="搜尋用戶名稱 / 電話 / Email / UID"
-        style={{
-          border: '1px solid #dce6dd',
-          borderRadius: 10,
-          padding: '9px 10px',
-          outline: 'none',
-          background: '#fff',
-        }}
+        className="ui-input"
       />
 
       {loadingUsers ? (
-        <div style={{ fontSize: 13, color: '#6e827c' }}>讀取用戶中...</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.users}</div>
       ) : filteredUsers.length === 0 ? (
-        <div style={{ fontSize: 13, color: '#6e827c' }}>沒有符合條件的用戶</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.users}</div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {filteredUsers.map((user) => {
@@ -870,14 +780,8 @@ export default function AdminConsole() {
             return (
               <article
                 key={user.id}
-                style={{
-                  background: '#fff',
-                  border: '1px solid #dce6dd',
-                  borderRadius: 14,
-                  padding: 12,
-                  display: 'grid',
-                  gap: 6,
-                }}
+                className="ui-card ui-clickable-surface"
+                style={{ padding: 12, display: 'grid', gap: 6 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                   <strong style={{ color: '#27483f' }}>{user.name || '未命名用戶'}</strong>
@@ -899,7 +803,8 @@ export default function AdminConsole() {
                         [user.id]: event.target.value as AdminUserRecord['role'],
                       }))
                     }
-                    style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px', background: '#fff' }}
+                    className="ui-input"
+                    style={{ minHeight: 34, width: 'auto', padding: '7px 10px' }}
                   >
                     <option value="passenger">乘客</option>
                     <option value="driver">司機</option>
@@ -913,12 +818,8 @@ export default function AdminConsole() {
                         [user.id]: event.target.value,
                       }))
                     }
-                    style={{
-                      border: '1px solid #dce6dd',
-                      borderRadius: 10,
-                      padding: '7px 10px',
-                      background: '#fff',
-                    }}
+                    className="ui-input"
+                    style={{ minHeight: 34, width: 'auto', padding: '7px 10px' }}
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="PENDING">PENDING</option>
@@ -933,83 +834,25 @@ export default function AdminConsole() {
                         [user.id]: event.target.value,
                       }))
                     }
-                    style={{
-                      width: 120,
-                      border: '1px solid #dce6dd',
-                      borderRadius: 10,
-                      padding: '7px 10px',
-                      outline: 'none',
-                    }}
+                    className="ui-input"
+                    style={{ width: 120, minHeight: 34, padding: '7px 10px' }}
                   />
                   <button
                     onClick={() => void handleSaveUser(user)}
                     disabled={savingUserId === user.id}
-                    style={{
-                      border: 0,
-                      borderRadius: 10,
-                      padding: '8px 12px',
-                      fontWeight: 700,
-                      background: savingUserId === user.id ? '#e8e8e4' : '#1f4f43',
-                      color: savingUserId === user.id ? '#8d8a80' : '#effff7',
-                      cursor: savingUserId === user.id ? 'not-allowed' : 'pointer',
-                    }}
+                    className="ui-btn ui-btn-primary"
+                    style={{ padding: '8px 12px' }}
                   >
                     {savingUserId === user.id ? '保存中...' : '保存'}
                   </button>
-                  {editingPasswordUserId === user.id ? (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value)}
-                        placeholder="驗證碼"
-                        style={{ width: 80, border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px' }}
-                      />
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="新密碼"
-                        style={{ width: 100, border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px' }}
-                      />
-                      <button
-                        onClick={() => void handleResetPassword(user)}
-                        disabled={resettingPasswordId === user.id}
-                        style={{
-                          border: 0,
-                          borderRadius: 10,
-                          padding: '7px 10px',
-                          fontWeight: 700,
-                          background: resettingPasswordId === user.id ? '#e8e8e4' : '#b35c2e',
-                          color: resettingPasswordId === user.id ? '#8d8a80' : '#fff',
-                        }}
-                      >
-                        {resettingPasswordId === user.id ? '處理中...' : '確認'}
-                      </button>
-                      <button
-                        onClick={() => { setEditingPasswordUserId(null); setResetStep(1); setOtpCode(''); setNewPassword('') }}
-                        style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px', background: '#fff' }}
-                      >
-                        取消
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => { setEditingPasswordUserId(user.id); setResetStep(1) }}
-                      disabled={!user.phone}
-                      style={{
-                        border: '1px solid #dce6dd',
-                        borderRadius: 10,
-                        padding: '8px 12px',
-                        fontWeight: 700,
-                        background: !user.phone ? '#e8e8e4' : '#fff',
-                        color: !user.phone ? '#8d8a80' : '#b35c2e',
-                        cursor: !user.phone ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      重設密碼
-                    </button>
-                  )}
+                  <button
+                    onClick={() => void handleResetPassword(user)}
+                    disabled={!user.phone || resettingPasswordId === user.id}
+                    className="ui-btn ui-btn-outline"
+                    style={{ padding: '8px 12px' }}
+                  >
+                    {resettingPasswordId === user.id ? '發送中...' : '發送重設郵件'}
+                  </button>
                 </div>
               </article>
             )
@@ -1022,14 +865,8 @@ export default function AdminConsole() {
   const renderRoutesTab = () => (
     <div style={{ display: 'grid', gap: 12 }}>
       <section
-        style={{
-          background: '#fff',
-          border: '1px solid #dce6dd',
-          borderRadius: 14,
-          padding: 12,
-          display: 'grid',
-          gap: 8,
-        }}
+        className="ui-card"
+        style={{ padding: 12, display: 'grid', gap: 8 }}
       >
         <h3 style={{ margin: 0, color: '#27483f' }}>
           {routeForm.id ? '編輯官方班次' : '新增官方班次'}
@@ -1039,26 +876,26 @@ export default function AdminConsole() {
             value={routeForm.pickup}
             onChange={(event) => setRouteForm((prev) => ({ ...prev, pickup: event.target.value }))}
             placeholder="上車地點"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <input
             value={routeForm.dropoff}
             onChange={(event) => setRouteForm((prev) => ({ ...prev, dropoff: event.target.value }))}
             placeholder="目的地"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <input
             type="datetime-local"
             value={routeForm.date}
             onChange={(event) => setRouteForm((prev) => ({ ...prev, date: event.target.value }))}
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <select
             value={routeForm.status}
             onChange={(event) =>
               setRouteForm((prev) => ({ ...prev, status: event.target.value as OfficialRouteStatus }))
             }
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           >
             {OFFICIAL_ROUTE_STATUS_OPTIONS.map((status) => (
               <option key={status} value={status}>
@@ -1070,25 +907,25 @@ export default function AdminConsole() {
             value={routeForm.pickupLat}
             onChange={(event) => setRouteForm((prev) => ({ ...prev, pickupLat: event.target.value }))}
             placeholder="上車緯度"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <input
             value={routeForm.pickupLng}
             onChange={(event) => setRouteForm((prev) => ({ ...prev, pickupLng: event.target.value }))}
             placeholder="上車經度"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <input
             value={routeForm.dropoffLat}
             onChange={(event) => setRouteForm((prev) => ({ ...prev, dropoffLat: event.target.value }))}
             placeholder="下車緯度"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <input
             value={routeForm.dropoffLng}
             onChange={(event) => setRouteForm((prev) => ({ ...prev, dropoffLng: event.target.value }))}
             placeholder="下車經度"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <input
             type="number"
@@ -1096,7 +933,7 @@ export default function AdminConsole() {
             value={routeForm.totalSeats}
             onChange={(event) => setRouteForm((prev) => ({ ...prev, totalSeats: event.target.value }))}
             placeholder="總座位"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <input
             type="number"
@@ -1106,7 +943,7 @@ export default function AdminConsole() {
               setRouteForm((prev) => ({ ...prev, pricePerSeat: event.target.value }))
             }
             placeholder="每位價格"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
           <input
             type="number"
@@ -1116,36 +953,22 @@ export default function AdminConsole() {
               setRouteForm((prev) => ({ ...prev, charterPrice: event.target.value }))
             }
             placeholder="整車價格"
-            style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+            className="ui-input"
           />
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => void handleSubmitRouteForm()}
             disabled={savingRoute}
-            style={{
-              border: 0,
-              borderRadius: 10,
-              padding: '9px 14px',
-              fontWeight: 700,
-              background: savingRoute ? '#e8e8e4' : '#1f4f43',
-              color: savingRoute ? '#8d8a80' : '#effff7',
-              cursor: savingRoute ? 'not-allowed' : 'pointer',
-            }}
+            className="ui-btn ui-btn-primary"
+            style={{ padding: '9px 14px' }}
           >
             {savingRoute ? '保存中...' : routeForm.id ? '更新班次' : '建立班次'}
           </button>
           <button
             onClick={handleResetRouteForm}
-            style={{
-              border: '1px solid #dce6dd',
-              borderRadius: 10,
-              padding: '9px 14px',
-              fontWeight: 700,
-              background: '#fff',
-              color: '#2d5449',
-              cursor: 'pointer',
-            }}
+            className="ui-btn ui-btn-outline"
+            style={{ padding: '9px 14px' }}
           >
             清空
           </button>
@@ -1153,9 +976,9 @@ export default function AdminConsole() {
       </section>
 
       {loadingRoutes ? (
-        <div style={{ fontSize: 13, color: '#6e827c' }}>讀取官方班次中...</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.routes}</div>
       ) : routes.length === 0 ? (
-        <div style={{ fontSize: 13, color: '#6e827c' }}>尚未建立官方班次</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.routes}</div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {routes.map((route) => {
@@ -1164,18 +987,12 @@ export default function AdminConsole() {
             return (
               <article
                 key={route.id}
-                style={{
-                  background: '#fff',
-                  border: '1px solid #dce6dd',
-                  borderRadius: 14,
-                  padding: 12,
-                  display: 'grid',
-                  gap: 6,
-                }}
+                className="ui-card ui-clickable-surface"
+                style={{ padding: 12, display: 'grid', gap: 6 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <strong style={{ color: '#27483f' }}>{route.id}</strong>
-                  <span style={{ border: '1px solid #d9e5dc', borderRadius: 999, padding: '2px 8px', fontSize: 11, color: '#31564b', background: '#f8fbf9' }}>
+                  <span className="ui-pill" style={{ fontSize: 11, padding: '2px 8px' }}>
                     {ROUTE_STATUS_LABELS[route.status]}
                   </span>
                 </div>
@@ -1200,7 +1017,8 @@ export default function AdminConsole() {
                         [route.id]: event.target.value as OfficialRouteStatus,
                       }))
                     }
-                    style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '7px 10px', background: '#fff' }}
+                    className="ui-input"
+                    style={{ minHeight: 34, width: 'auto', padding: '7px 10px' }}
                   >
                     {OFFICIAL_ROUTE_STATUS_OPTIONS.map((status) => (
                       <option key={status} value={status}>
@@ -1211,29 +1029,15 @@ export default function AdminConsole() {
                   <button
                     onClick={() => void handleUpdateRouteStatus(route)}
                     disabled={updatingRouteId === route.id}
-                    style={{
-                      border: 0,
-                      borderRadius: 10,
-                      padding: '8px 12px',
-                      fontWeight: 700,
-                      background: updatingRouteId === route.id ? '#e8e8e4' : '#1f4f43',
-                      color: updatingRouteId === route.id ? '#8d8a80' : '#effff7',
-                      cursor: updatingRouteId === route.id ? 'not-allowed' : 'pointer',
-                    }}
+                    className="ui-btn ui-btn-primary"
+                    style={{ padding: '8px 12px' }}
                   >
                     {updatingRouteId === route.id ? '更新中...' : '更新狀態'}
                   </button>
                   <button
                     onClick={() => handleEditRoute(route)}
-                    style={{
-                      border: '1px solid #dce6dd',
-                      borderRadius: 10,
-                      padding: '8px 12px',
-                      fontWeight: 700,
-                      background: '#fff',
-                      color: '#2d5449',
-                      cursor: 'pointer',
-                    }}
+                    className="ui-btn ui-btn-outline"
+                    style={{ padding: '8px 12px' }}
                   >
                     編輯
                   </button>
@@ -1249,19 +1053,9 @@ export default function AdminConsole() {
   const renderPricingTab = () => (
     <div style={{ display: 'grid', gap: 12 }}>
       {loadingPricing ? (
-        <div style={{ fontSize: 13, color: '#6e827c' }}>讀取定價設定中...</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.pricing}</div>
       ) : (
-        <section
-          style={{
-            background: '#fff',
-            border: '1px solid #dce6dd',
-            borderRadius: 14,
-            padding: 12,
-            display: 'grid',
-            gap: 10,
-            maxWidth: 760,
-          }}
-        >
+        <section className="ui-card" style={{ padding: 12, display: 'grid', gap: 10, maxWidth: 760 }}>
           <h3 style={{ margin: 0, color: '#27483f' }}>定價設定</h3>
           <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
@@ -1274,7 +1068,7 @@ export default function AdminConsole() {
                     activeSystem: event.target.value as PricingConfigRecord['activeSystem'],
                   }))
                 }
-                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', background: '#fff' }}
+                className="ui-input"
               >
                 <option value="distance">distance</option>
                 <option value="matrix">matrix</option>
@@ -1289,7 +1083,7 @@ export default function AdminConsole() {
                 onChange={(event) =>
                   setPricingForm((prev) => ({ ...prev, minSpend: parseNumber(event.target.value, 0) }))
                 }
-                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+                className="ui-input"
               />
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
@@ -1300,7 +1094,7 @@ export default function AdminConsole() {
                 onChange={(event) =>
                   setPricingForm((prev) => ({ ...prev, tier1Rate: parseNumber(event.target.value, 0) }))
                 }
-                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+                className="ui-input"
               />
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
@@ -1311,7 +1105,7 @@ export default function AdminConsole() {
                 onChange={(event) =>
                   setPricingForm((prev) => ({ ...prev, tier2Rate: parseNumber(event.target.value, 0) }))
                 }
-                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+                className="ui-input"
               />
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
@@ -1322,7 +1116,7 @@ export default function AdminConsole() {
                 onChange={(event) =>
                   setPricingForm((prev) => ({ ...prev, tier3Rate: parseNumber(event.target.value, 0) }))
                 }
-                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+                className="ui-input"
               />
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
@@ -1336,7 +1130,7 @@ export default function AdminConsole() {
                     midnightSurcharge: parseNumber(event.target.value, 0),
                   }))
                 }
-                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+                className="ui-input"
               />
             </label>
             <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#556f67' }}>
@@ -1351,7 +1145,7 @@ export default function AdminConsole() {
                     driverFeePercentage: parseNumber(event.target.value, 0),
                   }))
                 }
-                style={{ border: '1px solid #dce6dd', borderRadius: 10, padding: '9px 10px', outline: 'none' }}
+                className="ui-input"
               />
             </label>
           </div>
@@ -1364,15 +1158,8 @@ export default function AdminConsole() {
             <button
               onClick={() => void handleSavePricing()}
               disabled={savingPricing}
-              style={{
-                border: 0,
-                borderRadius: 10,
-                padding: '9px 14px',
-                fontWeight: 700,
-                background: savingPricing ? '#e8e8e4' : '#1f4f43',
-                color: savingPricing ? '#8d8a80' : '#effff7',
-                cursor: savingPricing ? 'not-allowed' : 'pointer',
-              }}
+              className="ui-btn ui-btn-primary"
+              style={{ padding: '9px 14px' }}
             >
               {savingPricing ? '保存中...' : '保存設定'}
             </button>
@@ -1759,14 +1546,12 @@ export default function AdminConsole() {
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={() => navigate('/home')}
+              className="ui-btn ui-btn-outline"
               style={{
-                border: '1px solid rgba(255,255,255,0.35)',
-                borderRadius: 10,
+                borderColor: 'rgba(255,255,255,0.35)',
                 background: 'rgba(255,255,255,0.1)',
                 color: '#f3fff8',
-                fontWeight: 700,
                 padding: '8px 12px',
-                cursor: 'pointer',
               }}
             >
               乘客前台
@@ -1774,14 +1559,12 @@ export default function AdminConsole() {
             <button
               onClick={() => void handleLogout()}
               disabled={loggingOut}
+              className="ui-btn ui-btn-outline"
               style={{
-                border: '1px solid rgba(255,255,255,0.35)',
-                borderRadius: 10,
+                borderColor: 'rgba(255,255,255,0.35)',
                 background: loggingOut ? 'rgba(255,255,255,0.12)' : '#ffffff',
                 color: loggingOut ? '#f3fff8' : '#27483f',
-                fontWeight: 700,
                 padding: '8px 12px',
-                cursor: loggingOut ? 'not-allowed' : 'pointer',
               }}
             >
               {loggingOut ? '登出中...' : '登出'}
@@ -1802,15 +1585,14 @@ export default function AdminConsole() {
             <button
               key={item.key}
               onClick={() => setActiveTab(item.key as AdminTab)}
+              className={`ui-btn ui-btn-tab ${activeTab === item.key ? 'active' : ''}`}
               style={{
                 border: '1px solid rgba(255,255,255,0.26)',
                 borderRadius: 999,
                 background: activeTab === item.key ? '#ffffff' : 'rgba(255,255,255,0.08)',
                 color: activeTab === item.key ? '#27483f' : '#f0fff8',
-                fontWeight: 800,
                 fontSize: 12,
                 padding: '7px 12px',
-                cursor: 'pointer',
               }}
             >
               {item.label}
@@ -1821,25 +1603,7 @@ export default function AdminConsole() {
 
       <main style={{ maxWidth: 1240, margin: '0 auto', padding: 16, display: 'grid', gap: 12 }}>
         {notice && (
-          <div
-            style={{
-              borderRadius: 10,
-              padding: '10px 12px',
-              border:
-                notice.tone === 'error'
-                  ? '1px solid #edc2bb'
-                  : notice.tone === 'ok'
-                    ? '1px solid #c3dfcf'
-                    : '1px solid #d8e2da',
-              background:
-                notice.tone === 'error'
-                  ? '#fff0ec'
-                  : notice.tone === 'ok'
-                    ? '#eff9f2'
-                    : '#f5f8f5',
-              color: notice.tone === 'error' ? '#9c3d31' : '#2c5a4f',
-            }}
-          >
+          <div className={noticeClassByTone(notice.tone)}>
             {notice.text}
           </div>
         )}

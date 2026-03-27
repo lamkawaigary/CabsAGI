@@ -576,7 +576,7 @@ export default function AdminConsole() {
 
   const renderOrdersTab = () => (
     <div style={{ display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="ui-row">
         <select
           value={orderFilter}
           onChange={(event) => setOrderFilter(event.target.value as 'all' | OrderStatus)}
@@ -617,7 +617,7 @@ export default function AdminConsole() {
             return (
               <article
                 key={order.id || `${order.passengerId}-${order.createdAt}`}
-                className="ui-card"
+                className="ui-card ui-clickable-surface"
                 style={{ padding: 12, display: 'grid', gap: 6 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -739,7 +739,7 @@ export default function AdminConsole() {
             return (
               <article
                 key={user.id}
-                className="ui-card"
+                className="ui-card ui-clickable-surface"
                 style={{ padding: 12, display: 'grid', gap: 6 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -946,7 +946,7 @@ export default function AdminConsole() {
             return (
               <article
                 key={route.id}
-                className="ui-card"
+                className="ui-card ui-clickable-surface"
                 style={{ padding: 12, display: 'grid', gap: 6 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

@@ -219,7 +219,7 @@ export default function Messages({ orders = [] }: MessagesProps) {
                   <button
                     key={conv.key}
                     onClick={() => void openConversation(conv.partnerId, conv.orderId)}
-                    className="ui-card-muted"
+                    className="ui-card-muted ui-clickable-surface"
                     style={{ textAlign: 'left', cursor: 'pointer', padding: 10 }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>

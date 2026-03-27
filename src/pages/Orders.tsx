@@ -57,7 +57,7 @@ export default function OrdersPage() {
         orders.map((order) => (
           <article
             key={order.id}
-            className="ui-card"
+            className="ui-card ui-card-interactive"
             style={{ padding: 14, display: 'grid', gap: 6 }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

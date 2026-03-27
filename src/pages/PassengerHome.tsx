@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import TencentMap from '../components/map/TencentMap'
 import {
   STATIC_LOCATIONS,
   calculatePrice,
@@ -17,6 +16,8 @@ import {
   type OfficialRouteRecord,
   type OfficialRouteStatus,
 } from '../services/orderService'
+
+const TencentMap = lazy(() => import('../components/map/TencentMap'))
 
 type QuoteView = {
   total: number
@@ -583,21 +584,38 @@ export default function PassengerHome() {
           minHeight: 'clamp(260px, 50vh, 540px)',
         }}
       >
-        <TencentMap
-          pickup={bookingMode === 'charter' ? pickup : officialPickup}
-          dropoff={bookingMode === 'charter' ? dropoff : officialDropoff}
-          routePath={
-            bookingMode === 'charter'
-              ? routeInfo?.path
-              : officialPickup && officialDropoff
-                ? [
-                    { lat: officialPickup.lat, lng: officialPickup.lng },
-                    { lat: officialDropoff.lat, lng: officialDropoff.lng },
-                  ]
-                : undefined
+        <Suspense
+          fallback={
+            <div
+              style={{
+                height: 'clamp(260px, 50vh, 540px)',
+                display: 'grid',
+                placeItems: 'center',
+                color: '#5f7770',
+                fontSize: 13,
+                background: '#f8fbf9',
+              }}
+            >
+              地圖載入中...
+            </div>
           }
-          height="clamp(260px, 50vh, 540px)"
-        />
+        >
+          <TencentMap
+            pickup={bookingMode === 'charter' ? pickup : officialPickup}
+            dropoff={bookingMode === 'charter' ? dropoff : officialDropoff}
+            routePath={
+              bookingMode === 'charter'
+                ? routeInfo?.path
+                : officialPickup && officialDropoff
+                  ? [
+                      { lat: officialPickup.lat, lng: officialPickup.lng },
+                      { lat: officialDropoff.lat, lng: officialDropoff.lng },
+                    ]
+                  : undefined
+            }
+            height="clamp(260px, 50vh, 540px)"
+          />
+        </Suspense>
       </div>
 
       {bookingMode === 'charter' ? (

@@ -1,12 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  STATIC_LOCATIONS,
   calculatePrice,
-  calculateRoute,
-  searchLocation,
+  getDistanceFromLatLonInKm,
+  STATIC_LOCATIONS,
   type LocationRecord,
-  type RouteResult,
 } from '../services/mapService'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -17,13 +15,14 @@ import {
   type OfficialRouteStatus,
 } from '../services/orderService'
 
-const TencentMap = lazy(() => import('../components/map/TencentMap'))
+const MAP_FEATURE_ENABLED = false
 
 type QuoteView = {
   total: number
   distance: string
   duration: number
   tollsTotal: number
+  routeSource: 'local-estimate'
 }
 
 type NoticeTone = 'ok' | 'error' | 'info'
@@ -111,6 +110,33 @@ const getStaticLocation = (id: string): LocationRecord | null => {
   return { ...found, source: 'local' }
 }
 
+const buildLocalQuote = (
+  pickup: LocationRecord,
+  dropoff: LocationRecord,
+): QuoteView => {
+  const distance = getDistanceFromLatLonInKm(
+    pickup.lat,
+    pickup.lng,
+    dropoff.lat,
+    dropoff.lng,
+  )
+  const roundedDistance = Math.max(1, Math.round(distance * 10) / 10)
+  const estimatedDuration = Math.max(15, Math.round((roundedDistance / 35) * 60))
+  const pricing = calculatePrice({
+    distance: roundedDistance,
+    duration: estimatedDuration,
+    tolls: [],
+    hasCrossBorder: false,
+    checkpoints: [],
+    path: [],
+    hasRealPath: false,
+  })
+  return {
+    ...pricing,
+    routeSource: 'local-estimate',
+  }
+}
+
 function LocationInput({
   label,
   accent,
@@ -194,7 +220,6 @@ export default function PassengerHome() {
   const [pickup, setPickup] = useState<LocationRecord | null>(null)
   const [dropoff, setDropoff] = useState<LocationRecord | null>(null)
   const [quote, setQuote] = useState<QuoteView | null>(null)
-  const [routeInfo, setRouteInfo] = useState<RouteResult | null>(null)
   const [calculating, setCalculating] = useState(false)
   const [placingOrder, setPlacingOrder] = useState(false)
   const [bookingDate, setBookingDate] = useState('')
@@ -251,9 +276,9 @@ export default function PassengerHome() {
   }, [quote, selectedVehicle.multiplier])
   const charterStep = useMemo(() => {
     if (!pickup || !dropoff) return 1
-    if (!quoteWithVehicle || !routeInfo) return 2
+    if (!quoteWithVehicle) return 2
     return 3
-  }, [pickup, dropoff, quoteWithVehicle, routeInfo])
+  }, [pickup, dropoff, quoteWithVehicle])
   const activePresetId = useMemo(() => {
     if (!pickup || !dropoff) return null
     return (
@@ -264,34 +289,6 @@ export default function PassengerHome() {
       )?.id || null
     )
   }, [pickup, dropoff])
-
-  const officialPickup = useMemo<LocationRecord | null>(() => {
-    if (!selectedOfficialRoute) return null
-    if (!selectedOfficialRoute.pickupLat || !selectedOfficialRoute.pickupLng) return null
-    return {
-      id: `official-${selectedOfficialRoute.id}-pickup`,
-      name: selectedOfficialRoute.pickup,
-      address: selectedOfficialRoute.pickup,
-      lat: selectedOfficialRoute.pickupLat,
-      lng: selectedOfficialRoute.pickupLng,
-      keywords: ['official'],
-      source: 'local',
-    }
-  }, [selectedOfficialRoute])
-
-  const officialDropoff = useMemo<LocationRecord | null>(() => {
-    if (!selectedOfficialRoute) return null
-    if (!selectedOfficialRoute.dropoffLat || !selectedOfficialRoute.dropoffLng) return null
-    return {
-      id: `official-${selectedOfficialRoute.id}-dropoff`,
-      name: selectedOfficialRoute.dropoff,
-      address: selectedOfficialRoute.dropoff,
-      lat: selectedOfficialRoute.dropoffLat,
-      lng: selectedOfficialRoute.dropoffLng,
-      keywords: ['official'],
-      source: 'local',
-    }
-  }, [selectedOfficialRoute])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -355,7 +352,15 @@ export default function PassengerHome() {
     }
 
     const requestId = ++requestRef.current
-    const result = await searchLocation(query)
+    const normalized = query.toLowerCase()
+    const result = STATIC_LOCATIONS.filter(
+      (location) =>
+        location.name.toLowerCase().includes(normalized) ||
+        location.address.toLowerCase().includes(normalized) ||
+        location.keywords.some((keyword) => keyword.toLowerCase().includes(normalized)),
+    )
+      .slice(0, 10)
+      .map((location) => ({ ...location, source: 'local' as const }))
     if (requestId !== requestRef.current) return
     searchCacheRef.current.set(query, result)
     setState((prev) => ({ ...prev, items: result, open: true }))
@@ -385,7 +390,6 @@ export default function PassengerHome() {
 
   const clearCharterEstimate = () => {
     setQuote(null)
-    setRouteInfo(null)
   }
 
   const applyRoutePreset = (preset: CharterRoutePreset) => {
@@ -414,9 +418,7 @@ export default function PassengerHome() {
     if (!pickup || !dropoff) return
     setCalculating(true)
     try {
-      const route = await calculateRoute(pickup, dropoff)
-      const pricing = calculatePrice(route)
-      setRouteInfo(route)
+      const pricing = buildLocalQuote(pickup, dropoff)
       setQuote(pricing)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '未知錯誤'
@@ -466,17 +468,14 @@ export default function PassengerHome() {
     setPlacingOrder(true)
 
     try {
-      let nextRoute = routeInfo
       let nextQuote = quoteWithVehicle
 
-      if (!nextRoute || !nextQuote) {
-        nextRoute = await calculateRoute(pickup, dropoff)
-        const baseQuote = calculatePrice(nextRoute)
+      if (!nextQuote) {
+        const baseQuote = buildLocalQuote(pickup, dropoff)
         nextQuote = {
           ...baseQuote,
           total: Math.round(baseQuote.total * selectedVehicle.multiplier),
         }
-        setRouteInfo(nextRoute)
         setQuote(baseQuote)
       }
 
@@ -655,38 +654,27 @@ export default function PassengerHome() {
           minHeight: 'clamp(260px, 50vh, 540px)',
         }}
       >
-        <Suspense
-          fallback={
-            <div
-              style={{
-                height: 'clamp(260px, 50vh, 540px)',
-                display: 'grid',
-                placeItems: 'center',
-                color: '#5f7770',
-                fontSize: 13,
-                background: '#f8fbf9',
-              }}
-            >
-              地圖載入中...
+        {!MAP_FEATURE_ENABLED ? (
+          <div
+            style={{
+              height: 'clamp(260px, 50vh, 540px)',
+              display: 'grid',
+              placeItems: 'center',
+              color: '#5f7770',
+              fontSize: 13,
+              background: '#f8fbf9',
+              textAlign: 'center',
+              padding: 20,
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 800, color: '#2f5449', marginBottom: 6 }}>
+                地圖模組已封存
+              </div>
+              <div>目前採用文字地址與本地估算模式，稍後可隨時恢復地圖連接。</div>
             </div>
-          }
-        >
-          <TencentMap
-            pickup={bookingMode === 'charter' ? pickup : officialPickup}
-            dropoff={bookingMode === 'charter' ? dropoff : officialDropoff}
-            routePath={
-              bookingMode === 'charter'
-                ? routeInfo?.path
-                : officialPickup && officialDropoff
-                  ? [
-                      { lat: officialPickup.lat, lng: officialPickup.lng },
-                      { lat: officialDropoff.lat, lng: officialDropoff.lng },
-                    ]
-                  : undefined
-            }
-            height="clamp(260px, 50vh, 540px)"
-          />
-        </Suspense>
+          </div>
+        ) : null}
       </div>
 
       {bookingMode === 'charter' ? (
@@ -972,7 +960,7 @@ export default function PassengerHome() {
             </button>
           </div>
 
-          {quoteWithVehicle && routeInfo && (
+          {quoteWithVehicle && (
             <div
               style={{
                 borderRadius: 12,
@@ -1001,7 +989,7 @@ export default function PassengerHome() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: '#5c7068' }}>路徑來源</span>
-                <strong>{routeInfo.hasRealPath ? 'Tencent Driving API' : 'Fallback 估算'}</strong>
+                <strong>Local 估算模式</strong>
               </div>
               <div
                 style={{

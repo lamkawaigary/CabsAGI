@@ -27,6 +27,12 @@ type QuoteView = {
 
 type NoticeTone = 'ok' | 'error' | 'info'
 
+const noticeClassByTone = (tone: NoticeTone) => {
+  if (tone === 'error') return 'ui-notice ui-notice-error'
+  if (tone === 'ok') return 'ui-notice ui-notice-ok'
+  return 'ui-notice ui-notice-info'
+}
+
 type BookingMode = 'charter' | 'official_route'
 type CharterVehicleType = 'standard' | 'luxury' | 'van'
 type CharterRoutePreset = {
@@ -158,7 +164,7 @@ function LocationInput({
 
   return (
     <div style={{ position: 'relative' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#4b665f', marginBottom: 6 }}>{label}</div>
+      <div className="ui-section-title" style={{ marginBottom: 6 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #dce6dd', background: '#fbfdfb', borderRadius: 12, padding: '12px 12px' }}>
         <span style={{ width: 11, height: 11, borderRadius: '50%', background: accent }} />
         <input
@@ -166,7 +172,8 @@ function LocationInput({
           onChange={(e) => onQueryChange(e.target.value)}
           onFocus={onOpen}
           placeholder="請輸入地點（AI建議）"
-          style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', fontSize: 14 }}
+          className="ui-input"
+          style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', minHeight: 'unset', padding: 0 }}
         />
       </div>
       {open && (
@@ -520,12 +527,10 @@ export default function PassengerHome() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 14, maxWidth: 960, margin: '0 auto' }}>
+    <div className="ui-page" style={{ gap: 14 }}>
       <div
+        className="ui-card"
         style={{
-          background: '#fff',
-          border: '1px solid #dce6dd',
-          borderRadius: 14,
           padding: 8,
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
@@ -534,29 +539,13 @@ export default function PassengerHome() {
       >
         <button
           onClick={() => setBookingMode('charter')}
-          style={{
-            border: 0,
-            borderRadius: 10,
-            padding: '10px 12px',
-            fontWeight: 800,
-            background: bookingMode === 'charter' ? '#1f4f43' : '#eef4f1',
-            color: bookingMode === 'charter' ? '#f2fff7' : '#32584d',
-            cursor: 'pointer',
-          }}
+          className={`ui-btn ui-btn-tab ${bookingMode === 'charter' ? 'active' : ''}`}
         >
           包車點對點
         </button>
         <button
           onClick={() => setBookingMode('official_route')}
-          style={{
-            border: 0,
-            borderRadius: 10,
-            padding: '10px 12px',
-            fontWeight: 800,
-            background: bookingMode === 'official_route' ? '#1f4f43' : '#eef4f1',
-            color: bookingMode === 'official_route' ? '#f2fff7' : '#32584d',
-            cursor: 'pointer',
-          }}
+          className={`ui-btn ui-btn-tab ${bookingMode === 'official_route' ? 'active' : ''}`}
         >
           官方班次
         </button>
@@ -603,41 +592,15 @@ export default function PassengerHome() {
 
       {notice && (
         <div
-          style={{
-            borderRadius: 10,
-            padding: '10px 12px',
-            border:
-              notice.tone === 'error'
-                ? '1px solid #edc2bb'
-                : notice.tone === 'ok'
-                  ? '1px solid #c3dfcf'
-                  : '1px solid #c8d7f5',
-            background:
-              notice.tone === 'error'
-                ? '#fff0ec'
-                : notice.tone === 'ok'
-                  ? '#eff9f2'
-                  : '#edf4ff',
-            color: notice.tone === 'error' ? '#9c3d31' : notice.tone === 'ok' ? '#2c5a4f' : '#2d4f7d',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 8,
-          }}
+          className={noticeClassByTone(notice.tone)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}
         >
           <span>{notice.text}</span>
           <button
             type="button"
             onClick={() => setNotice(null)}
-            style={{
-              border: 0,
-              borderRadius: 8,
-              padding: '5px 9px',
-              fontSize: 12,
-              background: 'rgba(255,255,255,0.7)',
-              color: '#3a5850',
-              cursor: 'pointer',
-            }}
+            className="ui-btn ui-btn-outline"
+            style={{ borderRadius: 8, padding: '5px 9px', fontSize: 12, background: 'rgba(255,255,255,0.7)' }}
           >
             關閉
           </button>
@@ -679,50 +642,36 @@ export default function PassengerHome() {
 
       {bookingMode === 'charter' ? (
         <div
+          className="ui-card"
           style={{
-            background: '#fff',
-            border: '1px solid #dce6dd',
-            borderRadius: 16,
             padding: 14,
             display: 'grid',
             gap: 10,
           }}
         >
           <div
+            className="ui-card-muted"
             style={{
-              borderRadius: 10,
-              background: '#f7faf8',
-              border: '1px solid #dce6dd',
               padding: 10,
               display: 'grid',
               gap: 8,
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#36534b' }}>包車選項</div>
+            <div className="ui-section-title">包車選項</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <input
                 type="date"
                 value={bookingDate}
                 onChange={(event) => setBookingDate(event.target.value)}
-                style={{
-                  border: '1px solid #dce6dd',
-                  borderRadius: 10,
-                  padding: '9px 10px',
-                  outline: 'none',
-                  fontSize: 13,
-                }}
+                className="ui-input"
+                style={{ fontSize: 13 }}
               />
               <input
                 type="time"
                 value={bookingTime}
                 onChange={(event) => setBookingTime(event.target.value)}
-                style={{
-                  border: '1px solid #dce6dd',
-                  borderRadius: 10,
-                  padding: '9px 10px',
-                  outline: 'none',
-                  fontSize: 13,
-                }}
+                className="ui-input"
+                style={{ fontSize: 13 }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -730,30 +679,16 @@ export default function PassengerHome() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button
                   onClick={() => setCharterPassengers((prev) => Math.max(1, prev - 1))}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    border: '1px solid #cfddd4',
-                    borderRadius: 8,
-                    background: '#fff',
-                    cursor: 'pointer',
-                    fontWeight: 800,
-                  }}
+                  className="ui-btn ui-btn-outline"
+                  style={{ width: 30, height: 30, borderRadius: 8, padding: 0, fontWeight: 800 }}
                 >
                   -
                 </button>
                 <strong style={{ minWidth: 28, textAlign: 'center' }}>{charterPassengers}</strong>
                 <button
                   onClick={() => setCharterPassengers((prev) => Math.min(6, prev + 1))}
-                  style={{
-                    width: 30,
-                    height: 30,
-                    border: '1px solid #cfddd4',
-                    borderRadius: 8,
-                    background: '#fff',
-                    cursor: 'pointer',
-                    fontWeight: 800,
-                  }}
+                  className="ui-btn ui-btn-outline"
+                  style={{ width: 30, height: 30, borderRadius: 8, padding: 0, fontWeight: 800 }}
                 >
                   +
                 </button>
@@ -782,10 +717,8 @@ export default function PassengerHome() {
           </div>
 
           <div
+            className="ui-card-muted"
             style={{
-              borderRadius: 10,
-              border: '1px solid #dce6dd',
-              background: '#f9fcfa',
               padding: 10,
               display: 'grid',
               gap: 8,
@@ -857,16 +790,8 @@ export default function PassengerHome() {
               type="button"
               onClick={swapStops}
               disabled={!pickup || !dropoff}
-              style={{
-                border: '1px solid #d1ded5',
-                borderRadius: 999,
-                padding: '7px 12px',
-                background: !pickup || !dropoff ? '#f0f3f1' : '#fff',
-                color: !pickup || !dropoff ? '#90a19a' : '#2f564a',
-                cursor: !pickup || !dropoff ? 'not-allowed' : 'pointer',
-                fontSize: 12,
-                fontWeight: 700,
-              }}
+              className="ui-btn ui-btn-outline"
+              style={{ borderRadius: 999, padding: '7px 12px', fontSize: 12, fontWeight: 700 }}
             >
               交換上下車地點
             </button>
@@ -903,10 +828,8 @@ export default function PassengerHome() {
 
           {(pickup || dropoff) && (
             <div
+              className="ui-card-muted"
               style={{
-                borderRadius: 10,
-                background: '#f7faf8',
-                border: '1px solid #dce6dd',
                 padding: '10px 11px',
                 display: 'grid',
                 gap: 6,
@@ -929,15 +852,13 @@ export default function PassengerHome() {
             <button
               onClick={() => void refreshQuote()}
               disabled={!bookingReady || calculating}
+              className="ui-btn ui-btn-accent"
               style={{
                 flex: 1,
-                border: 0,
-                borderRadius: 12,
                 padding: '12px 12px',
                 fontWeight: 800,
                 background: bookingReady ? '#f0bf2a' : '#e9e8e1',
                 color: bookingReady ? '#2e2a12' : '#8a8679',
-                cursor: bookingReady ? 'pointer' : 'not-allowed',
               }}
             >
               {calculating ? '計算中...' : '計算包車路線與車資'}
@@ -945,15 +866,13 @@ export default function PassengerHome() {
             <button
               onClick={() => void placeCharterOrder()}
               disabled={!bookingReady || placingOrder}
+              className="ui-btn ui-btn-primary"
               style={{
                 flex: 1,
-                border: 0,
-                borderRadius: 12,
                 padding: '12px 12px',
                 fontWeight: 800,
                 background: bookingReady ? '#1e4f43' : '#e9e8e1',
                 color: bookingReady ? '#effff7' : '#8a8679',
-                cursor: bookingReady ? 'pointer' : 'not-allowed',
               }}
             >
               {placingOrder ? '建立中...' : '確認包車'}
@@ -962,10 +881,8 @@ export default function PassengerHome() {
 
           {quoteWithVehicle && (
             <div
+              className="ui-card-muted"
               style={{
-                borderRadius: 12,
-                background: '#f5f9f6',
-                border: '1px solid #dde8df',
                 padding: 12,
                 display: 'grid',
                 gap: 6,
@@ -1008,20 +925,16 @@ export default function PassengerHome() {
         </div>
       ) : (
         <div
+          className="ui-card"
           style={{
-            background: '#fff',
-            border: '1px solid #dce6dd',
-            borderRadius: 16,
             padding: 14,
             display: 'grid',
             gap: 10,
           }}
         >
           <div
+            className="ui-card-muted"
             style={{
-              borderRadius: 10,
-              background: '#f7faf8',
-              border: '1px solid #dce6dd',
               padding: 10,
               fontSize: 12,
               color: '#41625a',
@@ -1031,22 +944,13 @@ export default function PassengerHome() {
           </div>
 
           {loadingOfficialRoutes ? (
-            <div style={{ fontSize: 13, color: '#688079' }}>讀取官方班次中...</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取官方班次中...</div>
           ) : officialError ? (
-            <div
-              style={{
-                borderRadius: 10,
-                border: '1px solid #edc2bb',
-                background: '#fff0ec',
-                padding: '10px 12px',
-                color: '#9c3d31',
-                fontSize: 13,
-              }}
-            >
+            <div className="ui-notice ui-notice-error" style={{ fontSize: 13 }}>
               官方班次讀取失敗: {officialError}
             </div>
           ) : officialRoutes.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#688079' }}>目前未有可預訂官方班次，請稍後再試。</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>目前未有可預訂官方班次，請稍後再試。</div>
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
               {officialRoutes.map((route) => {
@@ -1099,10 +1003,8 @@ export default function PassengerHome() {
 
           {selectedOfficialRoute && (
             <div
+              className="ui-card-muted"
               style={{
-                borderRadius: 12,
-                border: '1px solid #dce6dd',
-                background: '#f7faf8',
                 padding: 12,
                 display: 'grid',
                 gap: 10,
@@ -1121,14 +1023,14 @@ export default function PassengerHome() {
                   <button
                     onClick={() => setOfficialSeats((prev) => Math.max(1, prev - 1))}
                     disabled={selectedOfficialSeats <= 1}
+                    className="ui-btn ui-btn-outline"
                     style={{
                       width: 30,
                       height: 30,
-                      border: '1px solid #cfddd4',
                       borderRadius: 8,
                       background: selectedOfficialSeats <= 1 ? '#eef2ef' : '#fff',
                       color: selectedOfficialSeats <= 1 ? '#9ca9a3' : '#2e4c43',
-                      cursor: selectedOfficialSeats <= 1 ? 'not-allowed' : 'pointer',
+                      padding: 0,
                       fontWeight: 800,
                     }}
                   >
@@ -1145,10 +1047,10 @@ export default function PassengerHome() {
                       selectedOfficialAvailableSeats === 0 ||
                       selectedOfficialSeats >= selectedOfficialAvailableSeats
                     }
+                    className="ui-btn ui-btn-outline"
                     style={{
                       width: 30,
                       height: 30,
-                      border: '1px solid #cfddd4',
                       borderRadius: 8,
                       background:
                         selectedOfficialAvailableSeats === 0 ||
@@ -1160,11 +1062,7 @@ export default function PassengerHome() {
                         selectedOfficialSeats >= selectedOfficialAvailableSeats
                           ? '#9ca9a3'
                           : '#2e4c43',
-                      cursor:
-                        selectedOfficialAvailableSeats === 0 ||
-                        selectedOfficialSeats >= selectedOfficialAvailableSeats
-                          ? 'not-allowed'
-                          : 'pointer',
+                      padding: 0,
                       fontWeight: 800,
                     }}
                   >
@@ -1181,14 +1079,12 @@ export default function PassengerHome() {
               <button
                 onClick={() => void placeOfficialRouteOrder()}
                 disabled={placingOrder || selectedOfficialSeats < 1}
+                className="ui-btn ui-btn-primary"
                 style={{
-                  border: 0,
-                  borderRadius: 12,
                   padding: '12px 12px',
                   fontWeight: 800,
                   background: placingOrder || selectedOfficialSeats < 1 ? '#e9e8e1' : '#1e4f43',
                   color: placingOrder || selectedOfficialSeats < 1 ? '#8a8679' : '#effff7',
-                  cursor: placingOrder || selectedOfficialSeats < 1 ? 'not-allowed' : 'pointer',
                 }}
               >
                 {placingOrder ? '建立中...' : '確認預訂官方班次'}

@@ -11,6 +11,12 @@ import {
 
 type NoticeTone = 'ok' | 'error' | 'info'
 
+const noticeClassByTone = (tone: NoticeTone) => {
+  if (tone === 'error') return 'ui-notice ui-notice-error'
+  if (tone === 'ok') return 'ui-notice ui-notice-ok'
+  return 'ui-notice ui-notice-info'
+}
+
 export default function DriverDashboard() {
   const { currentUser } = useAuth()
   const navigate = useNavigate()
@@ -108,20 +114,12 @@ export default function DriverDashboard() {
 
   if (currentUser.role !== 'driver') {
     return (
-      <div style={{ maxWidth: 680, margin: '40px auto', background: '#fff', border: '1px solid #dce6dd', borderRadius: 14, padding: 16, display: 'grid', gap: 10 }}>
+      <div className="ui-card" style={{ maxWidth: 680, margin: '40px auto', display: 'grid', gap: 10 }}>
         <strong style={{ color: '#29473f' }}>此頁僅供司機使用</strong>
         <div style={{ fontSize: 13, color: '#5d746d' }}>目前登入身份為：{currentUser.role}</div>
         <button
           onClick={() => navigate('/home')}
-          style={{
-            border: 0,
-            borderRadius: 10,
-            padding: '10px 12px',
-            fontWeight: 700,
-            background: '#1f4f43',
-            color: '#effff7',
-            cursor: 'pointer',
-          }}
+          className="ui-btn ui-btn-primary"
         >
           返回首頁
         </button>
@@ -133,25 +131,7 @@ export default function DriverDashboard() {
     <div style={{ padding: '0 0 80px 0' }}>
       <main style={{ display: 'grid', gap: 12 }}>
         {notice && (
-          <div
-            style={{
-              borderRadius: 10,
-              padding: '10px 12px',
-              border:
-                notice.tone === 'error'
-                  ? '1px solid #edc2bb'
-                  : notice.tone === 'ok'
-                    ? '1px solid #c3dfcf'
-                    : '1px solid #d8e2da',
-              background:
-                notice.tone === 'error'
-                  ? '#fff0ec'
-                  : notice.tone === 'ok'
-                    ? '#eff9f2'
-                    : '#f5f8f5',
-              color: notice.tone === 'error' ? '#9c3d31' : '#2c5a4f',
-            }}
-          >
+          <div className={noticeClassByTone(notice.tone)}>
             {notice.text}
           </div>
         )}
@@ -159,29 +139,15 @@ export default function DriverDashboard() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => navigate('/driver')}
-            style={{
-              border: 0,
-              borderRadius: 10,
-              padding: '9px 12px',
-              fontWeight: 800,
-              background: activeTab === 'pool' ? '#1f4f43' : '#ecf2ef',
-              color: activeTab === 'pool' ? '#effff7' : '#33584d',
-              cursor: 'pointer',
-            }}
+            className={`ui-btn ui-btn-tab ${activeTab === 'pool' ? 'active' : ''}`}
+            style={{ padding: '9px 12px' }}
           >
             訂單公海
           </button>
           <button
             onClick={() => navigate('/driver/orders')}
-            style={{
-              border: 0,
-              borderRadius: 10,
-              padding: '9px 12px',
-              fontWeight: 800,
-              background: activeTab === 'mine' ? '#1f4f43' : '#ecf2ef',
-              color: activeTab === 'mine' ? '#effff7' : '#33584d',
-              cursor: 'pointer',
-            }}
+            className={`ui-btn ui-btn-tab ${activeTab === 'mine' ? 'active' : ''}`}
+            style={{ padding: '9px 12px' }}
           >
             我的行程
           </button>
@@ -189,11 +155,11 @@ export default function DriverDashboard() {
 
         {activeTab === 'pool' ? (
           loadingPool ? (
-            <div style={{ fontSize: 13, color: '#6e827c' }}>讀取接單池中...</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取接單池中...</div>
           ) : !online ? (
-            <div style={{ fontSize: 13, color: '#6e827c' }}>你已設為休息中，暫停顯示接單池。</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>你已設為休息中，暫停顯示接單池。</div>
           ) : poolOrders.length === 0 ? (
-            <div style={{ fontSize: 13, color: '#6e827c' }}>目前沒有可接訂單。</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>目前沒有可接訂單。</div>
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
               {poolOrders.map((order) => {
@@ -201,26 +167,14 @@ export default function DriverDashboard() {
                 return (
                   <article
                     key={order.id || `${order.passengerId}-${order.createdAt}`}
-                    style={{
-                      background: '#fff',
-                      border: '1px solid #dce6dd',
-                      borderRadius: 14,
-                      padding: 12,
-                      display: 'grid',
-                      gap: 6,
-                    }}
+                    className="ui-card"
+                    style={{ padding: 12, display: 'grid', gap: 6 }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                       <strong style={{ color: '#27483f' }}>{order.id}</strong>
                       <span
-                        style={{
-                          border: '1px solid #d9e5dc',
-                          borderRadius: 999,
-                          padding: '2px 8px',
-                          fontSize: 11,
-                          color: '#31564b',
-                          background: '#f8fbf9',
-                        }}
+                        className="ui-pill"
+                        style={{ fontSize: 11, padding: '2px 8px' }}
                       >
                         {orderType === 'official_route' ? '官方班次' : '包車點對點'}
                       </span>
@@ -237,19 +191,8 @@ export default function DriverDashboard() {
                     <button
                       onClick={() => void handleAcceptOrder(order)}
                       disabled={!order.id || processingOrderId === order.id}
-                      style={{
-                        justifySelf: 'start',
-                        border: 0,
-                        borderRadius: 10,
-                        padding: '8px 12px',
-                        fontWeight: 700,
-                        background:
-                          !order.id || processingOrderId === order.id ? '#e8e8e4' : '#1f4f43',
-                        color:
-                          !order.id || processingOrderId === order.id ? '#8d8a80' : '#effff7',
-                        cursor:
-                          !order.id || processingOrderId === order.id ? 'not-allowed' : 'pointer',
-                      }}
+                      className="ui-btn ui-btn-primary"
+                      style={{ justifySelf: 'start', padding: '8px 12px' }}
                     >
                       {processingOrderId === order.id ? '接單中...' : '一鍵接單'}
                     </button>
@@ -259,9 +202,9 @@ export default function DriverDashboard() {
             </div>
           )
         ) : loadingMine ? (
-          <div style={{ fontSize: 13, color: '#6e827c' }}>讀取我的行程中...</div>
+          <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取我的行程中...</div>
         ) : myOrders.length === 0 ? (
-          <div style={{ fontSize: 13, color: '#6e827c' }}>你目前沒有已接訂單。</div>
+          <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>你目前沒有已接訂單。</div>
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
             {myOrders.map((order) => {
@@ -286,26 +229,14 @@ export default function DriverDashboard() {
               return (
                 <article
                   key={order.id || `${order.passengerId}-${order.createdAt}`}
-                  style={{
-                    background: '#fff',
-                    border: '1px solid #dce6dd',
-                    borderRadius: 14,
-                    padding: 12,
-                    display: 'grid',
-                    gap: 6,
-                  }}
+                  className="ui-card"
+                  style={{ padding: 12, display: 'grid', gap: 6 }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                     <strong style={{ color: '#27483f' }}>{order.id}</strong>
                     <span
-                      style={{
-                        border: '1px solid #d9e5dc',
-                        borderRadius: 999,
-                        padding: '2px 8px',
-                        fontSize: 11,
-                        color: '#31564b',
-                        background: '#f8fbf9',
-                      }}
+                      className="ui-pill"
+                      style={{ fontSize: 11, padding: '2px 8px' }}
                     >
                       {statusLabel}
                     </span>
@@ -324,20 +255,8 @@ export default function DriverDashboard() {
                       <button
                         onClick={() => void handleAdvanceStatus(order, nextAction.status)}
                         disabled={!order.id || processingOrderId === order.id}
-                        style={{
-                          border: 0,
-                          borderRadius: 10,
-                          padding: '8px 12px',
-                          fontWeight: 700,
-                          background:
-                            !order.id || processingOrderId === order.id ? '#e8e8e4' : '#1f4f43',
-                          color:
-                            !order.id || processingOrderId === order.id ? '#8d8a80' : '#effff7',
-                          cursor:
-                            !order.id || processingOrderId === order.id
-                              ? 'not-allowed'
-                              : 'pointer',
-                        }}
+                        className="ui-btn ui-btn-primary"
+                        style={{ padding: '8px 12px' }}
                       >
                         {processingOrderId === order.id ? '處理中...' : nextAction.label}
                       </button>
@@ -346,19 +265,8 @@ export default function DriverDashboard() {
                       <button
                         onClick={() => void handleAdvanceStatus(order, 'cancelled')}
                         disabled={!order.id || processingOrderId === order.id}
-                        style={{
-                          border: '1px solid #e0d1cc',
-                          borderRadius: 10,
-                          padding: '8px 12px',
-                          fontWeight: 700,
-                          background: '#fff5f1',
-                          color: '#9f4236',
-                          cursor:
-                            !order.id || processingOrderId === order.id
-                              ? 'not-allowed'
-                              : 'pointer',
-                          opacity: !order.id || processingOrderId === order.id ? 0.6 : 1,
-                        }}
+                        className="ui-btn ui-btn-danger"
+                        style={{ padding: '8px 12px' }}
                       >
                         取消行程
                       </button>

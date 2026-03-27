@@ -8,6 +8,7 @@ import {
   subscribeDriverOrders,
   type OrderRecord,
 } from '../services/orderService'
+import { UI_TEXT } from '../constants/uiText'
 
 type NoticeTone = 'ok' | 'error' | 'info'
 
@@ -155,11 +156,11 @@ export default function DriverDashboard() {
 
         {activeTab === 'pool' ? (
           loadingPool ? (
-            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取接單池中...</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.driverPool}</div>
           ) : !online ? (
             <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>你已設為休息中，暫停顯示接單池。</div>
           ) : poolOrders.length === 0 ? (
-            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>目前沒有可接訂單。</div>
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.driverPool}</div>
           ) : (
             <div style={{ display: 'grid', gap: 10 }}>
               {poolOrders.map((order) => {
@@ -202,9 +203,9 @@ export default function DriverDashboard() {
             </div>
           )
         ) : loadingMine ? (
-          <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取我的行程中...</div>
+          <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.driverMine}</div>
         ) : myOrders.length === 0 ? (
-          <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>你目前沒有已接訂單。</div>
+          <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.driverMine}</div>
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
             {myOrders.map((order) => {

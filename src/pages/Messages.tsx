@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useMessage } from '../context/MessageContext'
 import type { OrderRecord } from '../services/orderService'
+import { UI_TEXT } from '../constants/uiText'
 
 interface MessagesProps {
   orders?: OrderRecord[]
@@ -189,12 +190,12 @@ export default function Messages({ orders = [] }: MessagesProps) {
 
       {error && (
         <div className={alertClass}>
-          Firebase 訊息讀取失敗: {error}
+          {UI_TEXT.error.readMessages}: {error}
         </div>
       )}
       {uploadError && (
         <div className={alertClass}>
-          圖片上傳失敗: {uploadError}
+          {UI_TEXT.error.uploadImage}: {uploadError}
         </div>
       )}
 
@@ -210,9 +211,9 @@ export default function Messages({ orders = [] }: MessagesProps) {
 
           <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
             {loading ? (
-              <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>載入訊息中...</div>
+              <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.messages}</div>
             ) : conversations.length === 0 ? (
-              <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>暫時無對話</div>
+              <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.messages}</div>
             ) : (
               conversations.map((conv) => {
                 return (
@@ -266,7 +267,7 @@ export default function Messages({ orders = [] }: MessagesProps) {
           <div style={{ overflow: 'auto', display: 'grid', gap: 8 }}>
             {activeMessages.length === 0 ? (
               <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>
-                尚未有訊息，開始發送第一句。
+                目前尚無訊息，開始發送第一句吧。
               </div>
             ) : (
               activeMessages.map((m) => {

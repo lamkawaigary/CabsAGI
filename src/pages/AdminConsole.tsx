@@ -21,6 +21,7 @@ import type {
   OrderRecord,
   OrderStatus,
 } from '../services/orderService'
+import { UI_TEXT } from '../constants/uiText'
 
 type NoticeTone = 'ok' | 'error' | 'info'
 type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing'
@@ -180,7 +181,7 @@ export default function AdminConsole() {
         setLoadingOrders(false)
       },
       (error) => {
-        setNotice({ text: `讀取訂單失敗: ${error.message}`, tone: 'error' })
+        setNotice({ text: `${UI_TEXT.error.readOrders}: ${error.message}`, tone: 'error' })
         setLoadingOrders(false)
       },
     )
@@ -190,7 +191,7 @@ export default function AdminConsole() {
         setLoadingUsers(false)
       },
       (error) => {
-        setNotice({ text: `讀取用戶失敗: ${error.message}`, tone: 'error' })
+        setNotice({ text: `${UI_TEXT.error.readUsers}: ${error.message}`, tone: 'error' })
         setLoadingUsers(false)
       },
     )
@@ -200,7 +201,7 @@ export default function AdminConsole() {
         setLoadingRoutes(false)
       },
       (error) => {
-        setNotice({ text: `讀取官方班次失敗: ${error.message}`, tone: 'error' })
+        setNotice({ text: `${UI_TEXT.error.readRoutes}: ${error.message}`, tone: 'error' })
         setLoadingRoutes(false)
       },
     )
@@ -211,7 +212,7 @@ export default function AdminConsole() {
         setLoadingPricing(false)
       },
       (error) => {
-        setNotice({ text: `讀取定價設定失敗: ${error.message}`, tone: 'error' })
+        setNotice({ text: `${UI_TEXT.error.readPricing}: ${error.message}`, tone: 'error' })
         setLoadingPricing(false)
       },
     )
@@ -605,9 +606,9 @@ export default function AdminConsole() {
       </div>
 
       {loadingOrders ? (
-        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取訂單中...</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.orders}</div>
       ) : filteredOrders.length === 0 ? (
-        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>沒有符合條件的訂單</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.orders}</div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {filteredOrders.map((order) => {
@@ -727,9 +728,9 @@ export default function AdminConsole() {
       />
 
       {loadingUsers ? (
-        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取用戶中...</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.users}</div>
       ) : filteredUsers.length === 0 ? (
-        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>沒有符合條件的用戶</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.users}</div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {filteredUsers.map((user) => {
@@ -935,9 +936,9 @@ export default function AdminConsole() {
       </section>
 
       {loadingRoutes ? (
-        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取官方班次中...</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.routes}</div>
       ) : routes.length === 0 ? (
-        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>尚未建立官方班次</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.empty.routes}</div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {routes.map((route) => {
@@ -1012,7 +1013,7 @@ export default function AdminConsole() {
   const renderPricingTab = () => (
     <div style={{ display: 'grid', gap: 12 }}>
       {loadingPricing ? (
-        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>讀取定價設定中...</div>
+        <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.pricing}</div>
       ) : (
         <section className="ui-card" style={{ padding: 12, display: 'grid', gap: 10, maxWidth: 760 }}>
           <h3 style={{ margin: 0, color: '#27483f' }}>定價設定</h3>

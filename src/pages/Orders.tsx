@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { usePassengerOrders } from '../hooks/usePassengerOrders'
+import { UI_TEXT } from '../constants/uiText'
 
 type NoticeTone = 'ok' | 'error' | 'info'
 
@@ -43,15 +44,15 @@ export default function OrdersPage() {
 
       {loading ? (
         <div className="ui-empty-state">
-          讀取訂單中...
+          {UI_TEXT.loading.orders}
         </div>
       ) : error ? (
         <div className="ui-empty-state ui-notice-error">
-          無法讀取 Firebase 訂單: {error}
+          {UI_TEXT.error.readOrders}: {error}
         </div>
       ) : orders.length === 0 ? (
         <div className="ui-empty-state">
-          未有與你帳號關聯的訂單記錄。
+          {UI_TEXT.empty.orders}
         </div>
       ) : (
         orders.map((order) => (

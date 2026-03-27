@@ -91,6 +91,13 @@ interface TencentDrivingResponse {
   }
 }
 
+interface OSMNominatimItem {
+  place_id: number | string
+  display_name: string
+  lat: string
+  lon: string
+}
+
 const staticSearch = (query: string): LocationRecord[] => {
   const q = normalize(query)
   if (!q) return []
@@ -107,21 +114,34 @@ const fetchOSMSuggestions = async (query: string): Promise<LocationRecord[]> => 
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&countrycodes=hk,cn`,
-      { headers: { 'Accept-Language': 'zh-HK,zh,en' } }
+      { headers: { 'Accept-Language': 'zh-HK,zh,en' } },
     )
     if (!res.ok) return []
     const data = await res.json()
     if (!Array.isArray(data)) return []
     
-    return data.map((item: any) => ({
-      id: `osm-${item.place_id}`,
-      name: item.display_name.split(',')[0] || item.display_name,
-      address: item.display_name,
-      lat: parseFloat(item.lat),
-      lng: parseFloat(item.lon),
-      keywords: [],
-      source: 'ai' as const,
-    }))
+    return data
+      .filter(
+        (item: unknown): item is OSMNominatimItem =>
+          typeof item === 'object' &&
+          item !== null &&
+          'place_id' in item &&
+          'display_name' in item &&
+          'lat' in item &&
+          'lon' in item &&
+          typeof (item as OSMNominatimItem).display_name === 'string' &&
+          typeof (item as OSMNominatimItem).lat === 'string' &&
+          typeof (item as OSMNominatimItem).lon === 'string',
+      )
+      .map((item) => ({
+        id: `osm-${item.place_id}`,
+        name: item.display_name.split(',')[0] || item.display_name,
+        address: item.display_name,
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+        keywords: [],
+        source: 'ai' as const,
+      }))
   } catch {
     return []
   }

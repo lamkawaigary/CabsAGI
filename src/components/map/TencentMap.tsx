@@ -11,17 +11,75 @@ interface TencentMapProps {
   dropoff?: Location | null
   routePath?: Array<{ lat: number; lng: number }>
   height?: string
-  onRouteCalculated?: (path: Array<{ lat: number; lng: number }>, distance: number, duration: number) => void
 }
 
+interface TMapMap {
+  fitBounds: (bounds: unknown, options?: { padding?: [number, number] }) => void
+  destroy: () => void
+}
+
+interface TMapLatLngBounds {
+  extend: (point: unknown) => void
+}
+
+interface TMapMarkerLayer {
+  setGeometries: (geometries: MarkerGeometry[]) => void
+}
+
+interface TMapPolylineLayer {
+  setGeometries: (geometries: PolylineGeometry[]) => void
+}
+
+interface MarkerGeometry {
+  id: string
+  styleId: 'pickup' | 'dropoff'
+  position: unknown
+  properties: {
+    title: string
+  }
+}
+
+interface PolylineGeometry {
+  id: 'route'
+  styleId: 'route'
+  paths: unknown[]
+}
+
+interface TMapConstructor {
+  Map: new (
+    element: HTMLDivElement,
+    options: { center: unknown; zoom: number; viewMode: '2D' | '3D' },
+  ) => TMapMap
+  LatLng: new (lat: number, lng: number) => unknown
+  LatLngBounds: new () => TMapLatLngBounds
+  MarkerStyle: new (options: Record<string, unknown>) => unknown
+  PolylineStyle: new (options: Record<string, unknown>) => unknown
+  MultiMarker: new (options: {
+    map: TMapMap
+    styles: Record<string, unknown>
+    geometries: MarkerGeometry[]
+  }) => TMapMarkerLayer
+  MultiPolyline: new (options: {
+    map: TMapMap
+    styles: Record<string, unknown>
+    geometries: PolylineGeometry[]
+  }) => TMapPolylineLayer
+}
+
+type WindowWithTMap = Window & { TMap?: TMapConstructor }
+
 const TENCENT_MAP_KEY = 'D42BZ-JZFCL-A2QPT-E2EKZ-D2WX5-VPFWY'
+const PI = Math.PI
+const EARTH_A = 6378245.0
+const EARTH_EE = Number.parseFloat('0.00669342162296594323')
+
+const getTMap = (): TMapConstructor | null => {
+  if (typeof window === 'undefined') return null
+  return (window as WindowWithTMap).TMap || null
+}
 
 // Convert WGS84 to GCJ02
 const wgs84ToGcj02 = (lng: number, lat: number) => {
-  const PI = 3.141592653589793
-  const a = 6378245.0
-  const ee = 0.00669342162296594323
-
   if ((lng < 72.004 || lng > 137.8347) || (lat < 0.8293 || lat > 55.8271)) {
     return { lat, lng }
   }
@@ -31,48 +89,23 @@ const wgs84ToGcj02 = (lng: number, lat: number) => {
 
   const radlat = lat / 180.0 * PI
   let magic = Math.sin(radlat)
-  magic = 1 - ee * magic * magic
+  magic = 1 - EARTH_EE * magic * magic
   const sqrtmagic = Math.sqrt(magic)
 
-  dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI)
-  dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * PI)
+  dlat = (dlat * 180.0) / ((EARTH_A * (1 - EARTH_EE)) / (magic * sqrtmagic) * PI)
+  dlng = (dlng * 180.0) / (EARTH_A / sqrtmagic * Math.cos(radlat) * PI)
 
   return { lat: lat + dlat, lng: lng + dlng }
 }
 
-// Convert GCJ02 to WGS84
-const gcj02ToWgs84 = (lng: number, lat: number) => {
-  const PI = 3.141592653589793
-  const a = 6378245.0
-  const ee = 0.00669342162296594323
-
-  if ((lng < 72.004 || lng > 137.8347) || (lat < 0.8293 || lat > 55.8271)) {
-    return { lat, lng }
-  }
-
-  let dlat = (lng - 105.0) * PI * 3000.0 / 180.0
-  let dlng = (lat - 35.0) * PI * 3000.0 / 180.0
-
-  const radlat = lat / 180.0 * PI
-  let magic = Math.sin(radlat)
-  magic = 1 - ee * magic * magic
-  const sqrtmagic = Math.sqrt(magic)
-
-  dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI)
-  dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * PI)
-
-  return { lat: lat - dlat, lng: lng - dlng }
-}
-
-// Load Tencent SDK with service library for routing
+// Load Tencent SDK
 const loadTencentSDK = (): Promise<boolean> => {
   if (typeof window === 'undefined') return Promise.resolve(false)
-  if ((window as any).TMap && (window as any).TMap.Map) return Promise.resolve(true)
+  if (getTMap()?.Map) return Promise.resolve(true)
 
   return new Promise((resolve) => {
     const script = document.createElement('script')
-    // IMPORTANT: Add 'service' library for driving route calculation
-    script.src = `https://map.qq.com/api/gljs?v=1.exp&key=${TENCENT_MAP_KEY}&libraries=service`
+    script.src = `https://map.qq.com/api/gljs?v=1.exp&key=${TENCENT_MAP_KEY}`
     script.async = true
     script.onload = () => resolve(true)
     script.onerror = () => resolve(false)
@@ -80,12 +113,11 @@ const loadTencentSDK = (): Promise<boolean> => {
   })
 }
 
-export default function TencentMap({ pickup, dropoff, routePath, height = '400px', onRouteCalculated }: TencentMapProps) {
+export default function TencentMap({ pickup, dropoff, routePath, height = '400px' }: TencentMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstance = useRef<any>(null)
-  const markersRef = useRef<any>(null)
-  const polylineRef = useRef<any>(null)
-  const drivingService = useRef<any>(null)
+  const mapInstance = useRef<TMapMap | null>(null)
+  const markersRef = useRef<TMapMarkerLayer | null>(null)
+  const polylineRef = useRef<TMapPolylineLayer | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -94,20 +126,18 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
       if (!mapRef.current) return
 
       const loaded = await loadTencentSDK()
-      if (!mounted || !loaded) return
+      if (!mounted || !loaded || !mapRef.current) return
 
-      const T = (window as any).TMap
-      if (!T || !mapRef.current) return
+      const T = getTMap()
+      if (!T) return
 
       try {
-        // Initialize map centered on HK
         mapInstance.current = new T.Map(mapRef.current, {
           center: new T.LatLng(22.3193, 114.1694),
           zoom: 11,
           viewMode: '2D',
         })
 
-        // Create marker layer with custom styles
         markersRef.current = new T.MultiMarker({
           map: mapInstance.current,
           styles: {
@@ -116,20 +146,17 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
               height: 40,
               anchor: { x: 15, y: 36 },
               src: 'https://mapapi.qq.com/web/lbs/javascriptGL/demo/img/markerDefault.png',
-              color: '#667eea',
             }),
             dropoff: new T.MarkerStyle({
               width: 30,
               height: 40,
               anchor: { x: 15, y: 36 },
               src: 'https://mapapi.qq.com/web/lbs/javascriptGL/demo/img/markerDefault.png',
-              color: '#f5576c',
             }),
           },
           geometries: [],
         })
 
-        // Create polyline layer for routes
         polylineRef.current = new T.MultiPolyline({
           map: mapInstance.current,
           styles: {
@@ -144,145 +171,96 @@ export default function TencentMap({ pickup, dropoff, routePath, height = '400px
           },
           geometries: [],
         })
-
-        // Initialize driving service for route calculation
-        if (T.service) {
-          drivingService.current = new T.service.Driving({
-            policy: 'REAL_TRAFFIC',
-          })
-        }
-
-      } catch (e) {
-        console.error('TencentMap init error:', e)
+      } catch (error) {
+        console.error('TencentMap init error:', error)
       }
     }
 
-    init()
+    void init()
 
     return () => {
       mounted = false
-      try {
-        if (mapInstance.current) {
+      if (mapInstance.current) {
+        try {
           mapInstance.current.destroy()
+        } catch (cleanupError) {
+          console.error('TencentMap destroy error:', cleanupError)
+        } finally {
           mapInstance.current = null
+          markersRef.current = null
+          polylineRef.current = null
         }
-      } catch (e) {}
+      }
     }
   }, [])
 
-  // Calculate real route when both pickup and dropoff are set
   useEffect(() => {
-    if (!mapInstance.current || !drivingService.current || !pickup || !dropoff) return
+    if (!mapInstance.current || !markersRef.current || !polylineRef.current) return
 
-    const T = (window as any).TMap
-
-    // Convert to GCJ02 for Tencent API
-    const startGCJ = wgs84ToGcj02(pickup.lng, pickup.lat)
-    const endGCJ = wgs84ToGcj02(dropoff.lng, dropoff.lat)
-
-    // Calculate driving route
-    drivingService.current.search({
-      from: new T.LatLng(startGCJ.lat, startGCJ.lng),
-      to: new T.LatLng(endGCJ.lat, endGCJ.lng),
-    }).then((result: any) => {
-      console.log('Route result:', result)
-      
-      if (result && result.result && result.result.routes && result.result.routes.length > 0) {
-        const route = result.result.routes[0]
-        
-        // Get the polyline path from the route - it's already LatLng objects!
-        if (route.polyline && route.polyline.length > 0) {
-          // Draw the route directly with the polyline
-          if (polylineRef.current) {
-            polylineRef.current.setGeometries([{
-              id: 'route',
-              styleId: 'route',
-              paths: [route.polyline],  // Already LatLng objects
-            }])
-          }
-
-          // Calculate distance in km
-          const distanceKm = route.distance ? (route.distance / 1000).toFixed(1) : '0'
-          const durationMins = route.duration || 0
-
-          // Notify parent about the calculated route
-          if (onRouteCalculated) {
-            // Convert polyline to WGS84 for parent
-            const wgsPath = route.polyline.map((coord: any) => {
-              const wgs = gcj02ToWgs84(coord.lng || coord[0], coord.lat || coord[1])
-              return { lat: wgs.lat, lng: wgs.lng }
-            })
-            onRouteCalculated(wgsPath, parseFloat(distanceKm), durationMins)
-          }
-
-          // Fit bounds to show entire route
-          if (mapInstance.current && route.polyline.length > 0) {
-            const bounds = new T.LatLngBounds()
-            route.polyline.forEach((p: any) => bounds.extend(p))
-            mapInstance.current.fitBounds(bounds, { padding: [50, 50] })
-          }
-        }
-      }
-    }).catch((err: any) => {
-      console.error('Route calculation error:', err)
-      // Fallback: draw straight line
-      if (pickup && dropoff && polylineRef.current) {
-        const T = (window as any).TMap
-        const startGCJ = wgs84ToGcj02(pickup.lng, pickup.lat)
-        const endGCJ = wgs84ToGcj02(dropoff.lng, dropoff.lat)
-        
-        polylineRef.current.setGeometries([{
-          id: 'route',
-          styleId: 'route',
-          paths: [[new T.LatLng(startGCJ.lat, startGCJ.lng), new T.LatLng(endGCJ.lat, endGCJ.lng)]],
-        }])
-      }
-    })
-
-  }, [pickup, dropoff, onRouteCalculated])
-
-  // Update markers when props change
-  useEffect(() => {
-    if (!mapInstance.current || !markersRef.current) return
-
-    const T = (window as any).TMap
+    const T = getTMap()
     if (!T) return
 
-    const geometries: any[] = []
+    const markerGeometries: MarkerGeometry[] = []
+    const bounds = new T.LatLngBounds()
 
-    // Add pickup marker
     if (pickup) {
       const gcj = wgs84ToGcj02(pickup.lng, pickup.lat)
-      geometries.push({
+      const position = new T.LatLng(gcj.lat, gcj.lng)
+      markerGeometries.push({
         id: 'pickup',
         styleId: 'pickup',
-        position: new T.LatLng(gcj.lat, gcj.lng),
+        position,
         properties: { title: pickup.name },
       })
+      bounds.extend(position)
     }
 
-    // Add dropoff marker
     if (dropoff) {
       const gcj = wgs84ToGcj02(dropoff.lng, dropoff.lat)
-      geometries.push({
+      const position = new T.LatLng(gcj.lat, gcj.lng)
+      markerGeometries.push({
         id: 'dropoff',
         styleId: 'dropoff',
-        position: new T.LatLng(gcj.lat, gcj.lng),
+        position,
         properties: { title: dropoff.name },
       })
+      bounds.extend(position)
     }
 
-    // Update markers
-    markersRef.current.setGeometries(geometries)
+    markersRef.current.setGeometries(markerGeometries)
 
-    // Fit bounds to show markers if no route
-    if (geometries.length > 0 && !routePath) {
-      const bounds = new T.LatLngBounds()
-      geometries.forEach(g => bounds.extend(g.position))
+    const routePoints = routePath && routePath.length >= 2
+      ? routePath
+      : pickup && dropoff
+        ? [
+            { lat: pickup.lat, lng: pickup.lng },
+            { lat: dropoff.lat, lng: dropoff.lng },
+          ]
+        : []
+
+    if (routePoints.length >= 2) {
+      const gcjPath = routePoints.map((point) => {
+        const gcj = wgs84ToGcj02(point.lng, point.lat)
+        const latLngPoint = new T.LatLng(gcj.lat, gcj.lng)
+        bounds.extend(latLngPoint)
+        return latLngPoint
+      })
+
+      polylineRef.current.setGeometries([
+        {
+          id: 'route',
+          styleId: 'route',
+          paths: [gcjPath],
+        },
+      ])
+    } else {
+      polylineRef.current.setGeometries([])
+    }
+
+    if (markerGeometries.length > 0 || routePoints.length >= 2) {
       mapInstance.current.fitBounds(bounds, { padding: [50, 50] })
     }
-
-  }, [pickup, dropoff])
+  }, [pickup, dropoff, routePath])
 
   return (
     <div

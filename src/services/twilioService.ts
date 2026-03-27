@@ -6,12 +6,12 @@ const CLIENT_BLOCK_MESSAGE =
   'Twilio client flow is disabled. Use server-side OTP verification instead.'
 
 export const TwilioService = {
-  sendOtp: async (_phoneNumber: string): Promise<boolean> => {
+  sendOtp: async (): Promise<boolean> => {
     console.error(CLIENT_BLOCK_MESSAGE)
     return false
   },
 
-  verifyOtp: async (_phoneNumber: string, _code: string): Promise<boolean> => {
+  verifyOtp: async (): Promise<boolean> => {
     console.error(CLIENT_BLOCK_MESSAGE)
     return false
   },

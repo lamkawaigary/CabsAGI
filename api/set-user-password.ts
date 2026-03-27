@@ -2,12 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { initializeApp, getApps, cert } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 
+interface ServiceAccountConfig {
+  project_id: string
+  private_key?: string
+  client_email?: string
+}
+
+interface ResetPasswordRequest {
+  uid?: unknown
+  newPassword?: unknown
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
 const serviceAccount = {
   type: 'service_account',
   project_id: process.env.FIREBASE_PROJECT_ID || 'p7s-web',
   private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
   client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  // @ts-ignore - additional fields
+  // Added for compatibility with some credentials payloads.
   universe_domain: 'googleapis.com',
 }
 
@@ -15,10 +29,10 @@ const serviceAccount = {
 if (!getApps().length) {
   try {
     initializeApp({
-      credential: cert(serviceAccount as any),
+      credential: cert(serviceAccount as ServiceAccountConfig),
     })
-  } catch (e) {
-    console.error('Firebase init error:', e)
+  } catch (error) {
+    console.error('Firebase init error:', error)
   }
 }
 
@@ -48,7 +62,7 @@ export async function POST(request: NextRequest) {
     let decodedToken
     try {
       decodedToken = await auth.verifyIdToken(idToken)
-    } catch (e) {
+    } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401, headers: corsHeaders })
     }
 
@@ -60,7 +74,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Only admins can reset passwords' }, { status: 403, headers: corsHeaders })
     }
 
-    const { uid, newPassword } = await request.json()
+    const bodyRaw: unknown = await request.json()
+    if (!isRecord(bodyRaw)) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400, headers: corsHeaders })
+    }
+    const body = bodyRaw as ResetPasswordRequest
+    const uid = typeof body.uid === 'string' ? body.uid : ''
+    const newPassword = typeof body.newPassword === 'string' ? body.newPassword : ''
 
     if (!uid || !newPassword) {
       return NextResponse.json({ error: 'UID and newPassword required' }, { status: 400, headers: corsHeaders })
@@ -73,8 +93,9 @@ export async function POST(request: NextRequest) {
     await auth.updateUser(uid, { password: newPassword })
 
     return NextResponse.json({ success: true, message: 'Password updated' }, { headers: corsHeaders })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to update password' }, { status: 500, headers: corsHeaders })
+    const message = error instanceof Error ? error.message : 'Failed to update password'
+    return NextResponse.json({ error: message }, { status: 500, headers: corsHeaders })
   }
 }

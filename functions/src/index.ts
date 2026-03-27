@@ -3,12 +3,17 @@ import * as admin from 'firebase-admin'
 
 admin.initializeApp()
 
+interface SetUserPasswordInput {
+  uid: string
+  newPassword: string
+}
+
 export const setUserPassword = functions.https.onCall({ region: 'us-central1' }, async (data, context) => {
   // Check authentication
   if (!context.auth) {
     throw new functions.https.HttpsError(
       'unauthenticated',
-      'Must be authenticated'
+      'Must be authenticated',
     )
   }
 
@@ -19,35 +24,38 @@ export const setUserPassword = functions.https.onCall({ region: 'us-central1' },
     if (customClaims.role !== 'admin') {
       throw new functions.https.HttpsError(
         'permission-denied',
-        'Only admins can reset passwords'
+        'Only admins can reset passwords',
       )
     }
   }
 
-  const { uid, newPassword } = data
+  const payload = (data ?? {}) as Partial<SetUserPasswordInput>
+  const uid = typeof payload.uid === 'string' ? payload.uid : ''
+  const newPassword = typeof payload.newPassword === 'string' ? payload.newPassword : ''
 
   if (!uid || !newPassword) {
     throw new functions.https.HttpsError(
       'invalid-argument',
-      'UID and newPassword are required'
+      'UID and newPassword are required',
     )
   }
 
   if (newPassword.length < 6) {
     throw new functions.https.HttpsError(
       'invalid-argument',
-      'Password must be at least 6 characters'
+      'Password must be at least 6 characters',
     )
   }
 
   try {
     await admin.auth().updateUser(uid, { password: newPassword })
     return { success: true, message: 'Password updated' }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error:', error)
+    const message = error instanceof Error ? error.message : 'Failed to update password'
     throw new functions.https.HttpsError(
       'internal',
-      error.message || 'Failed to update password'
+      message,
     )
   }
 })

@@ -188,10 +188,10 @@ export default function Landing() {
           <div style={{ letterSpacing: '0.18em', fontSize: 12, opacity: 0.7, fontWeight: 700 }}>CABS MOBILITY CLOUD</div>
           <h1 style={{ marginTop: 18, marginBottom: 14, fontSize: 40, lineHeight: 1.1 }}>跨境商務出行<br />身份入口</h1>
           <p style={{ margin: 0, opacity: 0.86, fontSize: 15, lineHeight: 1.7 }}>
-            沿用 P7S 核心認證流程，登入支援密碼與 OTP。可透過手機映射帳號執行重設密碼。
+            沿用 P7S 核心認證流程，登入支援密碼與 OTP。重設密碼改為發送安全郵件連結。
           </p>
           <div style={{ marginTop: 36, display: 'grid', gap: 10 }}>
-            {['密碼登入: 電郵 / 手機號 / admin 別名', 'OTP 登入: 手機驗證碼', 'Reset Password: 手機映射 email 發送重設信'].map((item) => (
+            {['密碼登入: 電郵 / 手機號 / admin 別名', 'OTP 登入: 手機驗證碼', 'Reset Password: 手機映射 email 發送重設信（安全流程）'].map((item) => (
               <div key={item} style={{ fontSize: 13, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 12, padding: '10px 12px' }}>
                 {item}
               </div>

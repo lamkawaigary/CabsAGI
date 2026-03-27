@@ -13,14 +13,14 @@ import {
   onAuthStateChanged,
   PhoneAuthProvider,
   RecaptchaVerifier,
+  sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
   signOut,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, updateDoc, getDocs, query, where, collection } from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../firebaseConfig'
-import { TwilioService } from '../services/twilioService'
 
 type UserRole = 'passenger' | 'driver' | 'admin'
 
@@ -46,7 +46,7 @@ interface AuthContextValue {
     name: string
     role?: UserRole
   }) => Promise<{ ok: boolean; message: string }>
-  resetPasswordByPhone: (regionCode: string, phone: string, newPassword?: string, otpCode?: string) => Promise<{ ok: boolean; message: string }>
+  resetPasswordByPhone: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
   logout: () => Promise<void>
 }
 
@@ -273,41 +273,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const resetPasswordByPhone: AuthContextValue['resetPasswordByPhone'] = async (regionCode, phone, newPassword?: string, otpCode?: string) => {
+  const resetPasswordByPhone: AuthContextValue['resetPasswordByPhone'] = async (regionCode, phone) => {
     if (!phone) return { ok: false, message: '請輸入手機號碼' }
+
     try {
       const fullPhone = normalizePhone(regionCode, phone)
-      
-      // If newPassword and otpCode provided, verify OTP and set new password
-      if (newPassword && otpCode) {
-        // Verify OTP
-        const valid = await TwilioService.verifyOtp(fullPhone, otpCode)
-        if (!valid) {
-          return { ok: false, message: '驗證碼錯誤' }
+      const mappedEmail = formatEmailFromPhone(fullPhone)
+
+      try {
+        await sendPasswordResetEmail(auth, mappedEmail)
+        return { ok: true, message: '如果帳號存在，已發送重設密碼郵件。' }
+      } catch (innerErr: unknown) {
+        const code = getErrorCode(innerErr)
+        if (code === 'auth/user-not-found' || code === 'auth/invalid-email') {
+          // Use generic response to reduce account-enumeration signal.
+          return { ok: true, message: '如果帳號存在，已發送重設密碼郵件。' }
         }
-        // Update password in Firestore
-        const q = query(collection(db, 'users'), where('phone', '==', fullPhone))
-        const snap = await getDocs(q)
-        if (snap.empty) {
-          return { ok: false, message: '用戶不存在' }
-        }
-        await updateDoc(snap.docs[0].ref, { password: newPassword })
-        return { ok: true, message: '密碼重設成功' }
+        return { ok: false, message: `發送重設郵件失敗: ${getErrorMessage(innerErr)}` }
       }
-      
-      // Otherwise, send OTP (Step 1)
-      // Check if user exists
-      const q = query(collection(db, 'users'), where('phone', '==', fullPhone))
-      const snap = await getDocs(q)
-      if (snap.empty) {
-        return { ok: false, message: '此手機號碼未註冊' }
-      }
-      // Send OTP via Twilio
-      const success = await TwilioService.sendOtp(fullPhone)
-      if (success) {
-        return { ok: true, message: '驗證碼已發送' }
-      }
-      return { ok: false, message: '發送驗證碼失敗' }
     } catch (err: unknown) {
       return { ok: false, message: `錯誤: ${getErrorMessage(err)}` }
     }

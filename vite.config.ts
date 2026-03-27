@@ -11,16 +11,22 @@ export default defineConfig({
           if (!id.includes('node_modules')) return undefined
 
           if (
-            id.includes('/react/') ||
-            id.includes('react-dom') ||
-            id.includes('scheduler') ||
-            id.includes('react-router-dom') ||
-            id.includes('@remix-run')
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/scheduler/') ||
+            id.includes('/node_modules/react-router-dom/') ||
+            id.includes('/node_modules/@remix-run/')
           ) {
             return 'vendor-react'
           }
-          if (id.includes('/firebase/')) return 'vendor-firebase'
-          if (id.includes('/leaflet/')) return 'vendor-map'
+          if (
+            id.includes('/node_modules/firebase/') ||
+            id.includes('/node_modules/@firebase/') ||
+            id.includes('/node_modules/idb/')
+          ) {
+            return 'vendor-firebase'
+          }
+          if (id.includes('/node_modules/leaflet/')) return 'vendor-map'
 
           return 'vendor-misc'
         },

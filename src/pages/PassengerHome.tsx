@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   STATIC_LOCATIONS,
@@ -36,6 +36,13 @@ type CharterRoutePreset = {
   pickupLocationId: string
   dropoffLocationId: string
   note: string
+}
+
+type SearchState = {
+  query: string
+  items: LocationRecord[]
+  open: boolean
+  searched: boolean
 }
 
 const CHARTER_VEHICLES: {
@@ -107,32 +114,21 @@ const getStaticLocation = (id: string): LocationRecord | null => {
 function LocationInput({
   label,
   accent,
-  value,
+  state,
+  onQueryChange,
+  onOpen,
+  onClose,
   onPick,
 }: {
   label: string
   accent: string
-  value: LocationRecord | null
+  state: SearchState
+  onQueryChange: (query: string) => void
+  onOpen: () => void
+  onClose: () => void
   onPick: (v: LocationRecord | null) => void
 }) {
-  const [query, setQuery] = useState(() => value?.name || '')
-  const [items, setItems] = useState<LocationRecord[]>([])
-  const [open, setOpen] = useState(false)
-  const [searched, setSearched] = useState(false)
-
-  const runSearch = async (q: string) => {
-    setQuery(q)
-    setSearched(true)
-    if (!q.trim()) {
-      setItems([])
-      setOpen(false)
-      onPick(null)
-      return
-    }
-    const result = await searchLocation(q)
-    setItems(result)
-    setOpen(true)
-  }
+  const { query, items, open, searched } = state
 
   return (
     <div style={{ position: 'relative' }}>
@@ -141,8 +137,8 @@ function LocationInput({
         <span style={{ width: 11, height: 11, borderRadius: '50%', background: accent }} />
         <input
           value={query}
-          onChange={(e) => void runSearch(e.target.value)}
-          onFocus={() => setOpen(items.length > 0)}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onFocus={onOpen}
           placeholder="請輸入地點（AI建議）"
           style={{ flex: 1, border: 0, outline: 'none', background: 'transparent', fontSize: 14 }}
         />
@@ -155,8 +151,8 @@ function LocationInput({
                 key={`${item.id}-${item.lat}`}
                 onClick={() => {
                   onPick(item)
-                  setQuery(item.name)
-                  setOpen(false)
+                  onQueryChange(item.name)
+                  onClose()
                 }}
                 style={{ width: '100%', textAlign: 'left', border: 0, background: 'transparent', cursor: 'pointer', padding: '10px 12px', borderBottom: '1px solid #f2f4f2' }}
               >
@@ -212,6 +208,21 @@ export default function PassengerHome() {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [officialSeats, setOfficialSeats] = useState(1)
   const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null)
+  const [pickupSearch, setPickupSearch] = useState<SearchState>({
+    query: '',
+    items: [],
+    open: false,
+    searched: false,
+  })
+  const [dropoffSearch, setDropoffSearch] = useState<SearchState>({
+    query: '',
+    items: [],
+    open: false,
+    searched: false,
+  })
+  const searchCacheRef = useRef<Map<string, LocationRecord[]>>(new Map())
+  const pickupSearchRequestIdRef = useRef(0)
+  const dropoffSearchRequestIdRef = useRef(0)
 
   const bookingReady = useMemo(() => !!pickup && !!dropoff, [pickup, dropoff])
   const selectedVehicle = useMemo(
@@ -311,6 +322,66 @@ export default function PassengerHome() {
     }, 3600)
     return () => window.clearTimeout(timeoutId)
   }, [notice])
+
+  useEffect(() => {
+    if (!pickup && pickupSearch.query) {
+      setPickupSearch((prev) => ({ ...prev, query: '' }))
+    }
+  }, [pickup, pickupSearch.query])
+
+  useEffect(() => {
+    if (!dropoff && dropoffSearch.query) {
+      setDropoffSearch((prev) => ({ ...prev, query: '' }))
+    }
+  }, [dropoff, dropoffSearch.query])
+
+  const runLocationSearch = useCallback(async (
+    rawQuery: string,
+    setState: React.Dispatch<React.SetStateAction<SearchState>>,
+    requestRef: React.MutableRefObject<number>,
+  ) => {
+    const query = rawQuery.trim()
+    if (!query) {
+      setState((prev) => ({ ...prev, items: [], open: false, searched: false }))
+      return
+    }
+
+    setState((prev) => ({ ...prev, searched: true }))
+
+    if (searchCacheRef.current.has(query)) {
+      const cached = searchCacheRef.current.get(query) || []
+      setState((prev) => ({ ...prev, items: cached, open: true }))
+      return
+    }
+
+    const requestId = ++requestRef.current
+    const result = await searchLocation(query)
+    if (requestId !== requestRef.current) return
+    searchCacheRef.current.set(query, result)
+    setState((prev) => ({ ...prev, items: result, open: true }))
+  }, [])
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void runLocationSearch(
+        pickupSearch.query,
+        setPickupSearch,
+        pickupSearchRequestIdRef,
+      )
+    }, 240)
+    return () => window.clearTimeout(timerId)
+  }, [pickupSearch.query, runLocationSearch])
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void runLocationSearch(
+        dropoffSearch.query,
+        setDropoffSearch,
+        dropoffSearchRequestIdRef,
+      )
+    }, 240)
+    return () => window.clearTimeout(timerId)
+  }, [dropoffSearch.query, runLocationSearch])
 
   const clearCharterEstimate = () => {
     setQuote(null)
@@ -765,12 +836,31 @@ export default function PassengerHome() {
           </div>
 
           <LocationInput
-            key={pickup?.id ?? 'pickup-empty'}
             label="上車地點"
             accent="#2e8b6d"
-            value={pickup}
+            state={pickupSearch}
+            onQueryChange={(query) => {
+              setPickupSearch((prev) => ({ ...prev, query }))
+              if (!query.trim()) {
+                setPickup(null)
+                clearCharterEstimate()
+              }
+            }}
+            onOpen={() => {
+              setPickupSearch((prev) => ({
+                ...prev,
+                open: prev.items.length > 0,
+              }))
+            }}
+            onClose={() => {
+              setPickupSearch((prev) => ({ ...prev, open: false }))
+            }}
             onPick={(v) => {
               setPickup(v)
+              setPickupSearch((prev) => ({
+                ...prev,
+                query: v?.name || '',
+              }))
               clearCharterEstimate()
             }}
           />
@@ -794,12 +884,31 @@ export default function PassengerHome() {
             </button>
           </div>
           <LocationInput
-            key={dropoff?.id ?? 'dropoff-empty'}
             label="目的地"
             accent="#df5f4a"
-            value={dropoff}
+            state={dropoffSearch}
+            onQueryChange={(query) => {
+              setDropoffSearch((prev) => ({ ...prev, query }))
+              if (!query.trim()) {
+                setDropoff(null)
+                clearCharterEstimate()
+              }
+            }}
+            onOpen={() => {
+              setDropoffSearch((prev) => ({
+                ...prev,
+                open: prev.items.length > 0,
+              }))
+            }}
+            onClose={() => {
+              setDropoffSearch((prev) => ({ ...prev, open: false }))
+            }}
             onPick={(v) => {
               setDropoff(v)
+              setDropoffSearch((prev) => ({
+                ...prev,
+                query: v?.name || '',
+              }))
               clearCharterEstimate()
             }}
           />

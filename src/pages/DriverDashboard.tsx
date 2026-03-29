@@ -65,7 +65,7 @@ const Icons = {
   ),
 }
 
-type Tab = 'dashboard' | 'shifts' | 'orders' | 'earnings' | 'profile'
+type Tab = 'dashboard' | 'shifts' | 'publish' | 'orders' | 'earnings' | 'profile'
 
 const DEFAULT_COMMISSION_RATE_PERCENT = 8
 
@@ -562,91 +562,6 @@ export default function DriverDashboard() {
               </div>
             )}
 
-            {canAcceptOrders && (
-              <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>🆕 提交閒置車廂路線</h2>
-                <div style={styles.idleRouteGrid}>
-                  <input
-                    value={idleRouteForm.routeName}
-                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, routeName: e.target.value }))}
-                    placeholder="路線名稱（例：灣仔 -> 深圳灣）"
-                    style={styles.idleRouteInput}
-                  />
-                  <input
-                    value={idleRouteForm.originName}
-                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, originName: e.target.value }))}
-                    placeholder="起點"
-                    style={styles.idleRouteInput}
-                  />
-                  <input
-                    value={idleRouteForm.destinationName}
-                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, destinationName: e.target.value }))}
-                    placeholder="終點"
-                    style={styles.idleRouteInput}
-                  />
-                  <input
-                    type="datetime-local"
-                    value={idleRouteForm.departureTime}
-                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, departureTime: e.target.value }))}
-                    style={styles.idleRouteInput}
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    value={idleRouteForm.totalSeats}
-                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, totalSeats: Number(e.target.value) }))}
-                    placeholder="可提供座位"
-                    style={styles.idleRouteInput}
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    value={idleRouteForm.price}
-                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, price: Number(e.target.value) }))}
-                    placeholder="每位車資（線下收款）"
-                    style={styles.idleRouteInput}
-                  />
-                  <textarea
-                    value={idleRouteForm.notes}
-                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="備註（可選）"
-                    style={styles.idleRouteTextarea}
-                  />
-                </div>
-                <button
-                  onClick={() => void handleSubmitIdleRoute()}
-                  disabled={submittingIdleRoute}
-                  style={styles.idleRouteSubmitBtn}
-                >
-                  {submittingIdleRoute ? '提交中...' : '提交路線（不扣點）'}
-                </button>
-              </div>
-            )}
-
-            {/* Stats Cards */}
-            <div style={styles.statsGrid}>
-              <div style={styles.statCard}>
-                <div style={styles.statIcon}>📅</div>
-                <div style={styles.statValue}>{todayCompleted.length}</div>
-                <div style={styles.statLabel}>今日完成</div>
-              </div>
-              <div style={styles.statCard}>
-                <div style={styles.statIcon}>💰</div>
-                <div style={styles.statValue}>${todayEarnings}</div>
-                <div style={styles.statLabel}>今日收入</div>
-              </div>
-              <div style={styles.statCard}>
-                <div style={styles.statIcon}>⭐</div>
-                <div style={styles.statValue}>{completedShifts.length}</div>
-                <div style={styles.statLabel}>總完成</div>
-              </div>
-              <div style={styles.statCard}>
-                <div style={styles.statIcon}>💵</div>
-                <div style={styles.statValue}>${totalEarnings}</div>
-                <div style={styles.statLabel}>總收入</div>
-              </div>
-            </div>
-
             {/* Hot Shifts - Have Passengers */}
             {shiftsWithPassengers.length > 0 && (
               <div style={styles.section}>
@@ -776,35 +691,7 @@ export default function DriverDashboard() {
               </div>
             )}
 
-            {/* Available Shifts Preview */}
-            {availableShifts.length > 0 && (
-              <div style={styles.section}>
-                <div style={styles.sectionHeader}>
-                  <h2 style={styles.sectionTitle}>📋 可接班次</h2>
-                  <button onClick={() => setActiveTab('shifts')} style={styles.viewAllBtn}>
-                    查看全部 →
-                  </button>
-                </div>
-                <div style={styles.shiftList}>
-                  {availableShifts.slice(0, 3).map(shift => (
-                    <div key={shift.id} style={styles.shiftCard}>
-                      <div style={styles.shiftInfo}>
-                        <div style={styles.shiftRoute}>{shift.routeName || '路線'}</div>
-                        <div style={styles.shiftTime}>
-                          <Icons.Clock /> {formatDateTime(shift.departureTime)}
-                        </div>
-                        <div style={styles.shiftSeats}>
-                          💺 {shift.availableSeats}/{shift.totalSeats} 座位
-                        </div>
-                      </div>
-                      <div style={styles.shiftPrice}>
-                        <span style={styles.priceValue}>${shift.price}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Available shifts are intentionally kept in "班次" tab only */}
           </div>
         )}
 
@@ -843,6 +730,75 @@ export default function DriverDashboard() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'publish' && (
+          <div style={styles.page}>
+            <h2 style={styles.pageTitle}>🆕 路線管理</h2>
+            {!canAcceptOrders ? (
+              <div style={styles.kycWarning}>
+                <span>⚠️ 完成 KYC 認證後先可以提交路線</span>
+              </div>
+            ) : (
+              <div style={styles.section}>
+                <div style={styles.idleRouteGrid}>
+                  <input
+                    value={idleRouteForm.routeName}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, routeName: e.target.value }))}
+                    placeholder="路線名稱（例：灣仔 -> 深圳灣）"
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    value={idleRouteForm.originName}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, originName: e.target.value }))}
+                    placeholder="起點"
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    value={idleRouteForm.destinationName}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, destinationName: e.target.value }))}
+                    placeholder="終點"
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    type="datetime-local"
+                    value={idleRouteForm.departureTime}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, departureTime: e.target.value }))}
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={idleRouteForm.totalSeats}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, totalSeats: Number(e.target.value) }))}
+                    placeholder="可提供座位"
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    value={idleRouteForm.price}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, price: Number(e.target.value) }))}
+                    placeholder="每位車資（線下收款）"
+                    style={styles.idleRouteInput}
+                  />
+                  <textarea
+                    value={idleRouteForm.notes}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="備註（可選）"
+                    style={styles.idleRouteTextarea}
+                  />
+                </div>
+                <button
+                  onClick={() => void handleSubmitIdleRoute()}
+                  disabled={submittingIdleRoute}
+                  style={styles.idleRouteSubmitBtn}
+                >
+                  {submittingIdleRoute ? '提交中...' : '提交路線（不扣點）'}
+                </button>
               </div>
             )}
           </div>
@@ -1207,6 +1163,7 @@ export default function DriverDashboard() {
         {[
           { id: 'dashboard', label: '主頁', icon: Icons.Home },
           { id: 'shifts', label: '班次', icon: Icons.List },
+          { id: 'publish', label: '路線', icon: Icons.Car },
           { id: 'orders', label: '訂單', icon: Icons.Orders },
           { id: 'earnings', label: '收入', icon: Icons.Wallet },
           { id: 'profile', label: '個人', icon: Icons.User },
@@ -1373,6 +1330,12 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#816d3d',
     borderTop: '1px dashed #e5d1a0',
     paddingTop: 6,
+  },
+  routeManageHint: {
+    margin: '0 0 10px',
+    fontSize: 13,
+    color: '#5f5f5f',
+    lineHeight: 1.5,
   },
   idleRouteGrid: {
     display: 'grid',

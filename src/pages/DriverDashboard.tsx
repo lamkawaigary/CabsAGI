@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { shiftService, bookingService } from '../services/shiftService'
+import { shiftService, bookingService, routeService } from '../services/shiftService'
 import { chatService, systemMessageService } from '../services/chatService'
 import { uploadService } from '../services/uploadService'
-import { pointsService } from '../services/pointsService'
+import { pointsConfigService, pointsService } from '../services/pointsService'
 import notificationService from '../services/notificationService'
 import PointsWallet from '../components/PointsWallet'
 import { doc, updateDoc } from 'firebase/firestore'
@@ -67,6 +67,9 @@ const Icons = {
 
 type Tab = 'dashboard' | 'shifts' | 'orders' | 'earnings' | 'profile'
 
+const DRIVER_SHIFT_JOIN_COST_POINTS = 20
+const DRIVER_IDLE_ROUTE_SUBMIT_COST_POINTS = 30
+
 const formatDateTime = (timestamp: string) => {
   const date = new Date(parseInt(timestamp))
   return date.toLocaleString('zh-HK', { 
@@ -105,6 +108,21 @@ export default function DriverDashboard() {
   const idCardBackRef = useRef<HTMLInputElement>(null)
   const driverLicenseRef = useRef<HTMLInputElement>(null)
   const vehicleLicenseRef = useRef<HTMLInputElement>(null)
+  const [driverPointsBalance, setDriverPointsBalance] = useState(0)
+  const [shiftJoinCostPoints, setShiftJoinCostPoints] = useState(DRIVER_SHIFT_JOIN_COST_POINTS)
+  const [idleRouteSubmitCostPoints, setIdleRouteSubmitCostPoints] = useState(
+    DRIVER_IDLE_ROUTE_SUBMIT_COST_POINTS,
+  )
+  const [submittingIdleRoute, setSubmittingIdleRoute] = useState(false)
+  const [idleRouteForm, setIdleRouteForm] = useState({
+    routeName: '',
+    originName: '',
+    destinationName: '',
+    departureTime: '',
+    totalSeats: 4,
+    price: 120,
+    notes: '',
+  })
 
   const canAcceptOrders = currentUser?.kycStatus === 'approved' && currentUser?.driverApproved
 
@@ -115,10 +133,19 @@ export default function DriverDashboard() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [allShifts, allBookings] = await Promise.all([
+      const [allShifts, allBookings, pointsConfig] = await Promise.all([
         shiftService.getAll(),
-        bookingService.getAll()
+        bookingService.getAll(),
+        pointsConfigService.get(),
       ])
+      const configuredJoinCost = Math.max(
+        0,
+        Math.round(pointsConfig.joinShiftCost ?? DRIVER_SHIFT_JOIN_COST_POINTS),
+      )
+      const configuredRouteCost = Math.max(
+        0,
+        Math.round(pointsConfig.publishRouteCost ?? DRIVER_IDLE_ROUTE_SUBMIT_COST_POINTS),
+      )
       
       // For driver: get shifts where driverId matches current user
       const myShifts = allShifts.filter((s: Shift) => s.driverId === currentUser?.id)
@@ -132,6 +159,13 @@ export default function DriverDashboard() {
         activeStatuses.includes(s.status) && 
         (s.driverId === currentUser?.id || s.status === 'OPEN' || s.status === 'SCHEDULED')
       ))
+
+      if (currentUser?.id) {
+        const balance = await pointsService.getBalance(currentUser.id)
+        setDriverPointsBalance(balance)
+      }
+      setShiftJoinCostPoints(configuredJoinCost)
+      setIdleRouteSubmitCostPoints(configuredRouteCost)
       
       // Use passenger bookings for driver's view, not driver's own bookings
       setBookings(driverShiftBookings)
@@ -221,6 +255,7 @@ export default function DriverDashboard() {
 
   const handleAcceptShift = async (shift: Shift) => {
     if (!canAcceptOrders) return
+    if (!currentUser?.id) return
     
     const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
     const passengerCount = shiftBookings.length
@@ -230,13 +265,33 @@ export default function DriverDashboard() {
       ? shiftBookings.map(b => `• ${b.passengerName || '乘客'}`).join('\n')
       : '暫無乘客'
     
+    const currentBalance = await pointsService.getBalance(currentUser.id)
+    if (currentBalance < shiftJoinCostPoints) {
+      alert(
+        `⚠️ 點數不足，未能參與班次。\n\n需要: ${shiftJoinCostPoints} points\n目前餘額: ${currentBalance} points\n\n請先向平台充值。`,
+      )
+      setDriverPointsBalance(currentBalance)
+      return
+    }
+
     const confirm = window.confirm(
-      `🚗 確認接單？\n\n路線: ${shift.routeName}\n時間: ${formatDateTime(shift.departureTime || shift.createdAt)}\n乘客:\n${passengerInfo}\n\n價錢: $${shift.price}/位`
+      `🚗 確認接單？\n\n路線: ${shift.routeName}\n時間: ${formatDateTime(shift.departureTime || shift.createdAt)}\n乘客:\n${passengerInfo}\n\n價錢: $${shift.price}/位\n\n參與班次將扣除 ${shiftJoinCostPoints} points（現金車資由司機與乘客線下自行交易）`
     )
     
     if (!confirm) return
     
     try {
+      const joinFeeResult = await pointsService.consumeDriverActionPoints({
+        driverId: currentUser.id,
+        action: 'JOIN_SHIFT',
+        shiftId: shift.id,
+        description: `參與班次費用：${shift.routeName || shift.id}`,
+      })
+      if (!joinFeeResult.success) {
+        alert(joinFeeResult.message || '扣除參與班次點數失敗，請稍後再試')
+        return
+      }
+
       await shiftService.update(shift.id, {
         driverId: currentUser?.id,
         driverName: currentUser?.name,
@@ -272,6 +327,101 @@ export default function DriverDashboard() {
     } catch (error) {
       console.error('Failed to accept shift:', error)
       alert('接單失敗，請稍後再試')
+    }
+  }
+
+  const handleSubmitIdleRoute = async () => {
+    if (!currentUser?.id || !currentUser?.name) return
+    if (!canAcceptOrders) {
+      alert('請先完成 KYC 並通過審批，才可提交閒置車廂路線')
+      return
+    }
+    if (
+      !idleRouteForm.routeName.trim() ||
+      !idleRouteForm.originName.trim() ||
+      !idleRouteForm.destinationName.trim() ||
+      !idleRouteForm.departureTime
+    ) {
+      alert('請完整填寫路線資料')
+      return
+    }
+
+    setSubmittingIdleRoute(true)
+    try {
+      const currentBalance = await pointsService.getBalance(currentUser.id)
+      if (currentBalance < idleRouteSubmitCostPoints) {
+        alert(
+          `⚠️ 點數不足，未能提交閒置車廂路線。\n\n需要: ${idleRouteSubmitCostPoints} points\n目前餘額: ${currentBalance} points\n\n請先向平台充值。`,
+        )
+        setDriverPointsBalance(currentBalance)
+        return
+      }
+
+      const routeId = await routeService.create({
+        name: idleRouteForm.routeName.trim(),
+        type: 'CROSS_BORDER',
+        origin: {
+          name: idleRouteForm.originName.trim(),
+          address: idleRouteForm.originName.trim(),
+          latitude: 0,
+          longitude: 0,
+          sequence: 0,
+        },
+        destination: {
+          name: idleRouteForm.destinationName.trim(),
+          address: idleRouteForm.destinationName.trim(),
+          latitude: 0,
+          longitude: 0,
+          sequence: 1,
+        },
+        stops: [],
+        price: Number(idleRouteForm.price) || 120,
+        distance: 0,
+        duration: 0,
+        status: 'ACTIVE',
+        isDriverRoute: true,
+        driverId: currentUser.id,
+        driverName: currentUser.name,
+        driverPhone: currentUser.phone || '',
+        createdAt: Date.now().toString(),
+        updatedAt: Date.now().toString(),
+      })
+
+      await shiftService.createDriverShift({
+        driverId: currentUser.id,
+        consumePoints: idleRouteSubmitCostPoints,
+        shift: {
+          routeId,
+          routeName: idleRouteForm.routeName.trim(),
+          departureTime: new Date(idleRouteForm.departureTime).getTime().toString(),
+          vehicleId: 'DRIVER_IDLE_CABIN',
+          driverId: '',
+          driverName: '',
+          driverPhone: '',
+          status: 'OPEN',
+          visibility: 'public',
+          availableSeats: Math.max(1, Number(idleRouteForm.totalSeats) || 4),
+          totalSeats: Math.max(1, Number(idleRouteForm.totalSeats) || 4),
+          price: Math.max(0, Number(idleRouteForm.price) || 120),
+          notes: idleRouteForm.notes.trim(),
+        },
+      })
+      alert(`已提交閒置車廂路線，扣除 ${idleRouteSubmitCostPoints} points`)
+      setIdleRouteForm({
+        routeName: '',
+        originName: '',
+        destinationName: '',
+        departureTime: '',
+        totalSeats: 4,
+        price: 120,
+        notes: '',
+      })
+      await loadData()
+    } catch (error) {
+      console.error('Submit idle route failed:', error)
+      alert('提交閒置車廂路線失敗，請稍後再試')
+    } finally {
+      setSubmittingIdleRoute(false)
     }
   }
 
@@ -421,6 +571,83 @@ export default function DriverDashboard() {
             {canAcceptOrders && currentUser && (
               <div style={{ marginBottom: 12 }}>
                 <PointsWallet userId={currentUser.id} userRole="driver" />
+              </div>
+            )}
+            {canAcceptOrders && (
+              <div style={styles.pointsRuleCard}>
+                <div style={styles.pointsRuleTitle}>💎 平台點數規則</div>
+                <div style={styles.pointsRuleRow}>
+                  <span>參與班次（接單）</span>
+                  <strong>{shiftJoinCostPoints} points / 次</strong>
+                </div>
+                <div style={styles.pointsRuleRow}>
+                  <span>提交閒置車廂路線</span>
+                  <strong>{idleRouteSubmitCostPoints} points / 次</strong>
+                </div>
+                <div style={styles.pointsRuleFoot}>
+                  目前餘額：{driverPointsBalance} points（乘客與司機車資為線下自行交易）
+                </div>
+              </div>
+            )}
+
+            {canAcceptOrders && (
+              <div style={styles.section}>
+                <h2 style={styles.sectionTitle}>🆕 提交閒置車廂路線</h2>
+                <div style={styles.idleRouteGrid}>
+                  <input
+                    value={idleRouteForm.routeName}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, routeName: e.target.value }))}
+                    placeholder="路線名稱（例：灣仔 -> 深圳灣）"
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    value={idleRouteForm.originName}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, originName: e.target.value }))}
+                    placeholder="起點"
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    value={idleRouteForm.destinationName}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, destinationName: e.target.value }))}
+                    placeholder="終點"
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    type="datetime-local"
+                    value={idleRouteForm.departureTime}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, departureTime: e.target.value }))}
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={idleRouteForm.totalSeats}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, totalSeats: Number(e.target.value) }))}
+                    placeholder="可提供座位"
+                    style={styles.idleRouteInput}
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    value={idleRouteForm.price}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, price: Number(e.target.value) }))}
+                    placeholder="每位車資（線下收款）"
+                    style={styles.idleRouteInput}
+                  />
+                  <textarea
+                    value={idleRouteForm.notes}
+                    onChange={(e) => setIdleRouteForm(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="備註（可選）"
+                    style={styles.idleRouteTextarea}
+                  />
+                </div>
+                <button
+                  onClick={() => void handleSubmitIdleRoute()}
+                  disabled={submittingIdleRoute}
+                  style={styles.idleRouteSubmitBtn}
+                >
+                  {submittingIdleRoute ? '提交中...' : `提交路線（扣 ${idleRouteSubmitCostPoints} points）`}
+                </button>
               </div>
             )}
 
@@ -1146,6 +1373,70 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#1e56a3',
     fontSize: 13,
     fontWeight: 600,
+    cursor: 'pointer',
+  },
+  pointsRuleCard: {
+    background: '#fff8e9',
+    border: '1px solid #f1ddb4',
+    borderRadius: 12,
+    padding: 12,
+    display: 'grid',
+    gap: 8,
+  },
+  pointsRuleTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: '#6b5319',
+  },
+  pointsRuleRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 13,
+    color: '#644f1b',
+  },
+  pointsRuleFoot: {
+    fontSize: 12,
+    color: '#816d3d',
+    borderTop: '1px dashed #e5d1a0',
+    paddingTop: 6,
+  },
+  idleRouteGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 8,
+    marginBottom: 10,
+  },
+  idleRouteInput: {
+    width: '100%',
+    border: '1px solid #d6dfd6',
+    borderRadius: 10,
+    padding: '9px 10px',
+    fontSize: 13,
+    outline: 'none',
+    background: '#fff',
+  },
+  idleRouteTextarea: {
+    gridColumn: '1 / -1',
+    width: '100%',
+    border: '1px solid #d6dfd6',
+    borderRadius: 10,
+    padding: '9px 10px',
+    fontSize: 13,
+    outline: 'none',
+    minHeight: 64,
+    resize: 'vertical',
+    background: '#fff',
+  },
+  idleRouteSubmitBtn: {
+    width: '100%',
+    border: 'none',
+    borderRadius: 10,
+    padding: '11px 12px',
+    background: '#284a41',
+    color: '#fff',
+    fontWeight: 700,
     cursor: 'pointer',
   },
   currentTripCard: {

@@ -92,6 +92,48 @@ export const shiftService = {
     return docRef.id
   },
 
+  async createDriverShift(params: {
+    shift: (Partial<Shift> & Pick<Shift, 'routeId'>)
+    driverId: string
+    consumePoints: number
+    createdBy?: string
+  }): Promise<string> {
+    const { pointsService } = await import('./pointsService')
+    const nowISO = new Date().toISOString()
+    const createdBy = params.createdBy || params.driverId
+    const pointsCost = Math.max(0, Math.round(params.consumePoints || 0))
+
+    if (!params.shift.routeId) {
+      throw new Error('routeId is required when creating driver shift')
+    }
+
+    if (pointsCost > 0) {
+      const deduction = await pointsService.deductPoints({
+        userId: params.driverId,
+        type: 'DRIVER_ROUTE_SUBMIT',
+        amount: pointsCost,
+        shiftId: undefined,
+        description: `提交閒置車廂班次（扣 ${pointsCost} 點）`,
+      })
+
+      if (!deduction) {
+        throw new Error(`點數不足，提交班次需要 ${pointsCost} 點`)
+      }
+    }
+
+    const docRef = await addDoc(collection(db, 'shifts'), {
+      ...params.shift,
+      status: params.shift.status || 'SCHEDULED',
+      visibility: params.shift.visibility || 'public',
+      pointsConsumed: pointsCost,
+      pointsDeductedAt: nowISO,
+      pointsDeductedBy: createdBy,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    return docRef.id
+  },
+
   async update(id: string, data: Partial<Shift>): Promise<void> {
     await updateDoc(doc(db, 'shifts', id), {
       ...data,

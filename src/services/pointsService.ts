@@ -17,6 +17,8 @@ import { db } from '../firebaseConfig'
 export type PointsTransactionType = 
   | 'DRIVER_TOPUP'      // 司機充值
   | 'COMMISSION'       // 佣金扣費
+  | 'DRIVER_SHIFT_JOIN' // 司機參與班次扣點
+  | 'DRIVER_ROUTE_SUBMIT' // 司機提交閒置路線扣點
   | 'PASSENGER_BONUS'  // 乘客獎勵
   | 'PASSENGER_COMPENSATION'  // 乘客賠償
   | 'DRIVER_REFUND'    // 司機退款
@@ -40,6 +42,8 @@ export interface PointsConfig {
   id: string
   commissionRate: number // 0.08 = 8%
   minDriverBalance: number // minimum balance required to complete trips
+  joinShiftCost: number // points required for a driver to join/take a shift
+  publishRouteCost: number // points required for a driver to publish idle route
   createdAt: string
   updatedAt: string
 }
@@ -47,6 +51,8 @@ export interface PointsConfig {
 // ==================== Constants ====================
 const DEFAULT_COMMISSION_RATE = 0.08 // 8%
 const DEFAULT_MIN_BALANCE = 0
+const DEFAULT_JOIN_SHIFT_COST = 20
+const DEFAULT_PUBLISH_ROUTE_COST = 30
 
 // ==================== Config Service ====================
 const CONFIG_DOC = 'systemConfig/points'
@@ -64,6 +70,8 @@ export const pointsConfigService = {
     const defaultConfig: Omit<PointsConfig, 'id'> = {
       commissionRate: DEFAULT_COMMISSION_RATE,
       minDriverBalance: DEFAULT_MIN_BALANCE,
+      joinShiftCost: DEFAULT_JOIN_SHIFT_COST,
+      publishRouteCost: DEFAULT_PUBLISH_ROUTE_COST,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
@@ -84,6 +92,12 @@ export const pointsConfigService = {
 
 // ==================== Points Service ====================
 export const pointsService = {
+  /**
+   * Get points-related runtime config
+   */
+  async getConfig(): Promise<PointsConfig> {
+    return pointsConfigService.get()
+  },
 
   /**
    * Get user's current points balance
@@ -246,6 +260,58 @@ export const pointsService = {
       success: false,
       commission,
       message: '扣費失敗'
+    }
+  },
+
+  /**
+   * Consume driver points for operational actions (non-fare settlement model)
+   */
+  async consumeDriverActionPoints(params: {
+    driverId: string
+    action: 'JOIN_SHIFT' | 'PUBLISH_IDLE_ROUTE'
+    shiftId?: string
+    description?: string
+  }): Promise<{ success: boolean; cost: number; message: string }> {
+    const { driverId, action, shiftId, description } = params
+    const config = await pointsConfigService.get()
+    const cost =
+      action === 'JOIN_SHIFT'
+        ? Math.max(0, Math.round(config.joinShiftCost || 0))
+        : Math.max(0, Math.round(config.publishRouteCost || 0))
+
+    if (cost <= 0) {
+      return { success: true, cost: 0, message: '本次操作不需扣點' }
+    }
+
+    const txType: PointsTransactionType =
+      action === 'JOIN_SHIFT' ? 'DRIVER_SHIFT_JOIN' : 'DRIVER_ROUTE_SUBMIT'
+    const txDescription =
+      description ||
+      (action === 'JOIN_SHIFT'
+        ? `參與班次扣點 (${cost} points)`
+        : `提交閒置路線扣點 (${cost} points)`)
+
+    const result = await this.deductPoints({
+      userId: driverId,
+      type: txType,
+      amount: cost,
+      shiftId,
+      description: txDescription,
+    })
+
+    if (!result) {
+      const balance = await this.getBalance(driverId)
+      return {
+        success: false,
+        cost,
+        message: `點數不足。需要 ${cost} points，目前 ${balance} points`,
+      }
+    }
+
+    return {
+      success: true,
+      cost,
+      message: `已扣除 ${cost} points`,
     }
   },
 

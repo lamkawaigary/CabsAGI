@@ -67,8 +67,7 @@ const Icons = {
 
 type Tab = 'dashboard' | 'shifts' | 'orders' | 'earnings' | 'profile'
 
-const DRIVER_SHIFT_JOIN_COST_POINTS = 20
-const DRIVER_IDLE_ROUTE_SUBMIT_COST_POINTS = 30
+const DEFAULT_COMMISSION_RATE_PERCENT = 8
 
 const formatDateTime = (timestamp: string) => {
   const date = new Date(parseInt(timestamp))
@@ -109,9 +108,8 @@ export default function DriverDashboard() {
   const driverLicenseRef = useRef<HTMLInputElement>(null)
   const vehicleLicenseRef = useRef<HTMLInputElement>(null)
   const [driverPointsBalance, setDriverPointsBalance] = useState(0)
-  const [shiftJoinCostPoints, setShiftJoinCostPoints] = useState(DRIVER_SHIFT_JOIN_COST_POINTS)
-  const [idleRouteSubmitCostPoints, setIdleRouteSubmitCostPoints] = useState(
-    DRIVER_IDLE_ROUTE_SUBMIT_COST_POINTS,
+  const [commissionRatePercent, setCommissionRatePercent] = useState(
+    DEFAULT_COMMISSION_RATE_PERCENT,
   )
   const [submittingIdleRoute, setSubmittingIdleRoute] = useState(false)
   const [idleRouteForm, setIdleRouteForm] = useState({
@@ -138,13 +136,9 @@ export default function DriverDashboard() {
         bookingService.getAll(),
         pointsConfigService.get(),
       ])
-      const configuredJoinCost = Math.max(
+      const configuredCommissionRatePercent = Math.max(
         0,
-        Math.round(pointsConfig.joinShiftCost ?? DRIVER_SHIFT_JOIN_COST_POINTS),
-      )
-      const configuredRouteCost = Math.max(
-        0,
-        Math.round(pointsConfig.publishRouteCost ?? DRIVER_IDLE_ROUTE_SUBMIT_COST_POINTS),
+        Math.round((pointsConfig.commissionRate ?? 0.08) * 100),
       )
       
       // For driver: get shifts where driverId matches current user
@@ -164,8 +158,7 @@ export default function DriverDashboard() {
         const balance = await pointsService.getBalance(currentUser.id)
         setDriverPointsBalance(balance)
       }
-      setShiftJoinCostPoints(configuredJoinCost)
-      setIdleRouteSubmitCostPoints(configuredRouteCost)
+      setCommissionRatePercent(configuredCommissionRatePercent)
       
       // Use passenger bookings for driver's view, not driver's own bookings
       setBookings(driverShiftBookings)
@@ -265,30 +258,32 @@ export default function DriverDashboard() {
       ? shiftBookings.map(b => `• ${b.passengerName || '乘客'}`).join('\n')
       : '暫無乘客'
     
+    const estimatedGrossAmount = Math.max(0, (shift.price || 0) * passengerCount)
+    const estimatedCommission = await pointsService.calculateCommission(estimatedGrossAmount)
     const currentBalance = await pointsService.getBalance(currentUser.id)
-    if (currentBalance < shiftJoinCostPoints) {
+    if (currentBalance < estimatedCommission) {
       alert(
-        `⚠️ 點數不足，未能參與班次。\n\n需要: ${shiftJoinCostPoints} points\n目前餘額: ${currentBalance} points\n\n請先向平台充值。`,
+        `⚠️ 點數不足，未能開始行程。\n\n應扣佣金: ${estimatedCommission} points（車資 ${estimatedGrossAmount} 的 ${commissionRatePercent}%）\n目前餘額: ${currentBalance} points\n\n請先向平台充值。`,
       )
       setDriverPointsBalance(currentBalance)
       return
     }
 
     const confirm = window.confirm(
-      `🚗 確認接單？\n\n路線: ${shift.routeName}\n時間: ${formatDateTime(shift.departureTime || shift.createdAt)}\n乘客:\n${passengerInfo}\n\n價錢: $${shift.price}/位\n\n參與班次將扣除 ${shiftJoinCostPoints} points（現金車資由司機與乘客線下自行交易）`
+      `🚗 確認接單並開始行程？\n\n路線: ${shift.routeName}\n時間: ${formatDateTime(shift.departureTime || shift.createdAt)}\n乘客:\n${passengerInfo}\n\n價錢: $${shift.price}/位\n預估實收: $${estimatedGrossAmount}\n平台佣金: ${commissionRatePercent}%（扣 ${estimatedCommission} points）\n\n現金車資由司機與乘客線下自行交易`
     )
     
     if (!confirm) return
     
     try {
-      const joinFeeResult = await pointsService.consumeDriverActionPoints({
+      const commissionResult = await pointsService.deductCommission({
         driverId: currentUser.id,
-        action: 'JOIN_SHIFT',
+        orderId: shift.id,
         shiftId: shift.id,
-        description: `參與班次費用：${shift.routeName || shift.id}`,
+        orderPrice: estimatedGrossAmount,
       })
-      if (!joinFeeResult.success) {
-        alert(joinFeeResult.message || '扣除參與班次點數失敗，請稍後再試')
+      if (!commissionResult.success) {
+        alert(commissionResult.message || '扣除佣金點數失敗，請稍後再試')
         return
       }
 
@@ -298,6 +293,8 @@ export default function DriverDashboard() {
         driverPhone: currentUser?.phone,
         status: 'IN_PROGRESS'
       })
+      const refreshedBalance = await pointsService.getBalance(currentUser.id)
+      setDriverPointsBalance(refreshedBalance)
       
       // Notify passengers
       for (const booking of shiftBookings) {
@@ -323,7 +320,9 @@ export default function DriverDashboard() {
         { type: 'order_accepted', shiftId: shift.id }
       )
       
-      alert(`已接單！\n\n路線: ${shift.routeName}\n乘客: ${passengerCount}人`)
+      alert(
+        `已接單並開始行程！\n\n路線: ${shift.routeName}\n乘客: ${passengerCount}人\n已扣佣金: ${commissionResult.commission} points`,
+      )
     } catch (error) {
       console.error('Failed to accept shift:', error)
       alert('接單失敗，請稍後再試')
@@ -348,15 +347,6 @@ export default function DriverDashboard() {
 
     setSubmittingIdleRoute(true)
     try {
-      const currentBalance = await pointsService.getBalance(currentUser.id)
-      if (currentBalance < idleRouteSubmitCostPoints) {
-        alert(
-          `⚠️ 點數不足，未能提交閒置車廂路線。\n\n需要: ${idleRouteSubmitCostPoints} points\n目前餘額: ${currentBalance} points\n\n請先向平台充值。`,
-        )
-        setDriverPointsBalance(currentBalance)
-        return
-      }
-
       const routeId = await routeService.create({
         name: idleRouteForm.routeName.trim(),
         type: 'CROSS_BORDER',
@@ -389,7 +379,6 @@ export default function DriverDashboard() {
 
       await shiftService.createDriverShift({
         driverId: currentUser.id,
-        consumePoints: idleRouteSubmitCostPoints,
         shift: {
           routeId,
           routeName: idleRouteForm.routeName.trim(),
@@ -406,7 +395,7 @@ export default function DriverDashboard() {
           notes: idleRouteForm.notes.trim(),
         },
       })
-      alert(`已提交閒置車廂路線，扣除 ${idleRouteSubmitCostPoints} points`)
+      alert('已提交閒置車廂路線')
       setIdleRouteForm({
         routeName: '',
         originName: '',
@@ -427,45 +416,8 @@ export default function DriverDashboard() {
 
   const handleCompleteShift = async (shift: Shift) => {
     try {
-      // Calculate commission
       const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
       const passengerCount = shiftBookings.length
-      const orderPrice = shift.price * passengerCount
-      const commission = await pointsService.calculateCommission(orderPrice)
-      
-      // Check if driver has enough points
-      if (currentUser) {
-        const balance = await pointsService.getBalance(currentUser.id)
-        
-        // Low balance warning notification
-        if (balance < commission * 2) {
-          notificationService.driver.lowBalance(commission)
-        }
-        
-        if (balance < commission) {
-          const confirm = window.confirm(
-            `⚠️ 餘額不足！\n\n需要: ${commission} points\n目前餘額: ${balance} points\n\n差額: ${commission - balance} points\n\n請聯繫平台充值後再完成行程。`
-          )
-          if (!confirm) return
-        }
-        
-        // Deduct commission
-        const result = await pointsService.deductCommission({
-          driverId: currentUser.id,
-          orderId: shift.id,
-          shiftId: shift.id,
-          orderPrice
-        })
-        
-        if (!result.success) {
-          alert(`扣費失敗: ${result.message}`)
-          return
-        }
-        
-        // Success notification
-        const newBalance = balance - commission
-        notificationService.driver.commissionDeducted(commission, newBalance)
-      }
       
       // Update shift status
       await shiftService.update(shift.id, { status: 'COMPLETED' })
@@ -483,7 +435,7 @@ export default function DriverDashboard() {
       
       // Show success dialog
       window.confirm(
-        `✅ 行程已完成！\n\n路線: ${shift.routeName}\n乘客: ${passengerCount}人\n佣金: ${commission} points`
+        `✅ 行程已完成！\n\n路線: ${shift.routeName}\n乘客: ${passengerCount}人`
       )
     } catch (error) {
       console.error('Failed to complete shift:', error)
@@ -577,15 +529,11 @@ export default function DriverDashboard() {
               <div style={styles.pointsRuleCard}>
                 <div style={styles.pointsRuleTitle}>💎 平台點數規則</div>
                 <div style={styles.pointsRuleRow}>
-                  <span>參與班次（接單）</span>
-                  <strong>{shiftJoinCostPoints} points / 次</strong>
-                </div>
-                <div style={styles.pointsRuleRow}>
-                  <span>提交閒置車廂路線</span>
-                  <strong>{idleRouteSubmitCostPoints} points / 次</strong>
+                  <span>平台佣金比例</span>
+                  <strong>{commissionRatePercent}%（行程開始即扣除）</strong>
                 </div>
                 <div style={styles.pointsRuleFoot}>
-                  目前餘額：{driverPointsBalance} points（乘客與司機車資為線下自行交易）
+                  目前餘額：{driverPointsBalance} points（乘客與司機車資為線下自行交易，完成行程不再重複扣費）
                 </div>
               </div>
             )}
@@ -646,7 +594,7 @@ export default function DriverDashboard() {
                   disabled={submittingIdleRoute}
                   style={styles.idleRouteSubmitBtn}
                 >
-                  {submittingIdleRoute ? '提交中...' : `提交路線（扣 ${idleRouteSubmitCostPoints} points）`}
+                  {submittingIdleRoute ? '提交中...' : '提交路線（不扣點）'}
                 </button>
               </div>
             )}

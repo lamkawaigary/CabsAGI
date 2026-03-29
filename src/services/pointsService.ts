@@ -229,6 +229,13 @@ export const pointsService = {
     const { driverId, orderId, shiftId, orderPrice } = params
     
     const commission = await this.calculateCommission(orderPrice)
+    if (commission <= 0) {
+      return {
+        success: true,
+        commission: 0,
+        message: '本次行程不需扣費',
+      }
+    }
     const currentBalance = await this.getBalance(driverId)
     
     if (currentBalance < commission) {
@@ -245,7 +252,7 @@ export const pointsService = {
       amount: commission,
       orderId,
       shiftId,
-      description: `訂單 ${orderId} 佣金 (8%)`
+      description: `訂單 ${orderId} 佣金 (${Math.round((await pointsConfigService.get()).commissionRate * 100)}%)`
     })
     
     if (result) {

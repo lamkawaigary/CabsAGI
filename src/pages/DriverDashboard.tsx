@@ -259,18 +259,32 @@ export default function DriverDashboard() {
       : '暫無乘客'
     
     const estimatedGrossAmount = Math.max(0, (shift.price || 0) * passengerCount)
-    const estimatedCommission = await pointsService.calculateCommission(estimatedGrossAmount)
+    const collectedAmountInput = window.prompt(
+      `請輸入本次實收車資（用作扣點基礎金額）\n\n路線: ${shift.routeName}\n乘客: ${passengerCount} 人`,
+      `${estimatedGrossAmount}`,
+    )
+    if (collectedAmountInput === null) return
+
+    const normalizedCollected = collectedAmountInput.replace(/,/g, '').trim()
+    const actualGrossAmount = Number(normalizedCollected)
+    if (!Number.isFinite(actualGrossAmount) || actualGrossAmount < 0) {
+      alert('實收金額格式不正確，請輸入大於或等於 0 的數字')
+      return
+    }
+
+    const roundedGrossAmount = Math.round(actualGrossAmount * 100) / 100
+    const estimatedCommission = await pointsService.calculateCommission(roundedGrossAmount)
     const currentBalance = await pointsService.getBalance(currentUser.id)
     if (currentBalance < estimatedCommission) {
       alert(
-        `⚠️ 點數不足，未能開始行程。\n\n應扣佣金: ${estimatedCommission} points（車資 ${estimatedGrossAmount} 的 ${commissionRatePercent}%）\n目前餘額: ${currentBalance} points\n\n請先向平台充值。`,
+        `⚠️ 點數不足，未能開始行程。\n\n應扣佣金: ${estimatedCommission} points（車資 ${roundedGrossAmount} 的 ${commissionRatePercent}%）\n目前餘額: ${currentBalance} points\n\n請先向平台充值。`,
       )
       setDriverPointsBalance(currentBalance)
       return
     }
 
     const confirm = window.confirm(
-      `🚗 確認接單並開始行程？\n\n路線: ${shift.routeName}\n時間: ${formatDateTime(shift.departureTime || shift.createdAt)}\n乘客:\n${passengerInfo}\n\n價錢: $${shift.price}/位\n預估實收: $${estimatedGrossAmount}\n平台佣金: ${commissionRatePercent}%（扣 ${estimatedCommission} points）\n\n現金車資由司機與乘客線下自行交易`
+      `🚗 確認接單並開始行程？\n\n路線: ${shift.routeName}\n時間: ${formatDateTime(shift.departureTime || shift.createdAt)}\n乘客:\n${passengerInfo}\n\n價錢: $${shift.price}/位\n本次實收: $${roundedGrossAmount}\n平台佣金: ${commissionRatePercent}%（扣 ${estimatedCommission} points）\n\n現金車資由司機與乘客線下自行交易`
     )
     
     if (!confirm) return
@@ -280,7 +294,7 @@ export default function DriverDashboard() {
         driverId: currentUser.id,
         orderId: shift.id,
         shiftId: shift.id,
-        orderPrice: estimatedGrossAmount,
+        orderPrice: roundedGrossAmount,
       })
       if (!commissionResult.success) {
         alert(commissionResult.message || '扣除佣金點數失敗，請稍後再試')
@@ -291,7 +305,11 @@ export default function DriverDashboard() {
         driverId: currentUser?.id,
         driverName: currentUser?.name,
         driverPhone: currentUser?.phone,
-        status: 'IN_PROGRESS'
+        status: 'IN_PROGRESS',
+        commissionBaseAmount: roundedGrossAmount,
+        commissionPointsDeducted: commissionResult.commission,
+        commissionRatePercentAtStart: commissionRatePercent,
+        commissionDeductedAt: new Date().toISOString(),
       })
       const refreshedBalance = await pointsService.getBalance(currentUser.id)
       setDriverPointsBalance(refreshedBalance)
@@ -321,7 +339,7 @@ export default function DriverDashboard() {
       )
       
       alert(
-        `已接單並開始行程！\n\n路線: ${shift.routeName}\n乘客: ${passengerCount}人\n已扣佣金: ${commissionResult.commission} points`,
+        `已接單並開始行程！\n\n路線: ${shift.routeName}\n乘客: ${passengerCount}人\n實收車資: $${roundedGrossAmount}\n已扣佣金: ${commissionResult.commission} points`,
       )
     } catch (error) {
       console.error('Failed to accept shift:', error)
@@ -533,7 +551,7 @@ export default function DriverDashboard() {
                   <strong>{commissionRatePercent}%（行程開始即扣除）</strong>
                 </div>
                 <div style={styles.pointsRuleFoot}>
-                  目前餘額：{driverPointsBalance} points（乘客與司機車資為線下自行交易，完成行程不再重複扣費）
+                  目前餘額：{driverPointsBalance} points（司機接單時輸入本次實收車資作扣點基礎，完成行程不再重複扣費）
                 </div>
               </div>
             )}

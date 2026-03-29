@@ -58,6 +58,14 @@ export interface Shift {
   availableSeats: number
   totalSeats: number
   price: number
+  // The amount entered by driver when accepting the shift (offline cash settlement baseline)
+  commissionBaseAmount?: number
+  // Commission points deducted when shift starts
+  commissionPointsDeducted?: number
+  // Commission rate snapshot at shift start (e.g. 8 for 8%)
+  commissionRatePercentAtStart?: number
+  // Timestamp when commission was deducted at shift start
+  commissionDeductedAt?: string
   notes?: string
   createdAt: string
   updatedAt: string

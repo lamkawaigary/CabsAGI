@@ -402,11 +402,12 @@ export default function DriverDashboard() {
           routeName: idleRouteForm.routeName.trim(),
           departureTime: new Date(idleRouteForm.departureTime).getTime().toString(),
           vehicleId: 'DRIVER_IDLE_CABIN',
-          driverId: '',
-          driverName: '',
-          driverPhone: '',
-          status: 'OPEN',
+          driverId: currentUser.id,
+          driverName: currentUser.name,
+          driverPhone: currentUser.phone || '',
+          status: 'IN_PROGRESS',
           visibility: 'public',
+          isDriverRoute: true,
           availableSeats: Math.max(1, Number(idleRouteForm.totalSeats) || 4),
           totalSeats: Math.max(1, Number(idleRouteForm.totalSeats) || 4),
           price: Math.max(0, Number(idleRouteForm.price) || 120),
@@ -489,7 +490,12 @@ export default function DriverDashboard() {
   const totalEarnings = completedShifts.reduce((sum, s) => sum + (s.price || 0) * (s.totalSeats - s.availableSeats), 0)
   const todayEarnings = todayCompleted.reduce((sum, s) => sum + (s.price || 0) * (s.totalSeats - s.availableSeats), 0)
 
-  const availableShifts = shifts.filter(s => (s.status === 'OPEN' || s.status === 'SCHEDULED') && !s.driverId)
+  const availableShifts = shifts.filter(
+    s =>
+      (s.status === 'OPEN' || s.status === 'SCHEDULED') &&
+      !s.driverId &&
+      !s.isDriverRoute,
+  )
   
   // 已有乘客既班次 - 顯示需求高既班次俾司機鼓勵接單
   const shiftsWithPassengers = availableShifts

@@ -53,6 +53,8 @@ export interface Shift {
   driverId?: string
   driverName?: string
   driverPhone?: string
+  // Driver-created shift marker, used to hide private self-published shifts from public pool
+  isDriverRoute?: boolean
   status: ShiftStatus
   visibility: 'public' | 'drivers_only' | 'hidden' // Who can see this shift
   availableSeats: number

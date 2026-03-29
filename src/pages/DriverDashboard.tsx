@@ -112,6 +112,8 @@ export default function DriverDashboard() {
     DEFAULT_COMMISSION_RATE_PERCENT,
   )
   const [submittingIdleRoute, setSubmittingIdleRoute] = useState(false)
+  const [hotShiftsExpanded, setHotShiftsExpanded] = useState(true)
+  const [activeTripsExpanded, setActiveTripsExpanded] = useState(true)
   const [idleRouteForm, setIdleRouteForm] = useState({
     routeName: '',
     originName: '',
@@ -569,53 +571,68 @@ export default function DriverDashboard() {
                   <h2 style={styles.sectionTitle}>
                     🔥 搶手班次 <span style={{ fontSize: 12, color: '#c62828', fontWeight: 600 }}>已有乘客</span>
                   </h2>
-                  <button onClick={() => setActiveTab('shifts')} style={styles.viewAllBtn}>
-                    搶單 →
-                  </button>
-                </div>
-                <div style={styles.shiftList}>
-                  {shiftsWithPassengers.slice(0, 3).map(shift => (
-                    <div key={shift.id} style={{ ...styles.shiftCard, borderLeft: '4px solid #4caf50' }}>
-                      <div style={styles.shiftInfo}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <span style={styles.shiftRoute}>{shift.routeName || '路線'}</span>
-                          <span style={{ background: '#4caf50', color: '#fff', padding: '2px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700 }}>
-                            {shift.passengerCount} 位乘客
-                          </span>
-                        </div>
-                        <div style={styles.shiftTime}>
-                          <Icons.Clock /> {formatDateTime(shift.departureTime)}
-                        </div>
-                        <div style={styles.shiftSeats}>
-                          💺 剩餘 {shift.availableSeats} 位 / 共 {shift.totalSeats} 位
-                        </div>
-                      </div>
-                      <div style={styles.shiftPrice}>
-                        <span style={styles.priceValue}>${shift.price}</span>
-                        <button 
-                          onClick={() => handleAcceptShift(shift)}
-                          style={{ 
-                            marginTop: 8, 
-                            padding: '8px 16px', 
-                            background: '#4caf50', 
-                            color: '#fff', 
-                            border: 'none', 
-                            borderRadius: 8, 
-                            fontSize: 13, 
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          立即搶單
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {shiftsWithPassengers.length > 3 && (
-                  <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: '#666' }}>
-                    仲有 {shiftsWithPassengers.length - 3} 個班次有乘客等緊你 →
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      onClick={() => setHotShiftsExpanded(prev => !prev)}
+                      style={styles.sectionToggleBtn}
+                      aria-expanded={hotShiftsExpanded}
+                    >
+                      {hotShiftsExpanded ? '收起' : '展開'}
+                    </button>
+                    <button onClick={() => setActiveTab('shifts')} style={styles.viewAllBtn}>
+                      搶單 →
+                    </button>
                   </div>
+                </div>
+                {hotShiftsExpanded ? (
+                  <>
+                    <div style={styles.shiftList}>
+                      {shiftsWithPassengers.slice(0, 3).map(shift => (
+                        <div key={shift.id} style={{ ...styles.shiftCard, borderLeft: '4px solid #4caf50' }}>
+                          <div style={styles.shiftInfo}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <span style={styles.shiftRoute}>{shift.routeName || '路線'}</span>
+                              <span style={{ background: '#4caf50', color: '#fff', padding: '2px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700 }}>
+                                {shift.passengerCount} 位乘客
+                              </span>
+                            </div>
+                            <div style={styles.shiftTime}>
+                              <Icons.Clock /> {formatDateTime(shift.departureTime)}
+                            </div>
+                            <div style={styles.shiftSeats}>
+                              💺 剩餘 {shift.availableSeats} 位 / 共 {shift.totalSeats} 位
+                            </div>
+                          </div>
+                          <div style={styles.shiftPrice}>
+                            <span style={styles.priceValue}>${shift.price}</span>
+                            <button 
+                              onClick={() => handleAcceptShift(shift)}
+                              style={{ 
+                                marginTop: 8, 
+                                padding: '8px 16px', 
+                                background: '#4caf50', 
+                                color: '#fff', 
+                                border: 'none', 
+                                borderRadius: 8, 
+                                fontSize: 13, 
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              立即搶單
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {shiftsWithPassengers.length > 3 && (
+                      <div style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: '#666' }}>
+                        仲有 {shiftsWithPassengers.length - 3} 個班次有乘客等緊你 →
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={styles.sectionCollapsedHint}>已收起搶手班次（{shiftsWithPassengers.length}）</div>
                 )}
               </div>
             )}
@@ -623,71 +640,84 @@ export default function DriverDashboard() {
             {/* Current Trip */}
             {activeShifts.length > 0 && (
               <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>🚗 當前行程</h2>
-                {activeShifts.map(shift => {
-                  const status = statusConfig[shift.status] || { label: shift.status, color: '#666', bg: '#eee' }
-                  const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
-                  const hasPassengers = shiftBookings.length > 0
-                  
-                  return (
-                    <div key={shift.id} style={styles.currentTripCard}>
-                      <div style={styles.tripHeader}>
-                        <span style={styles.routeName}>{shift.routeName || '路線'}</span>
-                        <span style={{ ...styles.statusBadge, color: status.color, background: status.bg }}>
-                          {status.label}
-                        </span>
-                      </div>
-                      <div style={styles.tripInfo}>
-                        <div style={styles.tripRow}>
-                          <Icons.Clock />
-                          <span>{formatDateTime(shift.departureTime)}</span>
+                <div style={styles.sectionHeader}>
+                  <h2 style={styles.sectionTitle}>🚗 當前行程</h2>
+                  <button
+                    onClick={() => setActiveTripsExpanded(prev => !prev)}
+                    style={styles.sectionToggleBtn}
+                    aria-expanded={activeTripsExpanded}
+                  >
+                    {activeTripsExpanded ? '收起' : '展開'}
+                  </button>
+                </div>
+                {activeTripsExpanded ? (
+                  activeShifts.map(shift => {
+                    const status = statusConfig[shift.status] || { label: shift.status, color: '#666', bg: '#eee' }
+                    const shiftBookings = bookings.filter(b => b.shiftId === shift.id)
+                    const hasPassengers = shiftBookings.length > 0
+                    
+                    return (
+                      <div key={shift.id} style={styles.currentTripCard}>
+                        <div style={styles.tripHeader}>
+                          <span style={styles.routeName}>{shift.routeName || '路線'}</span>
+                          <span style={{ ...styles.statusBadge, color: status.color, background: status.bg }}>
+                            {status.label}
+                          </span>
                         </div>
-                        <div style={styles.tripRow}>
-                          <Icons.Car />
-                          <span>座位: {shift.totalSeats - shift.availableSeats}/{shift.totalSeats}</span>
-                        </div>
-                      </div>
-                      
-                      {/* Passengers in Current Trip */}
-                      {hasPassengers ? (
-                        <div style={{ marginTop: 12, padding: 10, background: '#e3f2fd', borderRadius: 8 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#1565c0', marginBottom: 8 }}>
-                            👥 乘客 ({shiftBookings.length} 位)
+                        <div style={styles.tripInfo}>
+                          <div style={styles.tripRow}>
+                            <Icons.Clock />
+                            <span>{formatDateTime(shift.departureTime)}</span>
                           </div>
-                          {shiftBookings.map((booking, idx) => (
-                            <div key={booking.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < shiftBookings.length - 1 ? '1px solid #bbdefb' : 'none' }}>
-                              <div style={{ fontSize: 13, color: '#333' }}>{booking.passengerName || '乘客'}</div>
-                              <div style={{ fontSize: 12, color: '#666' }}>{booking.seatCount || 1} 位</div>
+                          <div style={styles.tripRow}>
+                            <Icons.Car />
+                            <span>座位: {shift.totalSeats - shift.availableSeats}/{shift.totalSeats}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Passengers in Current Trip */}
+                        {hasPassengers ? (
+                          <div style={{ marginTop: 12, padding: 10, background: '#e3f2fd', borderRadius: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#1565c0', marginBottom: 8 }}>
+                              👥 乘客 ({shiftBookings.length} 位)
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ marginTop: 12, padding: 10, background: '#fff8e1', borderRadius: 8, textAlign: 'center' }}>
-                          <span style={{ fontSize: 12, color: '#f57c00' }}>⏳ 等待乘客預訂...</span>
-                        </div>
-                      )}
-                      
-                      <div style={styles.tripActions}>
-                        <button 
-                          onClick={() => handleOpenChat(shift)} 
-                          disabled={!hasPassengers}
-                          style={{
-                            ...styles.chatBtn,
-                            opacity: hasPassengers ? 1 : 0.5,
-                            cursor: hasPassengers ? 'pointer' : 'not-allowed'
-                          }}
-                        >
-                          {hasPassengers ? '💬 乘客對話' : '💬 等待乘客'}
-                        </button>
-                        {shift.status === 'IN_PROGRESS' && (
-                          <button onClick={() => handleCompleteShift(shift)} style={styles.completeBtn}>
-                            ✅ 完成行程
-                          </button>
+                            {shiftBookings.map((booking, idx) => (
+                              <div key={booking.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: idx < shiftBookings.length - 1 ? '1px solid #bbdefb' : 'none' }}>
+                                <div style={{ fontSize: 13, color: '#333' }}>{booking.passengerName || '乘客'}</div>
+                                <div style={{ fontSize: 12, color: '#666' }}>{booking.seatCount || 1} 位</div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 12, padding: 10, background: '#fff8e1', borderRadius: 8, textAlign: 'center' }}>
+                            <span style={{ fontSize: 12, color: '#f57c00' }}>⏳ 等待乘客預訂...</span>
+                          </div>
                         )}
+                        
+                        <div style={styles.tripActions}>
+                          <button 
+                            onClick={() => handleOpenChat(shift)} 
+                            disabled={!hasPassengers}
+                            style={{
+                              ...styles.chatBtn,
+                              opacity: hasPassengers ? 1 : 0.5,
+                              cursor: hasPassengers ? 'pointer' : 'not-allowed'
+                            }}
+                          >
+                            {hasPassengers ? '💬 乘客對話' : '💬 等待乘客'}
+                          </button>
+                          {shift.status === 'IN_PROGRESS' && (
+                            <button onClick={() => handleCompleteShift(shift)} style={styles.completeBtn}>
+                              ✅ 完成行程
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })
+                ) : (
+                  <div style={styles.sectionCollapsedHint}>已收起當前行程（{activeShifts.length}）</div>
+                )}
               </div>
             )}
 
@@ -1331,11 +1361,24 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: '1px dashed #e5d1a0',
     paddingTop: 6,
   },
-  routeManageHint: {
-    margin: '0 0 10px',
-    fontSize: 13,
-    color: '#5f5f5f',
-    lineHeight: 1.5,
+  sectionToggleBtn: {
+    border: '1px solid #d0d7d0',
+    background: '#fff',
+    color: '#444',
+    fontSize: 12,
+    fontWeight: 600,
+    borderRadius: 8,
+    padding: '4px 10px',
+    cursor: 'pointer',
+  },
+  sectionCollapsedHint: {
+    fontSize: 12,
+    color: '#666',
+    background: '#f6f8f6',
+    border: '1px dashed #d7ddd7',
+    borderRadius: 10,
+    padding: '8px 10px',
+    textAlign: 'center',
   },
   idleRouteGrid: {
     display: 'grid',

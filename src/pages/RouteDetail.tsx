@@ -119,6 +119,7 @@ export default function RouteDetail() {
       ),
     [shiftsOfDate],
   )
+  const earliestBookableShift = useMemo(() => bookableShifts[0] ?? null, [bookableShifts])
 
   const handleBooking = (shiftId: string) => {
     navigate(`/booking/${shiftId}`)
@@ -142,13 +143,38 @@ export default function RouteDetail() {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
       <header style={styles.header}>
         <button style={styles.backBtn} onClick={() => navigate('/')}>
           ← 返回
         </button>
-        <h1 style={styles.title}>{route.name}</h1>
+        <div style={styles.titleWrap}>
+          <h1 style={styles.title}>{route.name}</h1>
+          <p style={styles.titleSub}>路線型共乘</p>
+        </div>
       </header>
+
+      <section style={styles.heroCard}>
+        <div style={styles.heroEyebrow}>{sceneLabelByType[route.type] || '固定路線'}</div>
+        <h2 style={styles.heroTitle}>
+          {route.origin.name} {'->'} {route.destination.name}
+        </h2>
+        <p style={styles.heroSubtitle}>先鎖定班次再集合上車，流程更清晰、等待更少。</p>
+        <div style={styles.heroStats}>
+          <span style={styles.heroStat}>⏱ {formatDuration(route.duration)}</span>
+          <span style={styles.heroStat}>📍 {route.distance || 0} km</span>
+          <span style={styles.heroStat}>💰 {formatPrice(route.price)} / 位</span>
+        </div>
+        {earliestBookableShift ? (
+          <button
+            style={styles.heroPrimaryBtn}
+            onClick={() => handleBooking(earliestBookableShift.id)}
+          >
+            立即加入最近班次 · {formatTime(earliestBookableShift.departureTime)}
+          </button>
+        ) : (
+          <div style={styles.heroHint}>目前沒有可加入班次，先查看下方日期。</div>
+        )}
+      </section>
 
       <section style={styles.section}>
         <div style={styles.headlineRow}>
@@ -194,29 +220,30 @@ export default function RouteDetail() {
               const status =
                 statusChipByShift[shift.status] || { label: shift.status, bg: '#eceff1', color: '#5f6368' }
               return (
-              <div key={shift.id} style={styles.shiftCard}>
-                <div style={styles.shiftInfo}>
-                  <div style={styles.shiftTime}>{formatTime(shift.departureTime)}</div>
+                <div key={shift.id} style={styles.shiftCard}>
+                  <div style={styles.shiftTopRow}>
+                    <div style={styles.shiftTime}>{formatTime(shift.departureTime)}</div>
+                    <div style={styles.shiftPrice}>
+                      <span style={styles.shiftPriceValue}>{formatPrice(shift.price)}</span>
+                      <span style={styles.shiftPriceUnit}>/ 位</span>
+                    </div>
+                  </div>
                   <div style={styles.shiftMeta}>
                     <span>{formatDate(shift.departureTime)}</span>
                     <span>•</span>
                     <span>剩餘 {shift.availableSeats}/{shift.totalSeats} 位</span>
                   </div>
-                  <span style={{ ...styles.statusChip, background: status.bg, color: status.color }}>
-                    {status.label}
-                  </span>
+                  <div style={styles.shiftBottomRow}>
+                    <span style={{ ...styles.statusChip, background: status.bg, color: status.color }}>
+                      {status.label}
+                    </span>
+                    <button style={styles.bookBtn} onClick={() => handleBooking(shift.id)}>
+                      加入班次
+                    </button>
+                  </div>
                 </div>
-                <div style={styles.shiftPrice}>
-                  <span style={styles.shiftPriceValue}>{formatPrice(shift.price)}</span>
-                </div>
-                <button
-                  style={styles.bookBtn}
-                  onClick={() => handleBooking(shift.id)}
-                >
-                  加入班次
-                </button>
-              </div>
-            )})}
+              )
+            })}
           </div>
         )}
       </section>
@@ -227,7 +254,7 @@ export default function RouteDetail() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: '#f5f6f5',
+    background: 'linear-gradient(180deg, #eef8f4 0%, #f6f8f7 160px, #f6f8f7 100%)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif',
   },
   loading: {
@@ -241,15 +268,13 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#7f3f3f',
   },
   header: {
-    padding: '14px 16px',
-    background: '#fff',
-    borderBottom: '1px solid #e3ebe6',
+    padding: '16px 16px 10px',
     display: 'flex',
     alignItems: 'center',
     gap: 10,
   },
   backBtn: {
-    padding: '8px 2px',
+    padding: '8px 4px',
     border: 'none',
     background: 'transparent',
     color: '#1d4f43',
@@ -259,9 +284,78 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     margin: 0,
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 700,
     color: '#1f3f38',
+  },
+  titleWrap: {
+    display: 'grid',
+    gap: 2,
+  },
+  titleSub: {
+    margin: 0,
+    fontSize: 12,
+    color: '#5f7b72',
+    fontWeight: 600,
+  },
+  heroCard: {
+    margin: '0 12px 0',
+    borderRadius: 18,
+    border: '1px solid rgba(30, 79, 67, 0.12)',
+    background: 'linear-gradient(135deg, #1e4f43 0%, #2b6a5a 100%)',
+    color: '#ffffff',
+    padding: '16px 14px',
+    boxShadow: '0 16px 32px rgba(30, 79, 67, 0.18)',
+  },
+  heroEyebrow: {
+    fontSize: 12,
+    fontWeight: 700,
+    opacity: 0.9,
+    marginBottom: 4,
+  },
+  heroTitle: {
+    margin: 0,
+    fontSize: 21,
+    lineHeight: 1.25,
+    fontWeight: 800,
+  },
+  heroSubtitle: {
+    margin: '8px 0 0',
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: 'rgba(255,255,255,0.92)',
+  },
+  heroStats: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 12,
+  },
+  heroStat: {
+    fontSize: 12,
+    borderRadius: 999,
+    border: '1px solid rgba(255,255,255,0.25)',
+    background: 'rgba(255,255,255,0.12)',
+    padding: '4px 10px',
+    fontWeight: 700,
+  },
+  heroPrimaryBtn: {
+    width: '100%',
+    marginTop: 14,
+    border: 'none',
+    borderRadius: 12,
+    padding: '12px 14px',
+    cursor: 'pointer',
+    background: '#ffffff',
+    color: '#1e4f43',
+    fontSize: 14,
+    fontWeight: 800,
+    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.18)',
+  },
+  heroHint: {
+    marginTop: 14,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
   },
   section: {
     padding: '12px',
@@ -349,17 +443,16 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '10px',
   },
   shiftCard: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px',
-    borderRadius: '12px',
+    padding: '12px 12px 10px',
+    borderRadius: '14px',
     border: '1px solid #dce7e1',
-    background: '#fcfefd',
+    background: '#fbfefd',
+    boxShadow: '0 10px 18px rgba(14, 64, 54, 0.06)',
   },
-  shiftInfo: {
-    flex: 1,
-    display: 'grid',
-    gap: 4,
+  shiftTopRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
   },
   shiftTime: {
     fontSize: '19px',
@@ -371,29 +464,42 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     fontSize: '13px',
     color: '#5e7770',
+    marginTop: 6,
+  },
+  shiftBottomRow: {
+    marginTop: 10,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   statusChip: {
-    justifySelf: 'start',
     fontSize: 11,
     fontWeight: 700,
     borderRadius: 999,
     padding: '2px 8px',
   },
   shiftPrice: {
-    marginRight: '12px',
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: 3,
   },
   shiftPriceValue: {
     fontSize: '17px',
-    fontWeight: 700,
+    fontWeight: 800,
     color: '#1e4f43',
+  },
+  shiftPriceUnit: {
+    fontSize: 12,
+    color: '#5f7b72',
+    fontWeight: 700,
   },
   bookBtn: {
     padding: '10px 14px',
-    borderRadius: '8px',
+    borderRadius: '10px',
     border: 'none',
-    background: '#1e4f43',
+    background: 'linear-gradient(135deg, #1e4f43 0%, #2a6a59 100%)',
     color: '#fff',
-    fontWeight: 700,
+    fontWeight: 800,
     fontSize: '13px',
     cursor: 'pointer',
   },

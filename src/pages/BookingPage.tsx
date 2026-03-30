@@ -126,21 +126,21 @@ export default function BookingPage() {
         </header>
         <div style={styles.confirmBox}>
           <div style={styles.successIcon}>✓</div>
-          <h2 style={styles.confirmTitle}>預訂成功！</h2>
+          <h2 style={styles.confirmTitle}>加入班次成功！</h2>
           <p style={styles.confirmText}>
-            感謝你既預訂，我地會盡快確認並發送確認電郵到你既郵箱。
+            你的乘車資料已提交，請準時到集合點上車。
           </p>
           <div style={styles.confirmDetails}>
             <div style={styles.confirmRow}>
-              <span>路線</span>
+              <span>班次路線</span>
               <span>{route.origin.name} → {route.destination.name}</span>
             </div>
             <div style={styles.confirmRow}>
-              <span>時間</span>
+              <span>出發時間</span>
               <span>{formatDate(shift.departureTime)} {formatTime(shift.departureTime)}</span>
             </div>
             <div style={styles.confirmRow}>
-              <span>座位</span>
+              <span>預約座位</span>
               <span>{seatCount} 位</span>
             </div>
             <div style={styles.confirmRow}>
@@ -182,10 +182,10 @@ export default function BookingPage() {
 
       {/* Passenger Details */}
       <section style={styles.section}>
-        <h2 style={styles.sectionTitle}>乘客資料</h2>
+        <h2 style={styles.sectionTitle}>乘車資料確認</h2>
         
         <div style={styles.formGroup}>
-          <label style={styles.label}>乘客姓名</label>
+          <label style={styles.label}>聯絡姓名</label>
           <input
             type="text"
             value={passengerName}
@@ -196,7 +196,7 @@ export default function BookingPage() {
         </div>
 
         <div style={styles.formGroup}>
-          <label style={styles.label}>聯絡電話</label>
+          <label style={styles.label}>聯絡電話（上車聯絡）</label>
           <input
             type="tel"
             value={passengerPhone}
@@ -218,7 +218,7 @@ export default function BookingPage() {
         </div>
 
         <div style={styles.formGroup}>
-          <label style={styles.label}>座位數量</label>
+          <label style={styles.label}>預約座位數量</label>
           <div style={styles.seatSelector}>
             {[1, 2, 3, 4, 5].map(num => (
               <button
@@ -236,11 +236,11 @@ export default function BookingPage() {
         </div>
 
         <div style={styles.formGroup}>
-          <label style={styles.label}>特別要求（可選）</label>
+          <label style={styles.label}>備註（可選）</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="例如：需要 BB 車位、輪椅位、較多行李..."
+            placeholder="例如：行李較多、同行長者..."
             style={styles.textarea}
             rows={3}
           />
@@ -270,7 +270,7 @@ export default function BookingPage() {
           disabled={!passengerName || !passengerPhone || submitting}
           onClick={handleSubmit}
         >
-          {submitting ? '處理中...' : `確認預訂 · ${formatPrice(shift.price * seatCount)}`}
+          {submitting ? '提交中...' : `確認加入班次 · ${formatPrice(shift.price * seatCount)}`}
         </button>
       </footer>
     </div>

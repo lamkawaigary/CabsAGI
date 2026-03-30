@@ -8,6 +8,7 @@ import type { Booking, Route, Shift } from '../types/shift'
 
 type Tab = 'routes' | 'bookings' | 'profile'
 type Scene = 'all' | 'event' | 'airport'
+type BookingFilter = 'upcoming' | 'active' | 'history'
 
 const BOOKING_STATUS: Record<string, { label: string; bg: string; color: string }> = {
   PENDING: { label: '待確認', bg: '#fff3cd', color: '#7a5a1a' },
@@ -43,6 +44,7 @@ export default function PassengerDashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('routes')
   const [selectedScene, setSelectedScene] = useState<Scene>('all')
+  const [bookingFilter, setBookingFilter] = useState<BookingFilter>('upcoming')
   const [routes, setRoutes] = useState<Route[]>([])
   const [shifts, setShifts] = useState<Shift[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -221,6 +223,21 @@ export default function PassengerDashboard() {
       .slice(0, 4)
   }, [openBookableShifts, sceneRoutes])
 
+  const bookingList = useMemo(() => {
+    const now = Date.now()
+    return bookings.filter((booking) => {
+      const shift = bookingShifts[booking.shiftId]
+      const departureTime = shift ? toDate(shift.departureTime)?.getTime() || 0 : 0
+      if (bookingFilter === 'upcoming') {
+        return booking.status === 'PENDING' || booking.status === 'CONFIRMED' || (departureTime > now && booking.status !== 'CANCELLED')
+      }
+      if (bookingFilter === 'active') {
+        return booking.status === 'COMPLETED' ? false : departureTime > 0 && departureTime <= now && booking.status !== 'CANCELLED'
+      }
+      return booking.status === 'COMPLETED' || booking.status === 'CANCELLED' || booking.status === 'NO_SHOW'
+    })
+  }, [bookingFilter, bookingShifts, bookings])
+
   if (loading) {
     return (
       <div style={styles.container}>
@@ -353,11 +370,31 @@ export default function PassengerDashboard() {
             <div style={styles.sectionHeader}>
               <h2 style={styles.sectionTitle}>我的行程</h2>
             </div>
-            {bookings.length === 0 ? (
+            <div style={styles.sceneRow}>
+              <button
+                onClick={() => setBookingFilter('upcoming')}
+                style={{ ...styles.sceneChip, ...(bookingFilter === 'upcoming' ? styles.sceneChipActive : {}) }}
+              >
+                即將出發
+              </button>
+              <button
+                onClick={() => setBookingFilter('active')}
+                style={{ ...styles.sceneChip, ...(bookingFilter === 'active' ? styles.sceneChipActive : {}) }}
+              >
+                進行中
+              </button>
+              <button
+                onClick={() => setBookingFilter('history')}
+                style={{ ...styles.sceneChip, ...(bookingFilter === 'history' ? styles.sceneChipActive : {}) }}
+              >
+                已完成
+              </button>
+            </div>
+            {bookingList.length === 0 ? (
               <div style={styles.empty}>目前尚無預訂紀錄</div>
             ) : (
               <div style={styles.list}>
-                {bookings.map((booking, index) => {
+                {bookingList.map((booking, index) => {
                   const shift = bookingShifts[booking.shiftId]
                   const status = BOOKING_STATUS[booking.status] || {
                     label: booking.status,

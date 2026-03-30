@@ -183,6 +183,28 @@ export default function PassengerDashboard() {
     return routes.filter((route) => route.type === 'EVENT' || route.type === 'CROSS_BORDER')
   }, [routes, selectedScene])
 
+  const sceneHero = useMemo(() => {
+    if (selectedScene === 'airport') {
+      return {
+        eyebrow: '機場接送',
+        title: '抵達後快速接駁市區',
+        subtitle: '先選路線，再選班次，集合上車更有效率',
+      }
+    }
+    if (selectedScene === 'event') {
+      return {
+        eyebrow: '演唱會散場',
+        title: '散場後同行跨境更省時',
+        subtitle: '集中上車點與固定班次，降低等待時間',
+      }
+    }
+    return {
+      eyebrow: '路線型共乘',
+      title: '先選場景，再選路線與班次',
+      subtitle: '適合跨境、機場與大型活動散場的共乘出行',
+    }
+  }, [selectedScene])
+
   const openBookableShifts = useMemo(
     () =>
       shifts.filter(
@@ -263,6 +285,30 @@ export default function PassengerDashboard() {
       <main style={styles.content}>
         {activeTab === 'routes' && (
           <div style={{ display: 'grid', gap: 12 }}>
+            <section style={styles.heroCard}>
+              <div style={styles.heroEyebrow}>{sceneHero.eyebrow}</div>
+              <h2 style={styles.heroTitle}>{sceneHero.title}</h2>
+              <p style={styles.heroSub}>{sceneHero.subtitle}</p>
+              <div style={styles.heroStatsRow}>
+                <div style={styles.heroStat}>
+                  <div style={styles.heroStatLabel}>可選路線</div>
+                  <strong>{sceneRoutes.length}</strong>
+                </div>
+                <div style={styles.heroStat}>
+                  <div style={styles.heroStatLabel}>即將出發</div>
+                  <strong>{highlightedShifts.length}</strong>
+                </div>
+              </div>
+              {highlightedShifts[0] && (
+                <button
+                  style={styles.heroPrimaryAction}
+                  onClick={() => navigate(`/booking/${highlightedShifts[0].id}`)}
+                >
+                  立即加入最近班次
+                </button>
+              )}
+            </section>
+
             <section style={styles.section}>
               <div style={styles.sectionHeader}>
                 <h2 style={styles.sectionTitle}>選擇出行場景</h2>
@@ -580,10 +626,68 @@ const styles: Record<string, React.CSSProperties> = {
   },
   section: {
     background: '#fff',
-    borderRadius: 14,
+    borderRadius: 16,
     border: '1px solid #e2eae5',
     padding: 12,
-    boxShadow: '0 1px 2px rgba(20, 45, 37, 0.05)',
+    boxShadow: '0 6px 18px rgba(20, 45, 37, 0.05)',
+  },
+  heroCard: {
+    borderRadius: 18,
+    padding: 14,
+    background: 'linear-gradient(145deg, #1f4f43 0%, #2a6657 100%)',
+    color: '#ecfff7',
+    boxShadow: '0 10px 24px rgba(26, 71, 59, 0.25)',
+    display: 'grid',
+    gap: 8,
+  },
+  heroEyebrow: {
+    fontSize: 11,
+    fontWeight: 700,
+    opacity: 0.86,
+    letterSpacing: '0.04em',
+  },
+  heroTitle: {
+    margin: 0,
+    fontSize: 20,
+    lineHeight: 1.2,
+    fontWeight: 800,
+  },
+  heroSub: {
+    margin: 0,
+    fontSize: 12,
+    color: 'rgba(236, 255, 247, 0.86)',
+    lineHeight: 1.45,
+  },
+  heroStatsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: 8,
+  },
+  heroStat: {
+    border: '1px solid rgba(255, 255, 255, 0.24)',
+    borderRadius: 11,
+    background: 'rgba(255, 255, 255, 0.12)',
+    padding: '8px 10px',
+    display: 'grid',
+    gap: 2,
+    fontSize: 16,
+    fontWeight: 800,
+  },
+  heroStatLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    opacity: 0.8,
+  },
+  heroPrimaryAction: {
+    border: 'none',
+    borderRadius: 11,
+    background: '#f0bf2a',
+    color: '#2c2a1c',
+    padding: '10px 12px',
+    fontSize: 13,
+    fontWeight: 800,
+    cursor: 'pointer',
+    marginTop: 2,
   },
   sectionHeader: {
     display: 'flex',
@@ -732,8 +836,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   primaryBtn: {
     border: 'none',
-    borderRadius: 9,
-    background: '#1e4f43',
+    borderRadius: 10,
+    background: 'linear-gradient(135deg, #1e4f43 0%, #2b6758 100%)',
     color: '#fff',
     padding: '9px 12px',
     fontSize: 13,

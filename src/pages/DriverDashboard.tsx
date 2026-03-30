@@ -564,6 +564,20 @@ export default function DriverDashboard() {
               </div>
             )}
 
+            {canAcceptOrders && (
+              <div style={styles.dashboardHero}>
+                <div style={styles.dashboardHeroEyebrow}>DRIVER OPERATION</div>
+                <h2 style={styles.dashboardHeroTitle}>今日重點：先處理當前行程，再接熱門班次</h2>
+                <div style={styles.dashboardHeroMeta}>
+                  <span>可接班次 {availableShifts.length}</span>
+                  <span>•</span>
+                  <span>熱門班次 {shiftsWithPassengers.length}</span>
+                  <span>•</span>
+                  <span>進行中 {activeShifts.length}</span>
+                </div>
+              </div>
+            )}
+
             {/* Hot Shifts - Have Passengers */}
             {shiftsWithPassengers.length > 0 && (
               <div style={styles.section}>
@@ -1232,8 +1246,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px 20px',
-    background: '#284a41',
+    padding: '16px 18px',
+    background: 'linear-gradient(180deg, #1f4e43 0%, #244d43 100%)',
     color: '#fff',
   },
   logo: {
@@ -1255,7 +1269,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   content: {
-    padding: 16,
+    padding: 12,
   },
   dashboard: {
     display: 'grid',
@@ -1335,9 +1349,9 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   pointsRuleCard: {
-    background: '#fff8e9',
-    border: '1px solid #f1ddb4',
-    borderRadius: 12,
+    background: '#ffffff',
+    border: '1px solid #deebe4',
+    borderRadius: 14,
     padding: 12,
     display: 'grid',
     gap: 8,
@@ -1345,7 +1359,7 @@ const styles: Record<string, React.CSSProperties> = {
   pointsRuleTitle: {
     fontSize: 13,
     fontWeight: 700,
-    color: '#6b5319',
+    color: '#24443c',
   },
   pointsRuleRow: {
     display: 'flex',
@@ -1357,18 +1371,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   pointsRuleFoot: {
     fontSize: 12,
-    color: '#816d3d',
-    borderTop: '1px dashed #e5d1a0',
+    color: '#637b74',
+    borderTop: '1px dashed #d6e4dd',
     paddingTop: 6,
   },
   sectionToggleBtn: {
-    border: '1px solid #d0d7d0',
+    border: '1px solid #cfddd5',
     background: '#fff',
-    color: '#444',
+    color: '#35534a',
     fontSize: 12,
     fontWeight: 600,
-    borderRadius: 8,
-    padding: '4px 10px',
+    borderRadius: 10,
+    padding: '5px 11px',
     cursor: 'pointer',
   },
   sectionCollapsedHint: {

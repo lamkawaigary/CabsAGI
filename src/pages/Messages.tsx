@@ -185,8 +185,12 @@ export default function Messages({ orders = [] }: MessagesProps) {
   }, [activePartnerId, activeOrderId, conversations, orders])
 
   return (
-    <div className="ui-page" style={{ gap: 10 }}>
-      <h2 className="ui-title">訊息中心</h2>
+    <div className="ui-page" style={{ gap: 10, paddingBottom: 18 }}>
+      <section style={styles.heroCard}>
+        <div style={styles.heroEyebrow}>訊息中心</div>
+        <h2 style={styles.heroTitle}>乘客與司機對話集中管理</h2>
+        <p style={styles.heroSubtitle}>按訂單時間整理對話，重要通知與客服消息不會漏看。</p>
+      </section>
 
       {error && (
         <div className={alertClass}>
@@ -200,16 +204,15 @@ export default function Messages({ orders = [] }: MessagesProps) {
       )}
 
       {!activePartnerId ? (
-        <section className="ui-card" style={{ padding: 12 }}>
+        <section className="ui-card" style={styles.panelCard}>
           <button
             onClick={() => void openConversation(SUPPORT_ID, null)}
-            className="ui-btn ui-btn-secondary"
-            style={{ width: '100%', textAlign: 'left' }}
+            style={styles.supportBtn}
           >
-            + 聯絡客服
+            + 聯絡客服中心
           </button>
 
-          <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+          <div style={styles.listWrap}>
             {loading ? (
               <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>{UI_TEXT.loading.messages}</div>
             ) : conversations.length === 0 ? (
@@ -220,19 +223,25 @@ export default function Messages({ orders = [] }: MessagesProps) {
                   <button
                     key={conv.key}
                     onClick={() => void openConversation(conv.partnerId, conv.orderId)}
-                    className="ui-card-muted ui-clickable-surface"
-                    style={{ textAlign: 'left', cursor: 'pointer', padding: 10 }}
+                    style={styles.conversationBtn}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                      <strong style={{ color: '#214239', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{conv.title}</strong>
+                    <div style={styles.conversationTopRow}>
+                      <strong style={styles.conversationTitle}>{conv.title}</strong>
                       {conv.unread > 0 && (
-                        <span style={{ minWidth: 18, height: 18, borderRadius: 999, background: '#1f4f43', color: '#fff', fontSize: 11, display: 'grid', placeItems: 'center', padding: '0 4px', flexShrink: 0 }}>
+                        <span style={styles.unreadBadge}>
                           {conv.unread}
                         </span>
                       )}
                     </div>
-                    <div style={{ marginTop: 4, color: '#5f746d', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.subtitle}</div>
-                    <div style={{ marginTop: 4, color: '#8a9a94', fontSize: 11 }}>{new Date(conv.time).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                    <div style={styles.conversationSubtitle}>{conv.subtitle}</div>
+                    <div style={styles.conversationTime}>
+                      {new Date(conv.time).toLocaleString('zh-HK', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
                   </button>
                 )
               })
@@ -243,28 +252,28 @@ export default function Messages({ orders = [] }: MessagesProps) {
         <section
           className="ui-card"
           style={{
-            padding: 12,
-            minHeight: 420,
+            ...styles.panelCard,
+            minHeight: 480,
             display: 'grid',
             gridTemplateRows: 'auto 1fr auto',
             gap: 10,
           }}
         >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={styles.chatHeader}>
               <button
                 onClick={() => {
                   closeConversation()
                   setInput('')
                 }}
                 className="ui-btn ui-btn-outline"
-                style={{ padding: '6px 10px' }}
+                style={{ padding: '7px 10px' }}
               >
                 返回
               </button>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#27483f' }}>{activeConversationTitle}</div>
+              <div style={styles.chatHeaderTitle}>{activeConversationTitle}</div>
             </div>
 
-          <div style={{ overflow: 'auto', display: 'grid', gap: 8 }}>
+          <div style={styles.chatBody}>
             {activeMessages.length === 0 ? (
               <div className="ui-empty-state" style={{ fontSize: 13, padding: 16 }}>
                 目前尚無訊息，開始發送第一句吧。
@@ -280,11 +289,14 @@ export default function Messages({ orders = [] }: MessagesProps) {
                     style={{
                       justifySelf: mine ? 'end' : 'start',
                       maxWidth: '78%',
-                      background: mine ? '#1f4f43' : '#f3f6f4',
+                      background: mine ? 'linear-gradient(135deg, #1e4f43 0%, #2a6a59 100%)' : '#f3f7f5',
                       color: mine ? '#effff7' : '#2f4e46',
-                      borderRadius: 12,
-                      padding: '8px 10px',
+                      borderRadius: 14,
+                      padding: '9px 11px',
                       fontSize: 13,
+                      boxShadow: mine
+                        ? '0 8px 20px rgba(30, 79, 67, 0.2)'
+                        : '0 6px 14px rgba(14, 64, 54, 0.08)',
                     }}
                   >
                     {m.type === 'IMAGE' ? (
@@ -320,12 +332,12 @@ export default function Messages({ orders = [] }: MessagesProps) {
             onChange={(event) => void handleImageSelected(event)}
             style={{ display: 'none' }}
           />
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={styles.chatComposer}>
             <button
               onClick={handlePickImage}
               disabled={uploadingImage || sending}
               className="ui-btn ui-btn-outline"
-              style={{ whiteSpace: 'nowrap' }}
+              style={{ whiteSpace: 'nowrap', minWidth: 68 }}
             >
               {uploadingImage ? '上傳中...' : '圖片'}
             </button>
@@ -335,13 +347,13 @@ export default function Messages({ orders = [] }: MessagesProps) {
               disabled={sending || uploadingImage}
               placeholder="輸入訊息..."
               className="ui-input"
-              style={{ flex: 1, fontSize: 13 }}
+              style={{ flex: 1, fontSize: 13, minHeight: 40 }}
             />
             <button
               onClick={() => void handleSend()}
               disabled={!input.trim() || sending || uploadingImage}
               className="ui-btn ui-btn-primary"
-              style={{ padding: '10px 14px' }}
+              style={{ padding: '10px 16px' }}
             >
               發送
             </button>
@@ -350,4 +362,128 @@ export default function Messages({ orders = [] }: MessagesProps) {
       )}
     </div>
   )
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  heroCard: {
+    borderRadius: 18,
+    border: '1px solid rgba(30, 79, 67, 0.12)',
+    background: 'linear-gradient(135deg, #1e4f43 0%, #2b6a5a 100%)',
+    color: '#fff',
+    padding: '16px 14px',
+    boxShadow: '0 16px 32px rgba(30, 79, 67, 0.18)',
+  },
+  heroEyebrow: {
+    fontSize: 12,
+    fontWeight: 700,
+    opacity: 0.9,
+  },
+  heroTitle: {
+    margin: '4px 0 0',
+    fontSize: 21,
+    lineHeight: 1.25,
+    fontWeight: 800,
+  },
+  heroSubtitle: {
+    margin: '8px 0 0',
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: 'rgba(255,255,255,0.92)',
+  },
+  panelCard: {
+    padding: 12,
+    borderRadius: 14,
+    border: '1px solid #dfe9e4',
+    boxShadow: '0 10px 20px rgba(14, 64, 54, 0.06)',
+  },
+  supportBtn: {
+    width: '100%',
+    textAlign: 'left',
+    padding: '11px 12px',
+    borderRadius: 10,
+    border: '1px solid #d8e5de',
+    background: '#f7fbf9',
+    color: '#1f4f43',
+    cursor: 'pointer',
+    fontWeight: 700,
+    fontSize: 14,
+  },
+  listWrap: {
+    marginTop: 10,
+    display: 'grid',
+    gap: 8,
+  },
+  conversationBtn: {
+    textAlign: 'left',
+    cursor: 'pointer',
+    padding: 10,
+    borderRadius: 12,
+    border: '1px solid #dce7e1',
+    background: '#fbfefd',
+    boxShadow: '0 6px 14px rgba(14, 64, 54, 0.05)',
+  },
+  conversationTopRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  conversationTitle: {
+    color: '#214239',
+    fontSize: 13,
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    minWidth: 0,
+  },
+  unreadBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 999,
+    background: '#1f4f43',
+    color: '#fff',
+    fontSize: 11,
+    display: 'grid',
+    placeItems: 'center',
+    padding: '0 4px',
+    flexShrink: 0,
+  },
+  conversationSubtitle: {
+    marginTop: 4,
+    color: '#5f746d',
+    fontSize: 12,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  conversationTime: {
+    marginTop: 4,
+    color: '#8a9a94',
+    fontSize: 11,
+  },
+  chatHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chatHeaderTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: '#27483f',
+  },
+  chatBody: {
+    overflow: 'auto',
+    display: 'grid',
+    gap: 8,
+    background: '#f7faf8',
+    border: '1px solid #e4ece8',
+    borderRadius: 12,
+    padding: 8,
+  },
+  chatComposer: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+  },
 }

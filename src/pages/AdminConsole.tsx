@@ -1133,7 +1133,7 @@ export default function AdminConsole() {
     <div style={{ minHeight: '100vh', background: '#f4f7f5' }}>
       <header
         style={{
-          padding: '14px 16px',
+          padding: '14px 16px 16px',
           borderBottom: '1px solid #dce6dd',
           background: 'linear-gradient(90deg, #273037 0%, #2e453e 48%, #36584e 100%)',
           color: '#f3fff8',
@@ -1145,6 +1145,9 @@ export default function AdminConsole() {
           <div>
             <div style={{ fontSize: 11, letterSpacing: '0.14em', opacity: 0.78, fontWeight: 700 }}>CABS ADMIN CONSOLE</div>
             <div style={{ fontSize: 20, fontWeight: 900 }}>後台管理中心 · {currentUser?.name}</div>
+            <div style={{ marginTop: 4, fontSize: 12, opacity: 0.9 }}>
+              一站式管理訂單、用戶、班次與計價策略
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -1173,6 +1176,45 @@ export default function AdminConsole() {
               {loggingOut ? '登出中...' : '登出'}
             </button>
           </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span
+            style={{
+              fontSize: 12,
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.25)',
+              background: 'rgba(255,255,255,0.12)',
+              padding: '4px 10px',
+              fontWeight: 700,
+            }}
+          >
+            待接訂單 {summary.pendingOrders}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.25)',
+              background: 'rgba(255,255,255,0.12)',
+              padding: '4px 10px',
+              fontWeight: 700,
+            }}
+          >
+            今日訂單 {summary.todayOrders}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.25)',
+              background: 'rgba(255,255,255,0.12)',
+              padding: '4px 10px',
+              fontWeight: 700,
+            }}
+          >
+            進行中班次 {summary.activeOfficialRoutes}
+          </span>
         </div>
 
         <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

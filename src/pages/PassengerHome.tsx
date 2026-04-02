@@ -528,6 +528,24 @@ export default function PassengerHome() {
 
   return (
     <div className="ui-page" style={{ gap: 14 }}>
+      <section
+        style={{
+          borderRadius: 18,
+          border: '1px solid rgba(30, 79, 67, 0.12)',
+          background: 'linear-gradient(135deg, #1e4f43 0%, #2b6a5a 100%)',
+          color: '#fff',
+          padding: '16px 14px',
+          boxShadow: '0 16px 32px rgba(30, 79, 67, 0.18)',
+        }}
+      >
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.9 }}>乘客首頁</div>
+        <h2 style={{ margin: '4px 0 0', fontSize: 21, lineHeight: 1.25, fontWeight: 800 }}>
+          選擇模式後快速完成預訂
+        </h2>
+        <p style={{ margin: '8px 0 0', fontSize: 13, lineHeight: 1.5, color: 'rgba(255,255,255,0.92)' }}>
+          包車與官方班次共用同一流程語言，先看路線再確認金額與座位。
+        </p>
+      </section>
       <div
         className="ui-card"
         style={{
@@ -559,7 +577,8 @@ export default function PassengerHome() {
             background: 'linear-gradient(145deg, #f9fcfa 0%, #f3f8f5 100%)',
             padding: 12,
             display: 'grid',
-            gap: 8,
+            gap: 10,
+            boxShadow: '0 10px 20px rgba(14, 64, 54, 0.06)',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
@@ -615,6 +634,7 @@ export default function PassengerHome() {
           background: '#fff',
           marginBottom: 12,
           minHeight: 'clamp(260px, 50vh, 540px)',
+          boxShadow: '0 10px 22px rgba(14, 64, 54, 0.08)',
         }}
       >
         {!MAP_FEATURE_ENABLED ? (
@@ -647,6 +667,7 @@ export default function PassengerHome() {
             padding: 14,
             display: 'grid',
             gap: 10,
+            boxShadow: '0 10px 22px rgba(14, 64, 54, 0.06)',
           }}
         >
           <div
@@ -930,6 +951,7 @@ export default function PassengerHome() {
             padding: 14,
             display: 'grid',
             gap: 10,
+            boxShadow: '0 10px 22px rgba(14, 64, 54, 0.06)',
           }}
         >
           <div

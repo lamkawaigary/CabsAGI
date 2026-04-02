@@ -22,10 +22,16 @@ const loginRegionOptions = [
   { label: '+86', value: '86' },
 ]
 
+const heroHighlights = [
+  '路線型共乘流程：場景 -> 路線 -> 班次',
+  '支援密碼 / OTP 登入與安全重設',
+  '乘客、司機、管理後台統一體驗',
+]
+
 const shell: CSSProperties = {
   minHeight: '100vh',
   background:
-    'radial-gradient(circle at 0% 0%, #ffe7bf 0%, #ffe7bf 20%, transparent 40%), radial-gradient(circle at 100% 100%, #c8ffe7 0%, #c8ffe7 18%, transparent 42%), linear-gradient(140deg, #f6f2eb 0%, #f1f7ff 55%, #f3fff7 100%)',
+    'radial-gradient(circle at 0% 0%, #ffe7bf 0%, #ffe7bf 16%, transparent 38%), radial-gradient(circle at 100% 100%, #c8ffe7 0%, #c8ffe7 16%, transparent 40%), linear-gradient(140deg, #f4f2ec 0%, #edf5f1 60%, #f4faf7 100%)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -39,28 +45,33 @@ const card: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
   background: '#fffefb',
-  borderRadius: '28px',
+  borderRadius: '24px',
   overflow: 'hidden',
-  boxShadow: '0 24px 60px rgba(25, 40, 35, 0.16)',
+  boxShadow: '0 20px 56px rgba(25, 40, 35, 0.16)',
   border: '1px solid #e8e2d6',
 }
 
 const hero: CSSProperties = {
-  padding: '48px',
+  padding: '40px 34px',
   background: 'linear-gradient(165deg, #173d36 0%, #224e45 62%, #2f6257 100%)',
   color: '#f8fff8',
 }
 
-const panel: CSSProperties = { padding: '32px 28px', background: '#fffefb' }
+const panel: CSSProperties = {
+  padding: '28px 24px',
+  background: '#fffefb',
+  display: 'grid',
+  gap: 10,
+}
 
 const inputStyle: CSSProperties = {
   width: '100%',
-  minHeight: 42,
+  minHeight: 44,
   padding: '10px 12px',
   borderRadius: 'var(--ui-radius-md)',
   border: '1px solid var(--ui-border)',
   outline: 'none',
-  fontSize: '14px',
+  fontSize: '15px',
   boxSizing: 'border-box',
   background: '#fcfefc',
 }
@@ -192,13 +203,30 @@ export default function Landing() {
     <div style={shell}>
       <div style={card}>
         <section style={hero}>
-          <div style={{ letterSpacing: '0.18em', fontSize: 12, opacity: 0.7, fontWeight: 700 }}>CABS MOBILITY CLOUD</div>
-          <h1 style={{ marginTop: 18, marginBottom: 14, fontSize: 40, lineHeight: 1.1 }}>跨境商務出行<br />身份入口</h1>
+          <div style={{ letterSpacing: '0.18em', fontSize: 12, opacity: 0.76, fontWeight: 700 }}>
+            CABS ROUTE MOBILITY
+          </div>
+          <h1 style={{ marginTop: 16, marginBottom: 12, fontSize: 34, lineHeight: 1.16 }}>
+            路線型共乘平台
+            <br />
+            統一身份入口
+          </h1>
           <p style={{ margin: 0, opacity: 0.86, fontSize: 15, lineHeight: 1.7 }}>
-            沿用 P7S 核心認證流程，登入支援密碼與 OTP。重設密碼改為發送安全郵件連結。
+            沿用 P7S 核心認證流程，登入支援密碼與 OTP，重設密碼改為發送安全郵件連結。
           </p>
-          <div style={{ marginTop: 36, display: 'grid', gap: 10 }}>
-            {['密碼登入: 電郵 / 手機號 / admin 別名', 'OTP 登入: 手機驗證碼', 'Reset Password: 手機映射 email 發送重設信（安全流程）'].map((item) => (
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.12)', padding: '4px 10px', fontWeight: 700 }}>
+              乘客 / 司機 / 管理員
+            </span>
+            <span style={{ fontSize: 12, borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.12)', padding: '4px 10px', fontWeight: 700 }}>
+              密碼 + OTP
+            </span>
+            <span style={{ fontSize: 12, borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.12)', padding: '4px 10px', fontWeight: 700 }}>
+              安全重設
+            </span>
+          </div>
+          <div style={{ marginTop: 24, display: 'grid', gap: 9 }}>
+            {heroHighlights.map((item) => (
               <div key={item} style={{ fontSize: 13, background: 'rgba(255,255,255,0.09)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 12, padding: '10px 12px' }}>
                 {item}
               </div>
@@ -207,7 +235,7 @@ export default function Landing() {
         </section>
 
         <section style={panel}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
             <button
               onClick={() => setMode('login')}
               className={`ui-btn ui-btn-tab ${mode === 'login' ? 'active' : ''}`}

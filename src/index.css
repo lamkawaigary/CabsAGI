@@ -261,6 +261,34 @@ body {
   }
 }
 
+@media (max-width: 420px) {
+  .ui-page {
+    padding-inline: 10px;
+    gap: 8px;
+  }
+
+  .ui-card {
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .ui-btn {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .ui-input {
+    min-height: 40px;
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .ui-pill {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+}
+
 .ui-section-title {
   font-size: 12px;
   font-weight: 700;

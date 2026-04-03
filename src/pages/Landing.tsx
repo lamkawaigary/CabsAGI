@@ -35,7 +35,7 @@ const shell: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '24px',
+  padding: 'clamp(12px, 3.8vw, 24px)',
   fontFamily: 'Avenir Next, SF Pro Display, Noto Sans TC, PingFang TC, sans-serif',
 }
 
@@ -45,20 +45,20 @@ const card: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
   background: '#fffefb',
-  borderRadius: '24px',
+  borderRadius: 'clamp(16px, 3.8vw, 24px)',
   overflow: 'hidden',
   boxShadow: '0 20px 56px rgba(25, 40, 35, 0.16)',
   border: '1px solid #e8e2d6',
 }
 
 const hero: CSSProperties = {
-  padding: '40px 34px',
+  padding: 'clamp(24px, 5vw, 40px) clamp(18px, 4.4vw, 34px)',
   background: 'linear-gradient(165deg, #173d36 0%, #224e45 62%, #2f6257 100%)',
   color: '#f8fff8',
 }
 
 const panel: CSSProperties = {
-  padding: '28px 24px',
+  padding: 'clamp(18px, 4.2vw, 28px) clamp(14px, 4vw, 24px)',
   background: '#fffefb',
   display: 'grid',
   gap: 10,
@@ -66,7 +66,7 @@ const panel: CSSProperties = {
 
 const inputStyle: CSSProperties = {
   width: '100%',
-  minHeight: 44,
+  minHeight: 42,
   padding: '10px 12px',
   borderRadius: 'var(--ui-radius-md)',
   border: '1px solid var(--ui-border)',

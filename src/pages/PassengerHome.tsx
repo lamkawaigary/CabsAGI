@@ -534,7 +534,7 @@ export default function PassengerHome() {
           border: '1px solid rgba(30, 79, 67, 0.12)',
           background: 'linear-gradient(135deg, #1e4f43 0%, #2b6a5a 100%)',
           color: '#fff',
-          padding: '16px 14px',
+          padding: 'clamp(12px, 3.8vw, 16px) clamp(12px, 3.5vw, 14px)',
           boxShadow: '0 16px 32px rgba(30, 79, 67, 0.18)',
         }}
       >
@@ -551,7 +551,7 @@ export default function PassengerHome() {
         style={{
           padding: 8,
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
           gap: 8,
         }}
       >
@@ -575,7 +575,7 @@ export default function PassengerHome() {
             borderRadius: 14,
             border: '1px solid #d7e4db',
             background: 'linear-gradient(145deg, #f9fcfa 0%, #f3f8f5 100%)',
-            padding: 12,
+            padding: 'clamp(10px, 3.2vw, 12px)',
             display: 'grid',
             gap: 10,
             boxShadow: '0 10px 20px rgba(14, 64, 54, 0.06)',
@@ -585,7 +585,7 @@ export default function PassengerHome() {
             <strong style={{ color: '#1f4f43', fontSize: 14 }}>包車預約流程</strong>
             <span style={{ fontSize: 12, color: '#5a746d' }}>目前步驟 {charterStep}/3</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(112px, 1fr))', gap: 8 }}>
             {CHARTER_STEPS.map((step, index) => {
               const reached = index + 1 <= charterStep
               return (
@@ -679,7 +679,7 @@ export default function PassengerHome() {
             }}
           >
             <div className="ui-section-title">包車選項</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(148px, 1fr))', gap: 8 }}>
               <input
                 type="date"
                 value={bookingDate}
@@ -715,7 +715,7 @@ export default function PassengerHome() {
                 </button>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))', gap: 8 }}>
               {CHARTER_VEHICLES.map((item) => (
                 <button
                   key={item.id}

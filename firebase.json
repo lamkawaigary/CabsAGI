@@ -2,13 +2,7 @@
   "functions": [
     {
       "source": "functions",
-      "codebase": "default",
-      "ignore": [
-        "node_modules",
-        "lib",
-        ".git"
-      ],
-      "runtime": "nodejs20"
+      "codebase": "default"
     }
   ]
 }

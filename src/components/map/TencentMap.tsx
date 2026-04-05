@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 
 interface Location {
-  lat: number
-  lng: number
-  name: string
+  lat?: number
+  lng?: number
+  name?: string
 }
 
 interface TencentMapProps {

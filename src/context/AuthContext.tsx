@@ -5,22 +5,22 @@ import {
   useContext,
   useEffect,
   useState,
+  useRef,
   type ReactNode,
 } from 'react'
 import type { FirebaseError } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
-  PhoneAuthProvider,
-  RecaptchaVerifier,
-  sendPasswordResetEmail,
-  signInWithCredential,
   signInWithEmailAndPassword,
-  signInWithPhoneNumber,
+  signInWithPopup,
   signOut,
+  signInWithPhoneNumber,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { auth, db } from '../firebaseConfig'
+import type { ApplicationVerifier, ConfirmationResult } from 'firebase/auth'
+import { doc, getDoc, setDoc, updateDoc, getDocs, query, where, collection } from 'firebase/firestore'
+import { auth, db, googleProvider } from '../firebaseConfig'
+import { RecaptchaVerifier } from 'firebase/auth'
 
 type UserRole = 'passenger' | 'driver' | 'admin'
 
@@ -28,16 +28,29 @@ export interface AuthUser {
   id: string
   name: string
   phone: string
+  phoneVerified: boolean
   email: string
   role: UserRole
   points: number
-  phoneVerified?: boolean
+  // Driver-specific fields
+  kycStatus?: 'pending' | 'submitted' | 'approved' | 'rejected' | 'n/a'
+  driverApproved?: boolean
+  kycSubmittedAt?: string | null
+  // KYC Documents
+  idCardFront?: string // URL to ID card front image
+  idCardBack?: string // URL to ID card back image
+  driverLicense?: string // URL to driver's license image
+  vehicleLicense?: string // URL to vehicle license image
+  kycRejectionReason?: string // Reason if rejected
 }
 
 interface AuthContextValue {
   currentUser: AuthUser | null
   loading: boolean
+  needsRoleSelection: boolean
+  setNeedsRoleSelection: (value: boolean) => void
   loginWithPassword: (input: string, password: string, regionCode?: string) => Promise<{ ok: boolean; message: string }>
+  loginWithGoogle: () => Promise<{ ok: boolean; message: string }>
   sendOtp: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
   verifyOtp: (otpCode: string) => Promise<{ ok: boolean; message: string }>
   triggerPhoneVerification: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
@@ -49,19 +62,24 @@ interface AuthContextValue {
     name: string
     role?: UserRole
   }) => Promise<{ ok: boolean; message: string }>
-  resetPasswordByPhone: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
+  resetPasswordByPhone: (regionCode: string, phone: string, newPassword?: string, otpCode?: string) => Promise<{ ok: boolean; message: string }>
   logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-declare global {
-  interface Window {
-    recaptchaVerifier?: RecaptchaVerifier
-  }
-}
 
 const MASTER_EMAIL = 'lamgary@p7s.app'
 const MASTER_PHONE = '+85269277488'
+
+// Admin emails - can be extended
+const ADMIN_EMAILS = [
+  'lamgary@p7s.app',
+  'gary@zerototendesign.com',
+]
+
+const isAdminEmail = (email: string): boolean => {
+  return ADMIN_EMAILS.includes(email.toLowerCase())
+}
 
 const getErrorCode = (err: unknown) =>
   err && typeof err === 'object' && 'code' in err && typeof (err as FirebaseError).code === 'string'
@@ -71,6 +89,12 @@ const getErrorCode = (err: unknown) =>
 const getErrorMessage = (err: unknown) => (err instanceof Error ? err.message : 'Unknown error')
 
 const normalizeUserRole = (role: unknown, fallbackEmail = ''): UserRole => {
+  // First check if email is in admin list (this takes priority)
+  if (fallbackEmail && isAdminEmail(fallbackEmail)) {
+    console.log('[DEBUG] Admin email detected:', fallbackEmail, '-> admin')
+    return 'admin'
+  }
+  
   if (typeof role === 'string') {
     const normalized = role.trim().toLowerCase()
     if (normalized === 'driver' || normalized.startsWith('driver')) return 'driver'
@@ -79,6 +103,8 @@ const normalizeUserRole = (role: unknown, fallbackEmail = ''): UserRole => {
     }
     if (normalized === 'passenger' || normalized.startsWith('passenger')) return 'passenger'
   }
+  // Legacy check for MASTER_EMAIL
+  console.log('[DEBUG] Role from DB:', role, 'Email:', fallbackEmail)
   return fallbackEmail === MASTER_EMAIL ? 'admin' : 'passenger'
 }
 
@@ -118,18 +144,36 @@ const defaultProfile = (uid: string, email: string): AuthUser => ({
   id: uid,
   name: email.split('@')[0] || 'Cabs User',
   phone: email.endsWith('@p7s.app') ? `+${email.split('@')[0]}` : '',
+  phoneVerified: false,
   email,
   role: normalizeUserRole(undefined, email),
   points: email === MASTER_EMAIL ? 999999 : 0,
+  kycStatus: 'n/a',
+  driverApproved: false,
+  kycSubmittedAt: null,
+  idCardFront: '',
+  idCardBack: '',
+  driverLicense: '',
+  vehicleLicense: '',
+  kycRejectionReason: '',
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
-  const [otpSession, setOtpSession] = useState<{ verificationId: string; phone: string } | null>(null)
+  const [otpSession, setOtpSession] = useState<ConfirmationResult | null>(null)
+  const recaptchaVerifierRef = useRef<ApplicationVerifier | null>(null)
+  const [needsRoleSelection, setNeedsRoleSelection] = useState(false)
 
   useEffect(() => {
+    // Timeout to prevent infinite loading if Firebase fails
+    const timeoutId = setTimeout(() => {
+      console.warn('Auth initialization timeout, setting loading to false')
+      setLoading(false)
+    }, 10000) // 10 seconds timeout
+
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      clearTimeout(timeoutId)
       if (!fbUser) {
         setCurrentUser(null)
         setLoading(false)
@@ -143,33 +187,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const ref = doc(db, 'users', fbUser.uid)
-      const snap = await getDoc(ref)
+      try {
+        const ref = doc(db, 'users', fbUser.uid)
+        const snap = await getDoc(ref)
 
-      if (snap.exists()) {
-        const data = snap.data() as Partial<AuthUser>
+        if (snap.exists()) {
+          const data = snap.data() as Partial<AuthUser>
+          const userRole = normalizeUserRole(data.role, data.email || fallbackEmail)
+          console.log('[DEBUG] User data:', data.email, 'role from DB:', data.role, 'calculated role:', userRole)
+          
+          // Check if user needs to select role (new user without role)
+          if (!data.role || (userRole === 'passenger' && !data.kycStatus)) {
+            setNeedsRoleSelection(true)
+          }
+          
+          setCurrentUser({
+            id: fbUser.uid,
+            name: data.name || 'Cabs User',
+            phone: data.phone || fbUser.phoneNumber || '',
+            phoneVerified: data.phoneVerified || false,
+            email: data.email || fallbackEmail,
+            role: userRole,
+            points: data.points || 0,
+            kycStatus: data.kycStatus || 'n/a',
+            driverApproved: data.driverApproved || false,
+            kycSubmittedAt: data.kycSubmittedAt || null,
+            // KYC Document URLs
+            idCardFront: data.idCardFront || '',
+            idCardBack: data.idCardBack || '',
+            driverLicense: data.driverLicense || '',
+            vehicleLicense: data.vehicleLicense || '',
+            kycRejectionReason: data.kycRejectionReason || '',
+          })
+        } else {
+          // New user - needs role selection
+          setNeedsRoleSelection(true)
+          const profile = defaultProfile(fbUser.uid, fallbackEmail)
+          if (fbUser.phoneNumber) {
+            profile.phone = fbUser.phoneNumber
+          }
+          await setDoc(ref, {
+            ...profile,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            kycStatus: 'n/a',
+            driverApproved: false,
+            phoneVerified: false,
+          })
+          setCurrentUser({ ...profile, kycStatus: 'n/a', driverApproved: false, phoneVerified: false })
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err)
+        // Still allow login even if Firestore fails
         setCurrentUser({
           id: fbUser.uid,
-          name: data.name || 'Cabs User',
-          phone: data.phone || fbUser.phoneNumber || '',
-          email: data.email || fallbackEmail,
-          role: normalizeUserRole(data.role, data.email || fallbackEmail),
-          points: data.points || 0,
-          phoneVerified: Boolean((data as { phoneVerified?: boolean }).phoneVerified),
+          name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Cabs User',
+          phone: fbUser.phoneNumber || '',
+          phoneVerified: false,
+          email: fallbackEmail,
+          role: 'passenger',
+          points: 0,
+          kycStatus: 'n/a',
+          driverApproved: false,
+          kycSubmittedAt: null,
+          idCardFront: '',
+          idCardBack: '',
+          driverLicense: '',
+          vehicleLicense: '',
+          kycRejectionReason: '',
         })
-      } else {
-        const profile = defaultProfile(fbUser.uid, fallbackEmail)
-        if (fbUser.phoneNumber) {
-          profile.phone = fbUser.phoneNumber
-        }
-        await setDoc(ref, {
-          ...profile,
-          phoneVerified: Boolean(fbUser.phoneNumber),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })
-        setCurrentUser(profile)
       }
+      setLoading(false)
+    }, (error) => {
+      // Handle auth errors
+      console.error('Auth state change error:', error)
+      clearTimeout(timeoutId)
       setLoading(false)
     })
 
@@ -194,61 +286,145 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const getRecaptchaVerifier = () => {
-    if (window.recaptchaVerifier) return window.recaptchaVerifier
-    const container = document.getElementById('recaptcha-container')
-    if (!container) throw new Error('OTP 驗證元件未就緒')
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' })
-    return window.recaptchaVerifier
+  const loginWithGoogle: AuthContextValue['loginWithGoogle'] = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider)
+      return { ok: true, message: 'Google 登入成功' }
+    } catch (err: unknown) {
+      const code = getErrorCode(err)
+      if (code === 'auth/popup-closed-by-user') {
+        return { ok: false, message: '已取消 Google 登入' }
+      }
+      if (code === 'auth/account-exists-with-different-credential') {
+        return { ok: false, message: '此 Google 帳號已被用作其他登入方式' }
+      }
+      return { ok: false, message: `Google 登入失敗: ${getErrorMessage(err)}` }
+    }
   }
 
   const sendOtp: AuthContextValue['sendOtp'] = async (regionCode, phone) => {
     if (!phone) return { ok: false, message: '請輸入手機號碼' }
     try {
       const fullPhone = normalizePhone(regionCode, phone)
-      const verifier = getRecaptchaVerifier()
-      const confirmation = await signInWithPhoneNumber(auth, fullPhone, verifier)
-      setOtpSession({ verificationId: confirmation.verificationId, phone: fullPhone })
+      
+      // Clean up old recaptcha if exists
+      const oldRecaptcha = document.getElementById('recaptcha-container')
+      if (oldRecaptcha) oldRecaptcha.innerHTML = ''
+      
+      // Create new RecaptchaVerifier
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': () => {
+          // reCAPTCHA solved
+        },
+        'expired-callback': () => {
+          setOtpSession(null)
+          return { ok: false, message: '驗證碼已過期，請重新發送' }
+        }
+      })
+      
+      // Send OTP via Firebase Auth
+      const confirmationResult = await signInWithPhoneNumber(auth, fullPhone, recaptchaVerifierRef.current)
+      
+      // Store confirmation result for verification
+      setOtpSession(confirmationResult)
+      
       return { ok: true, message: '驗證碼已發送' }
     } catch (err: unknown) {
+      const code = getErrorCode(err)
+      console.error('sendOtp error:', code, err)
+      if (code === 'auth/too-many-requests') {
+        return { ok: false, message: '發送次數過多，請稍後再試' }
+      }
+      if (code === 'auth/invalid-phone-number') {
+        return { ok: false, message: '電話號碼格式不正確' }
+      }
       return { ok: false, message: `發送失敗: ${getErrorMessage(err)}` }
     }
   }
 
   const verifyOtp: AuthContextValue['verifyOtp'] = async (otpCode) => {
-    if (!otpSession?.verificationId) return { ok: false, message: '請先發送驗證碼' }
+    if (!otpSession) return { ok: false, message: '請先發送驗證碼' }
     if (!otpCode) return { ok: false, message: '請輸入驗證碼' }
 
     try {
-      const credential = PhoneAuthProvider.credential(otpSession.verificationId, otpCode)
-      const cred = await signInWithCredential(auth, credential)
-      const ref = doc(db, 'users', cred.user.uid)
-      const snap = await getDoc(ref)
-      if (!snap.exists()) {
-        await setDoc(ref, {
-          id: cred.user.uid,
-          name: `用戶${otpSession.phone.slice(-4)}`,
-          phone: otpSession.phone,
-          email: formatEmailFromPhone(otpSession.phone),
+      // Confirm the verification code with Firebase Auth
+      const result = await otpSession.confirm(otpCode)
+      const fbUser = result.user
+      
+      // Get the phone number from Firebase user
+      const phone = fbUser.phoneNumber
+      
+      // Check if user exists in Firestore
+      const q = query(collection(db, 'users'), where('phone', '==', phone))
+      const snap = await getDocs(q)
+      
+      if (snap.empty) {
+        // Create new user document in Firestore (first time login via OTP)
+        const newUserId = fbUser.uid
+        
+        await setDoc(doc(db, 'users', newUserId), {
+          id: newUserId,
+          fbUid: fbUser.uid,
+          name: 'Cabs User',
+          phone: phone,
+          phoneVerified: true,
+          email: formatEmailFromPhone(phone || ''),
           role: 'passenger',
           points: 0,
-          phoneVerified: true,
+          kycStatus: 'n/a',
+          driverApproved: false,
+          kycSubmittedAt: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
-      } else {
-        await setDoc(
-          ref,
-          {
-            phone: otpSession.phone,
-            phoneVerified: true,
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true },
-        )
+        
+        // Set as current user
+        setCurrentUser({
+          id: newUserId,
+          name: 'Cabs User',
+          phone: phone || '',
+          phoneVerified: true,
+          email: formatEmailFromPhone(phone || ''),
+          role: 'passenger',
+          points: 0,
+          kycStatus: 'n/a',
+          driverApproved: false,
+          kycSubmittedAt: null,
+        })
+        
+        setOtpSession(null)
+        return { ok: true, message: '電話驗證成功！請完善您的個人資料。' }
       }
+      
+      // Update existing user
+      await updateDoc(snap.docs[0].ref, {
+        phone: phone,
+        phoneVerified: true,
+        fbUid: fbUser.uid,
+        updatedAt: new Date().toISOString(),
+      })
+      
+      // Trigger auth state refresh by re-fetching user data
+      const userDoc = await getDoc(snap.docs[0].ref)
+      if (userDoc.exists()) {
+        const data = userDoc.data()
+        setCurrentUser({
+          id: userDoc.id,
+          name: data.name || 'Cabs User',
+          phone: data.phone || phone,
+          phoneVerified: true,
+          email: data.email || formatEmailFromPhone(phone || ''),
+          role: data.role || 'passenger',
+          points: data.points || 0,
+          kycStatus: data.kycStatus || 'n/a',
+          driverApproved: data.driverApproved || false,
+          kycSubmittedAt: data.kycSubmittedAt || null,
+        })
+      }
+      
       setOtpSession(null)
-      return { ok: true, message: 'OTP 登入成功' }
+      return { ok: true, message: '電話驗證成功！' }
     } catch (err: unknown) {
       return { ok: false, message: `驗證失敗: ${getErrorMessage(err)}` }
     }
@@ -269,14 +445,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cred = await createUserWithEmailAndPassword(auth, email, password)
 
       const isMaster = fullPhone === MASTER_PHONE
+      const isDriver = role === 'driver'
+      
       await setDoc(doc(db, 'users', cred.user.uid), {
         id: cred.user.uid,
         name,
         phone: fullPhone,
+        phoneVerified: true,
         email,
         role: isMaster ? 'admin' : role,
         points: isMaster ? 999999 : 0,
-        phoneVerified: false,
+        // Driver-specific fields
+        kycStatus: isDriver ? 'pending' : 'n/a',
+        driverApproved: false,
+        kycSubmittedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
@@ -290,24 +472,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const resetPasswordByPhone: AuthContextValue['resetPasswordByPhone'] = async (regionCode, phone) => {
+  const resetPasswordByPhone: AuthContextValue['resetPasswordByPhone'] = async (regionCode, phone, newPassword?: string, otpCode?: string) => {
     if (!phone) return { ok: false, message: '請輸入手機號碼' }
-
     try {
       const fullPhone = normalizePhone(regionCode, phone)
-      const mappedEmail = formatEmailFromPhone(fullPhone)
-
-      try {
-        await sendPasswordResetEmail(auth, mappedEmail)
-        return { ok: true, message: '如果帳號存在，已發送重設密碼郵件。' }
-      } catch (innerErr: unknown) {
-        const code = getErrorCode(innerErr)
-        if (code === 'auth/user-not-found' || code === 'auth/invalid-email') {
-          // Use generic response to reduce account-enumeration signal.
-          return { ok: true, message: '如果帳號存在，已發送重設密碼郵件。' }
+      
+      // If newPassword and otpCode provided, verify OTP and set new password
+      if (newPassword && otpCode) {
+        // For password reset, we use Firebase Auth's phone verification
+        if (!otpSession) {
+          return { ok: false, message: '請先發送驗證碼' }
         }
-        return { ok: false, message: `發送重設郵件失敗: ${getErrorMessage(innerErr)}` }
+        
+        try {
+          await otpSession.confirm(otpCode)
+          
+          // Update password in Firestore (note: Firebase Auth doesn't store passwords for phone users)
+          const q = query(collection(db, 'users'), where('phone', '==', fullPhone))
+          const snap = await getDocs(q)
+          if (snap.empty) {
+            return { ok: false, message: '用戶不存在' }
+          }
+          // Note: For phone auth, we can't set a password. User would need email/password to reset.
+          return { ok: true, message: '驗證成功，請使用此電話號碼登入' }
+        } catch {
+          return { ok: false, message: '驗證碼錯誤' }
+        }
       }
+      
+      // Otherwise, send OTP (Step 1)
+      // Check if user exists
+      const q = query(collection(db, 'users'), where('phone', '==', fullPhone))
+      const snap = await getDocs(q)
+      if (snap.empty) {
+        return { ok: false, message: '此手機號碼未註冊' }
+      }
+      
+      // Send OTP via Firebase Auth
+      const recaptcha = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible'
+      })
+      
+      await signInWithPhoneNumber(auth, fullPhone, recaptcha)
+      setOtpSession({ verificationId: Date.now().toString() } as unknown as ConfirmationResult)
+      return { ok: true, message: '驗證碼已發送' }
     } catch (err: unknown) {
       return { ok: false, message: `錯誤: ${getErrorMessage(err)}` }
     }
@@ -331,7 +539,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     currentUser,
     loading,
+    needsRoleSelection,
+    setNeedsRoleSelection,
     loginWithPassword,
+    loginWithGoogle,
     sendOtp,
     verifyOtp,
     triggerPhoneVerification,

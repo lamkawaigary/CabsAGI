@@ -486,6 +486,12 @@ export default function PassengerHome() {
         setQuote(baseQuote)
       }
 
+      if (!nextQuote) {
+        setNotice({ text: '無法計算報價，請重試', tone: 'error' })
+        setPlacingOrder(false)
+        return
+      }
+
       await placeCharterOrderNow(nextQuote)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '未知錯誤'

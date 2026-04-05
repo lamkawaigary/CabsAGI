@@ -37,6 +37,17 @@ export interface AdminUserRecord {
   createdAt: string
   updatedAt?: string
   status?: string
+  // Driver KYC fields
+  kycStatus?: 'pending' | 'submitted' | 'approved' | 'rejected' | 'n/a'
+  driverApproved?: boolean
+  kycSubmittedAt?: string | null
+  kycApprovedAt?: string | null
+  // KYC Documents
+  idCardFront?: string
+  idCardBack?: string
+  driverLicense?: string
+  vehicleLicense?: string
+  kycRejectionReason?: string
 }
 
 export interface PricingConfigRecord {

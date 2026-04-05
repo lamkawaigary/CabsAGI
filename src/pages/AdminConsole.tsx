@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
+import { db } from '../firebaseConfig'
 import {
   assignOrderToDriverByAdmin,
   savePricingConfig,
@@ -15,6 +17,7 @@ import {
   type AdminUserRecord,
   type PricingConfigRecord,
 } from '../services/adminService'
+import { pointsService, pointsConfigService } from '../services/pointsService'
 import type {
   OfficialRouteRecord,
   OfficialRouteStatus,
@@ -24,7 +27,7 @@ import type {
 import { UI_TEXT } from '../constants/uiText'
 
 type NoticeTone = 'ok' | 'error' | 'info'
-type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing'
+type AdminTab = 'dashboard' | 'orders' | 'users' | 'routes' | 'pricing' | 'kyc' | 'points'
 
 const noticeClassByTone = (tone: NoticeTone) => {
   if (tone === 'error') return 'ui-notice ui-notice-error'
@@ -141,6 +144,10 @@ export default function AdminConsole() {
   const [pricing, setPricing] = useState<PricingConfigRecord>(DEFAULT_PRICING_FORM)
   const [pricingForm, setPricingForm] = useState<PricingConfigRecord>(DEFAULT_PRICING_FORM)
 
+  // KYC State
+  const [kycDrivers, setKycDrivers] = useState<AdminUserRecord[]>([])
+  const [loadingKyc, setLoadingKyc] = useState(false)
+
   const [loadingOrders, setLoadingOrders] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingRoutes, setLoadingRoutes] = useState(true)
@@ -223,6 +230,18 @@ export default function AdminConsole() {
       unsubRoutes()
       unsubPricing()
     }
+  }, [])
+
+  // Load KYC drivers
+  useEffect(() => {
+    setLoadingKyc(true)
+    const q = query(collection(db, 'users'), where('role', '==', 'driver'))
+    const unsub = onSnapshot(q, (snapshot) => {
+      const drivers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AdminUserRecord[]
+      setKycDrivers(drivers)
+      setLoadingKyc(false)
+    }, (err) => { console.error('KYC load error:', err); setLoadingKyc(false) })
+    return () => unsub()
   }, [])
 
   const summary = useMemo(() => {
@@ -473,6 +492,27 @@ export default function AdminConsole() {
     } finally {
       setUpdatingRouteId(null)
     }
+  }
+
+  // KYC handlers
+  const handleApproveDriver = async (driverId: string) => {
+    try {
+      await updateDoc(doc(db, 'users', driverId), { kycStatus: 'approved', driverApproved: true, kycApprovedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+      setNotice({ tone: 'ok', text: '✅ 司機 KYC 已批准' })
+    } catch (err) { console.error('Approve error:', err); setNotice({ tone: 'error', text: '批准失敗' }) }
+  }
+
+  const handleRejectDriver = async (driverId: string) => {
+    const reason = prompt('請輸入拒絕原因（可選）:')
+    try {
+      await updateDoc(doc(db, 'users', driverId), { 
+        kycStatus: 'rejected', 
+        driverApproved: false, 
+        kycRejectionReason: reason || '',
+        updatedAt: new Date().toISOString() 
+      })
+      setNotice({ tone: 'ok', text: '❌ 司機 KYC 已拒絕' })
+    } catch (err) { console.error('Reject error:', err); setNotice({ tone: 'error', text: '拒絕失敗' }) }
   }
 
   const handleSavePricing = async () => {
@@ -1129,6 +1169,363 @@ export default function AdminConsole() {
     </div>
   )
 
+  const renderKycTab = () => (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <h3 style={{ margin: 0, color: '#27483f' }}>司機 KYC 審批</h3>
+      {loadingKyc ? <div style={{ fontSize: 13, color: '#6e827c' }}>載入中...</div> : kycDrivers.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#6e827c', background: '#f5f8f5', borderRadius: 12 }}>暫無司機用户</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {kycDrivers.filter(d => d.kycStatus !== 'approved').map(driver => (
+            <div key={driver.id} style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 12, display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div><div style={{ fontWeight: 700, color: '#27483f' }}>{driver.name}</div><div style={{ fontSize: 12, color: '#6e827c' }}>{driver.phone}</div></div>
+                <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: driver.kycStatus === 'pending' ? '#fff3cd' : '#f8d7da', color: driver.kycStatus === 'pending' ? '#856404' : '#721c24' }}>{driver.kycStatus === 'pending' ? '⏳ 審批中' : '❌ 已拒絕'}</span>
+              </div>
+              
+              {/* Document Links */}
+              {(driver.idCardFront || driver.idCardBack || driver.driverLicense || driver.vehicleLicense) && (
+                <div style={{ display: 'grid', gap: 6, padding: 10, background: '#f8f9fa', borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6e827c' }}>📄 已上載證件：</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {driver.idCardFront && <a href={driver.idCardFront} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#e3f2fd', borderRadius: 6, fontSize: 11, color: '#1e56a3', textDecoration: 'none' }}>🪪 身份證正面</a>}
+                    {driver.idCardBack && <a href={driver.idCardBack} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#e3f2fd', borderRadius: 6, fontSize: 11, color: '#1e56a3', textDecoration: 'none' }}>🪪 身份證背面</a>}
+                    {driver.driverLicense && <a href={driver.driverLicense} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#e8f5e9', borderRadius: 6, fontSize: 11, color: '#1a7a3a', textDecoration: 'none' }}>🚗 駕駛執照</a>}
+                    {driver.vehicleLicense && <a href={driver.vehicleLicense} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#fff3e0', borderRadius: 6, fontSize: 11, color: '#e65100', textDecoration: 'none' }}>🚙 車輛登記</a>}
+                  </div>
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => handleApproveDriver(driver.id)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #c3dfcf', background: '#eff9f2', color: '#2c5a4f', fontWeight: 600, cursor: 'pointer' }}>✅ 批准</button>
+                <button onClick={() => handleRejectDriver(driver.id)} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #edc2bb', background: '#fff0ec', color: '#9c3d31', fontWeight: 600, cursor: 'pointer' }}>❌ 拒絕</button>
+              </div>
+            </div>
+          ))}
+          {kycDrivers.filter(d => d.kycStatus === 'approved').length > 0 && (
+            <><h4 style={{ margin: '16px 0 8px', color: '#6e827c', fontSize: 13 }}>已批准的司機 ({kycDrivers.filter(d => d.kycStatus === 'approved').length})</h4>
+            {kycDrivers.filter(d => d.kycStatus === 'approved').map(driver => (
+              <div key={driver.id} style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div><div style={{ fontWeight: 700, color: '#27483f' }}>{driver.name}</div><div style={{ fontSize: 12, color: '#6e827c' }}>{driver.phone}</div></div>
+                <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: '#eff9f2', color: '#2c5a4f' }}>✅ 已批准</span>
+              </div>
+            ))}</>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
+  // Points Management Tab
+  const [pointsConfig, setPointsConfig] = useState({ commissionRate: 0.08 })
+  const [pointsUsers, setPointsUsers] = useState<{id: string; name: string; email: string; phone: string; role: string; points: number}[]>([])
+  const [pointsLoading, setPointsLoading] = useState(false)
+  const [pointsNotice, setPointsNotice] = useState<{text: string; type: 'success' | 'error'} | null>(null)
+  
+  // Points form state
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [pointsAmount, setPointsAmount] = useState('')
+  const [pointsType, setPointsType] = useState<'DRIVER_TOPUP' | 'PASSENGER_BONUS' | 'PASSENGER_COMPENSATION'>('DRIVER_TOPUP')
+  const [pointsDescription, setPointsDescription] = useState('')
+  const [allTransactions, setAllTransactions] = useState<any[]>([])
+  const [pointsUserSearch, setPointsUserSearch] = useState('')
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
+
+  useEffect(() => {
+    if (activeTab === 'points') loadPointsData()
+  }, [activeTab])
+
+  // Close user dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.user-search-container')) {
+        setShowUserDropdown(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
+  const loadPointsData = async () => {
+    setPointsLoading(true)
+    try {
+      const [config, txns] = await Promise.all([
+        pointsConfigService.get(),
+        pointsService.getAllTransactions(50)
+      ])
+      
+      // Subscribe to users for real-time updates
+      subscribeAdminUsers(
+        (users) => {
+          console.log('[Points] Received users:', users.length)
+          setPointsUsers(users.map(u => ({
+            id: u.id,
+            name: u.name || '',
+            email: u.email || '',
+            phone: u.phone || '',
+            role: u.role || 'passenger',
+            points: u.points || 0
+          })))
+        },
+        (error) => {
+          console.error('[Points] Users subscription error:', error)
+        }
+      )
+      
+      setPointsConfig(config)
+      setAllTransactions(txns)
+    } catch (err) {
+      console.error('Failed to load points data:', err)
+    } finally {
+      setPointsLoading(false)
+    }
+  }
+
+  const handleUpdateCommission = async () => {
+    try {
+      await pointsConfigService.update({ commissionRate: parseFloat(pointsConfig.commissionRate.toString()) })
+      setPointsNotice({ text: '佣金比率已更新', type: 'success' })
+    } catch (err) {
+      setPointsNotice({ text: '更新失敗', type: 'error' })
+    }
+  }
+
+  const handleAddPoints = async () => {
+    if (!selectedUserId || !pointsAmount || !pointsDescription) {
+      setPointsNotice({ text: '請填寫所有欄位', type: 'error' })
+      return
+    }
+    const amount = parseInt(pointsAmount)
+    if (isNaN(amount) || amount <= 0) {
+      setPointsNotice({ text: '請輸入有效金額', type: 'error' })
+      return
+    }
+    try {
+      const user = pointsUsers.find(u => u.id === selectedUserId)
+      if (!user) return
+      
+      await pointsService.addPoints({
+        userId: selectedUserId,
+        userRole: user.role === 'driver' ? 'driver' : 'passenger',
+        type: pointsType,
+        amount,
+        description: pointsDescription,
+        createdBy: currentUser?.id || 'admin'
+      })
+      setPointsNotice({ text: `已成功添加 ${amount} points`, type: 'success' })
+      setSelectedUserId('')
+      setPointsAmount('')
+      setPointsDescription('')
+      loadPointsData()
+    } catch (err) {
+      const error = err as Error
+      console.error('[Points] Add points error:', error, 'message:', error.message, 'code:', (error as any).code)
+      setPointsNotice({ text: `操作失敗: ${error.message || JSON.stringify(error)}`, type: 'error' })
+    }
+  }
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'DRIVER_TOPUP': return '💰 司機充值'
+      case 'COMMISSION': return '💸 佣金'
+      case 'PASSENGER_BONUS': return '🎁 乘客獎勵'
+      case 'PASSENGER_COMPENSATION': return '🎯 乘客賠償'
+      case 'DRIVER_REFUND': return '↩️ 退款'
+      default: return type
+    }
+  }
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'driver': return '🚗 司機'
+      case 'passenger': return '👤 乘客'
+      case 'admin': return '⚙️ 管理員'
+      default: return role
+    }
+  }
+
+  const renderPointsTab = () => (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <h3 style={{ margin: 0, color: '#27483f' }}>💎 點數管理</h3>
+      
+      {/* Notice */}
+      {pointsNotice && (
+        <div style={{
+          padding: '10px 12px',
+          borderRadius: 8,
+          background: pointsNotice.type === 'success' ? '#eff9f2' : '#fff0ec',
+          border: `1px solid ${pointsNotice.type === 'success' ? '#c3dfcf' : '#edc2bb'}`,
+          color: pointsNotice.type === 'success' ? '#2c5a4f' : '#9c3d31',
+          fontSize: 13
+        }}>
+          {pointsNotice.text}
+        </div>
+      )}
+
+      {/* Commission Rate Config */}
+      <div style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 16 }}>
+        <h4 style={{ margin: '0 0 12px', color: '#27483f', fontSize: 14 }}>⚙️ 佣金比率設定</h4>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label style={{ fontSize: 13, color: '#666' }}>佣金比率:</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            value={pointsConfig.commissionRate}
+            onChange={(e) => setPointsConfig({ ...pointsConfig, commissionRate: parseFloat(e.target.value) })}
+            style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', width: 80 }}
+          />
+          <span style={{ fontSize: 13, color: '#666' }}>({(pointsConfig.commissionRate * 100).toFixed(0)}%)</span>
+          <button onClick={handleUpdateCommission} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1f4f43', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>儲存</button>
+        </div>
+      </div>
+
+      {/* Add Points Form */}
+      <div style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 16 }}>
+        <h4 style={{ margin: '0 0 12px', color: '#27483f', fontSize: 14 }}>➕ 添加點數</h4>
+        <div style={{ display: 'grid', gap: 10 }}>
+          {/* User Search */}
+          <div className="user-search-container" style={{ position: 'relative' }}>
+            <label style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>選擇用戶:</label>
+            <input
+              type="text"
+              placeholder="搜尋用戶 (名稱、電郵或電話)..."
+              value={pointsUserSearch}
+              onChange={(e) => {
+                setPointsUserSearch(e.target.value)
+                setShowUserDropdown(true)
+              }}
+              onFocus={() => setShowUserDropdown(true)}
+              style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, width: '100%', boxSizing: 'border-box' }}
+            />
+            {showUserDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: '#fff',
+                border: '1px solid #ddd',
+                borderRadius: 8,
+                maxHeight: 200,
+                overflow: 'auto',
+                zIndex: 1000,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}>
+                {pointsUsers.filter(u => 
+                  !pointsUserSearch || 
+                  (u.name?.toLowerCase().includes(pointsUserSearch.toLowerCase())) ||
+                  (u.email?.toLowerCase().includes(pointsUserSearch.toLowerCase())) ||
+                  (u.phone?.includes(pointsUserSearch))
+                ).length === 0 ? (
+                  <div style={{ padding: 12, color: '#888', textAlign: 'center' }}>找不到用戶</div>
+                ) : (
+                  pointsUsers.filter(u => 
+                    !pointsUserSearch || 
+                    (u.name?.toLowerCase().includes(pointsUserSearch.toLowerCase())) ||
+                    (u.email?.toLowerCase().includes(pointsUserSearch.toLowerCase())) ||
+                    (u.phone?.includes(pointsUserSearch))
+                  ).map(u => (
+                    <div
+                      key={u.id}
+                      onClick={() => {
+                        setSelectedUserId(u.id)
+                        setPointsUserSearch(u.name || u.email)
+                        setShowUserDropdown(false)
+                      }}
+                      style={{
+                        padding: '10px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #eee',
+                        background: selectedUserId === u.id ? '#f0f7f4' : '#fff'
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: '#333' }}>{u.name || '(無名稱)'}</div>
+                      <div style={{ fontSize: 12, color: '#666' }}>
+                        {u.email} | {getRoleLabel(u.role)} | {u.points || 0} pts
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+            {selectedUserId && (
+              <div style={{ marginTop: 4, fontSize: 12, color: '#1f4f43' }}>
+                已選擇: {pointsUsers.find(u => u.id === selectedUserId)?.name || pointsUsers.find(u => u.id === selectedUserId)?.email}
+                <button
+                  onClick={() => {
+                    setSelectedUserId('')
+                    setPointsUserSearch('')
+                  }}
+                  style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 4, border: 'none', background: '#ff4444', color: '#fff', cursor: 'pointer', fontSize: 11 }}
+                >
+                  清除
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <select
+            value={pointsType}
+            onChange={(e) => setPointsType(e.target.value as any)}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          >
+            <option value="DRIVER_TOPUP">💰 司機充值</option>
+            <option value="PASSENGER_BONUS">🎁 乘客獎勵</option>
+            <option value="PASSENGER_COMPENSATION">🎯 乘客賠償</option>
+          </select>
+          
+          <input
+            type="number"
+            placeholder="點數數量"
+            value={pointsAmount}
+            onChange={(e) => setPointsAmount(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          />
+          
+          <input
+            type="text"
+            placeholder="原因說明 (例如: 充值、獎勵、賠償)"
+            value={pointsDescription}
+            onChange={(e) => setPointsDescription(e.target.value)}
+            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+          />
+          
+          <button onClick={handleAddPoints} style={{ padding: '12px', borderRadius: 8, border: 'none', background: '#1f4f43', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+            確認添加點數
+          </button>
+        </div>
+      </div>
+
+      {/* Transaction History */}
+      <div style={{ background: '#fff', border: '1px solid #dce6dd', borderRadius: 12, padding: 16 }}>
+        <h4 style={{ margin: '0 0 12px', color: '#27483f', fontSize: 14 }}>📜 點數交易記錄</h4>
+        {pointsLoading ? (
+          <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>載入中...</div>
+        ) : allTransactions.length === 0 ? (
+          <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>暫無交易記錄</div>
+        ) : (
+          <div style={{ display: 'grid', gap: 8, maxHeight: 400, overflow: 'auto' }}>
+            {allTransactions.map(tx => (
+              <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#f8faf9', borderRadius: 8, border: '1px solid #eee' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>{getTypeLabel(tx.type)}</div>
+                  <div style={{ fontSize: 11, color: '#666' }}>{tx.description}</div>
+                  <div style={{ fontSize: 10, color: '#999' }}>{new Date(tx.createdAt).toLocaleString('zh-HK')}</div>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: tx.amount >= 0 ? '#2e7d32' : '#c62828' }}>
+                  {tx.amount >= 0 ? '+' : ''}{tx.amount}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div style={{ minHeight: '100vh', background: '#f4f7f5' }}>
       <header
@@ -1232,6 +1629,8 @@ export default function AdminConsole() {
             { key: 'users', label: '用戶管理' },
             { key: 'routes', label: '官方班次' },
             { key: 'pricing', label: '價格設定' },
+            { key: 'kyc', label: 'KYC審批' },
+            { key: 'points', label: '💎 點數管理' },
           ].map((item) => (
             <button
               key={item.key}
@@ -1264,6 +1663,8 @@ export default function AdminConsole() {
         {activeTab === 'users' && renderUsersTab()}
         {activeTab === 'routes' && renderRoutesTab()}
         {activeTab === 'pricing' && renderPricingTab()}
+        {activeTab === 'kyc' && renderKycTab()}
+        {activeTab === 'points' && renderPointsTab()}
       </main>
     </div>
   )

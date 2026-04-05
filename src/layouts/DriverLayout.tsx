@@ -27,6 +27,10 @@ export default function DriverLayout() {
     const active = driverNavItems.find((item) => location.pathname.startsWith(item.path))
     return active?.label || '司機中心'
   }, [location.pathname])
+  const activeIndex = Math.max(
+    1,
+    driverNavItems.findIndex((item) => location.pathname.startsWith(item.path)) + 1,
+  )
 
   useEffect(() => {
     if (!menuOpen) return undefined
@@ -110,6 +114,24 @@ export default function DriverLayout() {
         <div>
           <div style={{ letterSpacing: '0.12em', fontSize: 11, color: 'rgba(243,255,248,0.5)', fontWeight: 700 }}>CABS DRIVER</div>
           <div style={{ fontSize: 19, fontWeight: 800, color: '#f3fff8' }}>{pageTitle} · {currentUser?.name}</div>
+          <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(243,255,248,0.72)' }}>
+            專注接單、行程與即時訊息處理
+          </div>
+          <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontSize: 11,
+                borderRadius: 999,
+                border: '1px solid rgba(31,191,144,0.35)',
+                background: 'rgba(31,191,144,0.16)',
+                padding: '3px 8px',
+                fontWeight: 700,
+                color: '#c7ffed',
+              }}
+            >
+              目前分頁 {activeIndex}/{driverNavItems.length}
+            </span>
+          </div>
         </div>
         <button type="button" aria-label="開啟司機功能菜單" onClick={() => setMenuOpen(true)} style={menuButtonStyle}>
           <Icons.Menu />

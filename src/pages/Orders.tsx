@@ -13,6 +13,22 @@ interface OrdersRouteState {
   notice?: PageNotice
 }
 
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: '待接單',
+  accepted: '已接單',
+  in_progress: '進行中',
+  completed: '已完成',
+  cancelled: '已取消',
+}
+
+const ORDER_STATUS_STYLES: Record<string, React.CSSProperties> = {
+  pending: { background: '#fff3cd', color: '#7a5a1a' },
+  accepted: { background: '#d6ebff', color: '#1e56a3' },
+  in_progress: { background: '#d4edda', color: '#1a7a3a' },
+  completed: { background: '#c8e6c9', color: '#2e7d32' },
+  cancelled: { background: '#f8d7da', color: '#c62828' },
+}
+
 const noticeClassByTone = (tone: NoticeTone) => {
   if (tone === 'error') return 'ui-notice ui-notice-error'
   if (tone === 'ok') return 'ui-notice ui-notice-ok'
@@ -73,6 +89,13 @@ export default function OrdersPage() {
               className="ui-card ui-card-interactive"
               style={{ padding: 14, display: 'grid', gap: 7, borderRadius: 14, boxShadow: '0 10px 20px rgba(14, 64, 54, 0.06)' }}
             >
+              {(() => {
+                const statusStyle = ORDER_STATUS_STYLES[order.status] || {
+                  background: '#f5f8f6',
+                  color: '#2f5c4f',
+                }
+                const statusLabel = ORDER_STATUS_LABELS[order.status] || order.status
+                return (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <strong style={{ color: '#23443c' }}>{order.id}</strong>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -84,12 +107,14 @@ export default function OrdersPage() {
                   </span>
                   <span
                     className="ui-pill"
-                    style={{ background: '#f5f8f6', color: '#2f5c4f' }}
+                    style={statusStyle}
                   >
-                    {order.status}
+                    {statusLabel}
                   </span>
                 </div>
               </div>
+                )
+              })()}
               <div style={{ fontSize: 14, color: '#304f47', fontWeight: 700 }}>
                 {order.pickup}
                 {' -> '}

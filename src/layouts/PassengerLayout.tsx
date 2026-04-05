@@ -254,7 +254,7 @@ export default function PassengerLayout() {
         </div>
       )}
 
-      <section style={{ padding: '18px 16px' }}>
+      <section style={{ padding: '16px 14px' }}>
         <Outlet />
       </section>
 
@@ -264,15 +264,16 @@ export default function PassengerLayout() {
           left: 10,
           right: 10,
           bottom: 'max(10px, env(safe-area-inset-bottom, 0px))',
-          borderRadius: 16,
+          borderRadius: 18,
           border: '1px solid #d6e0d8',
           background: 'rgba(255,255,255,0.94)',
           backdropFilter: 'blur(8px)',
           padding: '8px 10px calc(8px + env(safe-area-inset-bottom, 0px))',
           display: 'grid',
           gridTemplateColumns: 'repeat(4,1fr)',
-          gap: 4,
+          gap: 5,
           zIndex: 15,
+          boxShadow: '0 10px 24px rgba(14, 64, 54, 0.14)',
         }}
       >
         {navItems.map((item) => (

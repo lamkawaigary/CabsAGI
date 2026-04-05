@@ -18,6 +18,14 @@ const noticeClassByTone = (tone: NoticeTone) => {
   return 'ui-notice ui-notice-info'
 }
 
+const statusLabelByOrderStatus: Record<string, string> = {
+  pending: '待接單',
+  accepted: '已接單',
+  in_progress: '進行中',
+  completed: '已完成',
+  cancelled: '已取消',
+}
+
 export default function DriverDashboard() {
   const { currentUser } = useAuth()
   const navigate = useNavigate()
@@ -128,9 +136,45 @@ export default function DriverDashboard() {
     )
   }
 
+  const activePoolCount = poolOrders.length
+  const activeMineCount = myOrders.filter(
+    (order) => order.status === 'accepted' || order.status === 'in_progress',
+  ).length
+  const completedMineCount = myOrders.filter((order) => order.status === 'completed').length
+
   return (
     <div style={{ padding: '0 0 80px 0' }}>
       <main style={{ display: 'grid', gap: 12 }}>
+        <section
+          style={{
+            borderRadius: 18,
+            border: '1px solid rgba(31, 191, 144, 0.25)',
+            background: 'linear-gradient(135deg, #1f3b49 0%, #2a4f63 100%)',
+            color: '#eafff7',
+            padding: '16px 14px',
+            boxShadow: '0 16px 32px rgba(0, 0, 0, 0.2)',
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.9 }}>司機工作台</div>
+          <h2 style={{ margin: '4px 0 0', fontSize: 21, lineHeight: 1.25, fontWeight: 800 }}>
+            先處理當前行程，再接新單
+          </h2>
+          <p style={{ margin: '8px 0 0', fontSize: 13, lineHeight: 1.5, color: 'rgba(234,255,247,0.92)' }}>
+            你可在公海快速接單，並在「我的行程」持續推進狀態。
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            <span style={{ fontSize: 12, borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.12)', padding: '4px 10px', fontWeight: 700 }}>
+              公海可接 {activePoolCount}
+            </span>
+            <span style={{ fontSize: 12, borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.12)', padding: '4px 10px', fontWeight: 700 }}>
+              進行中 {activeMineCount}
+            </span>
+            <span style={{ fontSize: 12, borderRadius: 999, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.12)', padding: '4px 10px', fontWeight: 700 }}>
+              已完成 {completedMineCount}
+            </span>
+          </div>
+        </section>
+
         {notice && (
           <div className={noticeClassByTone(notice.tone)}>
             {notice.text}
@@ -169,13 +213,13 @@ export default function DriverDashboard() {
                   <article
                     key={order.id || `${order.passengerId}-${order.createdAt}`}
                     className="ui-card"
-                    style={{ padding: 12, display: 'grid', gap: 6 }}
+                    style={{ padding: 12, display: 'grid', gap: 6, boxShadow: '0 8px 18px rgba(14, 64, 54, 0.06)' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                       <strong style={{ color: '#27483f' }}>{order.id}</strong>
                       <span
                         className="ui-pill"
-                        style={{ fontSize: 11, padding: '2px 8px' }}
+                        style={{ fontSize: 11, padding: '2px 8px', background: '#eef7f2', borderColor: '#d4e4db', color: '#2f5c4f' }}
                       >
                         {orderType === 'official_route' ? '官方班次' : '包車點對點'}
                       </span>
@@ -231,15 +275,15 @@ export default function DriverDashboard() {
                 <article
                   key={order.id || `${order.passengerId}-${order.createdAt}`}
                   className="ui-card"
-                  style={{ padding: 12, display: 'grid', gap: 6 }}
+                  style={{ padding: 12, display: 'grid', gap: 6, boxShadow: '0 8px 18px rgba(14, 64, 54, 0.06)' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                     <strong style={{ color: '#27483f' }}>{order.id}</strong>
                     <span
                       className="ui-pill"
-                      style={{ fontSize: 11, padding: '2px 8px' }}
+                      style={{ fontSize: 11, padding: '2px 8px', background: '#f5f8f6', color: '#2f5c4f' }}
                     >
-                      {statusLabel}
+                      {statusLabelByOrderStatus[order.status] || statusLabel}
                     </span>
                   </div>
                   <div style={{ fontSize: 13, color: '#37564e' }}>

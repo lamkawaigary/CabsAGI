@@ -1141,7 +1141,15 @@ export default function AdminConsole() {
           gap: 10,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
           <div>
             <div style={{ fontSize: 11, letterSpacing: '0.14em', opacity: 0.78, fontWeight: 700 }}>CABS ADMIN CONSOLE</div>
             <div style={{ fontSize: 20, fontWeight: 900 }}>後台管理中心 · {currentUser?.name}</div>
@@ -1149,7 +1157,7 @@ export default function AdminConsole() {
               一站式管理訂單、用戶、班次與計價策略
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               onClick={() => navigate('/home')}
               className="ui-btn ui-btn-outline"

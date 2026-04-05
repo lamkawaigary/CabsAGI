@@ -78,12 +78,15 @@ export interface CreateOrderInput {
 
 export interface OfficialRouteRecord {
   id: string
+  routeName?: string
   pickup: string
   pickupLat: number
   pickupLng: number
   dropoff: string
   dropoffLat: number
   dropoffLng: number
+  pickupHotspotId?: string
+  dropoffHotspotId?: string
   date: string
   status: OfficialRouteStatus
   totalSeats: number
@@ -91,6 +94,9 @@ export interface OfficialRouteRecord {
   pricePerSeat: number
   charterPrice: number
   createdAt: string
+  createdByDriverId?: string
+  createdByDriverName?: string
+  isDriverRoute?: boolean
 }
 
 const ORDER_STATUS_VALUES: OrderStatus[] = ['pending', 'accepted', 'in_progress', 'completed', 'cancelled']
@@ -110,6 +116,50 @@ const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   completed: [],
   cancelled: [],
 }
+
+export interface DriverRouteUpsertInput {
+  routeId?: string
+  driverId: string
+  driverName?: string
+  pickup: {
+    id: string
+    name: string
+    lat: number
+    lng: number
+  }
+  dropoff: {
+    id: string
+    name: string
+    lat: number
+    lng: number
+  }
+  date: string
+  totalSeats: number
+  pricePerSeat: number
+  charterPrice: number
+}
+
+export interface DriverPublishedRouteRecord {
+  id: string
+  driverId: string
+  driverName?: string
+  routeName: string
+  fromHotspotId: string
+  fromHotspotName: string
+  toHotspotId: string
+  toHotspotName: string
+  departureTime: string
+  suggestedPrice: number
+  discountAmount: number
+  effectivePrice: number
+  estimatedPointsCost: number
+  bookingsCount: number
+  status: DriverPublishedRouteStatus
+  createdAt: string
+  updatedAt?: string
+}
+
+export type DriverPublishedRouteStatus = 'OPEN' | 'CANCELLED'
 
 const isRecord = (val: unknown): val is Record<string, unknown> =>
   typeof val === 'object' && val !== null
@@ -297,6 +347,48 @@ const sanitizeOfficialRouteDoc = (docSnap: QueryDocumentSnapshot<DocumentData>):
   }
 }
 
+const sanitizeDriverPublishedRouteDoc = (
+  docSnap: QueryDocumentSnapshot<DocumentData>,
+): DriverPublishedRouteRecord => {
+  const data = docSnap.data() || {}
+  const clean: Record<string, unknown> = { id: docSnap.id }
+  Object.keys(data).forEach((key) => {
+    clean[key] = sanitizeValue(data[key])
+  })
+
+  const routeName = firstString(
+    clean.routeName,
+    clean.route_label,
+    `${firstString(clean.fromHotspotName)} → ${firstString(clean.toHotspotName)}`,
+  )
+  const statusRaw = firstString(clean.status).toUpperCase()
+  const status: DriverPublishedRouteStatus =
+    statusRaw === 'CANCELLED' ? 'CANCELLED' : 'OPEN'
+
+  return {
+    id: docSnap.id,
+    driverId: firstString(clean.driverId, clean.createdByDriverId),
+    driverName: firstString(clean.driverName, clean.createdByDriverName) || undefined,
+    routeName,
+    fromHotspotId: firstString(clean.fromHotspotId, clean.pickupHotspotId),
+    fromHotspotName: firstString(clean.fromHotspotName, clean.pickup),
+    toHotspotId: firstString(clean.toHotspotId, clean.dropoffHotspotId),
+    toHotspotName: firstString(clean.toHotspotName, clean.dropoff),
+    departureTime: firstString(clean.departureTime, clean.date),
+    suggestedPrice: Math.max(0, pickNumber(clean.suggestedPrice, clean.pricePerSeat)),
+    discountAmount: Math.max(0, pickNumber(clean.discountAmount)),
+    effectivePrice: Math.max(0, pickNumber(clean.effectivePrice, clean.pricePerSeat, clean.suggestedPrice)),
+    estimatedPointsCost: Math.max(0, Math.round(pickNumber(clean.estimatedPointsCost))),
+    bookingsCount: Math.max(
+      0,
+      Math.round(pickNumber(clean.bookingsCount, clean.occupiedSeats, clean.bookedSeats)),
+    ),
+    status,
+    createdAt: firstString(clean.createdAt, new Date(0).toISOString()),
+    updatedAt: firstString(clean.updatedAt) || undefined,
+  }
+}
+
 export const createOrder = async (order: CreateOrderInput) => {
   const nowISO = new Date().toISOString()
   const orderType = order.orderType || 'charter'
@@ -403,6 +495,112 @@ export const subscribeOfficialRoutes = (
   )
 }
 
+export const subscribeDriverOfficialRoutes = (
+  driverId: string,
+  callback: (routes: DriverPublishedRouteRecord[]) => void,
+  onError?: (error: Error) => void,
+) => {
+  const q = query(
+    collection(db, 'official_routes'),
+    where('isDriverRoute', '==', true),
+    where('createdByDriverId', '==', driverId),
+    limit(200),
+  )
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const routes = snapshot.docs
+        .map((docSnap) => sanitizeDriverPublishedRouteDoc(docSnap))
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+        )
+      callback(routes)
+    },
+    (error) => onError?.(error as Error),
+  )
+}
+
+export const upsertDriverOfficialRoute = async (params: {
+  routeId?: string
+  driverId: string
+  driverName?: string
+  patch: {
+    routeName: string
+    fromHotspotId: string
+    fromHotspotName: string
+    toHotspotId: string
+    toHotspotName: string
+    departureTime: string
+    suggestedPrice: number
+    discountAmount: number
+    effectivePrice: number
+    estimatedPointsCost: number
+    status: DriverPublishedRouteStatus
+    bookingsCount: number
+  }
+}) => {
+  const nowISO = new Date().toISOString()
+  const payload = {
+    routeName: params.patch.routeName,
+    pickup: params.patch.fromHotspotName,
+    dropoff: params.patch.toHotspotName,
+    pickupHotspotId: params.patch.fromHotspotId,
+    dropoffHotspotId: params.patch.toHotspotId,
+    fromHotspotId: params.patch.fromHotspotId,
+    fromHotspotName: params.patch.fromHotspotName,
+    toHotspotId: params.patch.toHotspotId,
+    toHotspotName: params.patch.toHotspotName,
+    date: params.patch.departureTime,
+    departureTime: params.patch.departureTime,
+    suggestedPrice: Math.max(0, params.patch.suggestedPrice),
+    discountAmount: Math.max(0, params.patch.discountAmount),
+    effectivePrice: Math.max(0, params.patch.effectivePrice),
+    estimatedPointsCost: Math.max(0, Math.round(params.patch.estimatedPointsCost)),
+    status: params.patch.status === 'CANCELLED' ? 'cancelled' : 'collecting',
+    occupiedSeats: Math.max(0, Math.round(params.patch.bookingsCount)),
+    bookingsCount: Math.max(0, Math.round(params.patch.bookingsCount)),
+    pricePerSeat: Math.max(0, params.patch.effectivePrice),
+    charterPrice: Math.max(0, params.patch.effectivePrice * 4),
+    totalSeats: 4,
+    isDriverRoute: true,
+    createdByDriverId: params.driverId,
+    createdByDriverName: firstString(params.driverName),
+    driverId: params.driverId,
+    driverName: firstString(params.driverName),
+    updatedAt: nowISO,
+    updatedAtServer: serverTimestamp(),
+  }
+
+  if (params.routeId) {
+    const routeRef = doc(db, 'official_routes', params.routeId)
+    await runTransaction(db, async (tx) => {
+      const routeSnap = await tx.get(routeRef)
+      if (!routeSnap.exists()) throw new Error('班次不存在')
+      const routeData = routeSnap.data() || {}
+      const routeDriverId = firstString(routeData.createdByDriverId, routeData.driverId)
+      if (!routeDriverId || routeDriverId !== params.driverId) {
+        throw new Error('你不是此班次的建立司機')
+      }
+      const occupiedSeats = Math.max(
+        0,
+        Math.round(pickNumber(routeData.occupiedSeats, routeData.bookingsCount, routeData.bookedSeats)),
+      )
+      if (occupiedSeats > 0) {
+        throw new Error('班次已有乘客參與，不能再修改時間或價格')
+      }
+      tx.update(routeRef, payload)
+    })
+    return
+  }
+
+  await addDoc(collection(db, 'official_routes'), {
+    ...payload,
+    createdAt: nowISO,
+    createdAtServer: serverTimestamp(),
+  })
+}
+
 export const joinOfficialRoute = async (params: {
   routeId: string
   seats: number
@@ -468,6 +666,95 @@ export const joinOfficialRoute = async (params: {
       updatedAt: nowISO,
       createdAtServer: serverTimestamp(),
       updatedAtServer: serverTimestamp(),
+    })
+  })
+}
+
+export const updateDriverOfficialRoute = async (params: {
+  routeId: string
+  driverId: string
+  driverName?: string
+  date?: string
+  pricePerSeat?: number
+  charterPrice?: number
+}) => {
+  await runTransaction(db, async (tx) => {
+    const routeRef = doc(db, 'official_routes', params.routeId)
+    const routeSnap = await tx.get(routeRef)
+    if (!routeSnap.exists()) throw new Error('班次不存在')
+
+    const routeData = routeSnap.data() || {}
+    const routeDriverId = firstString(routeData.driverId)
+    if (!routeDriverId || routeDriverId !== params.driverId) {
+      throw new Error('你不是此班次的建立司機')
+    }
+
+    const occupiedSeats = Math.max(
+      0,
+      Math.round(pickNumber(routeData.occupiedSeats, routeData.bookedSeats)),
+    )
+    if (occupiedSeats > 0) {
+      throw new Error('班次已有乘客參與，不能再修改時間或價格')
+    }
+
+    const nowISO = new Date().toISOString()
+    const payload: Record<string, unknown> = {
+      updatedAt: nowISO,
+      updatedAtServer: serverTimestamp(),
+      updatedBy: params.driverId,
+      updatedByName: firstString(params.driverName),
+    }
+
+    if (typeof params.date === 'string' && params.date.trim()) {
+      const nextDate = new Date(params.date)
+      if (Number.isNaN(nextDate.getTime())) {
+        throw new Error('班次時間格式無效')
+      }
+      payload.date = nextDate.toISOString()
+    }
+    if (typeof params.pricePerSeat === 'number' && Number.isFinite(params.pricePerSeat)) {
+      payload.pricePerSeat = Math.max(0, params.pricePerSeat)
+    }
+    if (typeof params.charterPrice === 'number' && Number.isFinite(params.charterPrice)) {
+      payload.charterPrice = Math.max(0, params.charterPrice)
+    }
+
+    tx.update(routeRef, payload)
+  })
+}
+
+export const cancelDriverOfficialRoute = async (params: {
+  routeId: string
+  driverId: string
+  driverName?: string
+}) => {
+  await runTransaction(db, async (tx) => {
+    const routeRef = doc(db, 'official_routes', params.routeId)
+    const routeSnap = await tx.get(routeRef)
+    if (!routeSnap.exists()) throw new Error('班次不存在')
+
+    const routeData = routeSnap.data() || {}
+    const routeDriverId = firstString(routeData.driverId)
+    if (!routeDriverId || routeDriverId !== params.driverId) {
+      throw new Error('你不是此班次的建立司機')
+    }
+
+    const occupiedSeats = Math.max(
+      0,
+      Math.round(pickNumber(routeData.occupiedSeats, routeData.bookedSeats)),
+    )
+    if (occupiedSeats > 0) {
+      throw new Error('班次已有乘客參與，不能取消')
+    }
+
+    const nowISO = new Date().toISOString()
+    tx.update(routeRef, {
+      status: 'cancelled',
+      cancelledAt: nowISO,
+      updatedAt: nowISO,
+      updatedAtServer: serverTimestamp(),
+      cancelledBy: params.driverId,
+      cancelledByName: firstString(params.driverName),
     })
   })
 }

@@ -6,11 +6,29 @@ import {
   advanceOrderStatusAsDriver,
   subscribeDriverOrderPool,
   subscribeDriverOrders,
+  subscribeDriverOfficialRoutes,
+  upsertDriverOfficialRoute,
+  updateDriverOfficialRoute,
+  cancelDriverOfficialRoute,
   type OrderRecord,
+  type DriverPublishedRouteRecord,
 } from '../services/orderService'
 import { UI_TEXT } from '../constants/uiText'
 
 type NoticeTone = 'ok' | 'error' | 'info'
+type DriverRouteHotspot = { id: string; name: string; category: 'event' | 'airport' | 'cross_border' }
+
+const DRIVER_ROUTE_HOTSPOTS: DriverRouteHotspot[] = [
+  { id: 'event-kai-tak', name: '啟德演唱會區', category: 'event' },
+  { id: 'event-asiaworld', name: '亞洲國際博覽館', category: 'event' },
+  { id: 'airport-hkg', name: '香港國際機場', category: 'airport' },
+  { id: 'airport-west-kowloon', name: '西九龍高鐵站', category: 'airport' },
+  { id: 'cb-szw', name: '深圳灣口岸', category: 'cross_border' },
+  { id: 'cb-lok-ma-chau', name: '落馬洲口岸', category: 'cross_border' },
+]
+
+const SUGGESTED_PRICE_OPTIONS = [80, 100, 120, 150, 180, 220]
+const DRIVER_POINT_RATE = 0.08
 
 const noticeClassByTone = (tone: NoticeTone) => {
   if (tone === 'error') return 'ui-notice ui-notice-error'
@@ -37,10 +55,21 @@ export default function DriverDashboard() {
   const [online] = useState(true)
   const [poolOrders, setPoolOrders] = useState<OrderRecord[]>([])
   const [myOrders, setMyOrders] = useState<OrderRecord[]>([])
+  const [publishedRoutes, setPublishedRoutes] = useState<DriverPublishedRouteRecord[]>([])
   const [loadingPool, setLoadingPool] = useState(true)
   const [loadingMine, setLoadingMine] = useState(true)
+  const [loadingRoutes, setLoadingRoutes] = useState(true)
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null)
+  const [processingRouteId, setProcessingRouteId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null)
+  const [publishingRoute, setPublishingRoute] = useState(false)
+  const [newRoute, setNewRoute] = useState({
+    fromHotspotId: DRIVER_ROUTE_HOTSPOTS[0].id,
+    toHotspotId: DRIVER_ROUTE_HOTSPOTS[2].id,
+    departureTime: '',
+    basePrice: SUGGESTED_PRICE_OPTIONS[2],
+    discountAmount: 0,
+  })
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -69,12 +98,136 @@ export default function DriverDashboard() {
         setLoadingMine(false)
       },
     )
+    const unsubRoutes = subscribeDriverOfficialRoutes(
+      currentUser.id,
+      (routes) => {
+        setPublishedRoutes(routes)
+        setLoadingRoutes(false)
+      },
+      (error) => {
+        setNotice({ text: `讀取已發佈路線失敗: ${error.message}`, tone: 'error' })
+        setLoadingRoutes(false)
+      },
+    )
 
     return () => {
       unsubPool()
       unsubMine()
+      unsubRoutes()
     }
   }, [currentUser?.id])
+
+  const selectedFromHotspot = DRIVER_ROUTE_HOTSPOTS.find(
+    (hotspot) => hotspot.id === newRoute.fromHotspotId,
+  )
+  const availableToHotspots = DRIVER_ROUTE_HOTSPOTS.filter(
+    (hotspot) => hotspot.id !== newRoute.fromHotspotId,
+  )
+  const selectedToHotspot = DRIVER_ROUTE_HOTSPOTS.find(
+    (hotspot) => hotspot.id === newRoute.toHotspotId,
+  )
+  const routeDisplayName =
+    selectedFromHotspot && selectedToHotspot
+      ? `${selectedFromHotspot.name} → ${selectedToHotspot.name}`
+      : '路線未設定'
+  const effectivePrice = Math.max(0, newRoute.basePrice - newRoute.discountAmount)
+  const estimatedPoints = Math.ceil(effectivePrice * DRIVER_POINT_RATE)
+
+  const handlePublishRoute = async () => {
+    if (!currentUser?.id) return
+    if (!selectedFromHotspot || !selectedToHotspot) {
+      setNotice({ text: '請先選擇起點與終點熱點', tone: 'error' })
+      return
+    }
+    if (selectedFromHotspot.id === selectedToHotspot.id) {
+      setNotice({ text: '起點與終點不可相同', tone: 'error' })
+      return
+    }
+    if (!newRoute.departureTime) {
+      setNotice({ text: '請先設定出發時間', tone: 'error' })
+      return
+    }
+
+    setPublishingRoute(true)
+    try {
+      await upsertDriverOfficialRoute({
+        driverId: currentUser.id,
+        driverName: currentUser.name,
+        patch: {
+          routeName: routeDisplayName,
+          fromHotspotId: selectedFromHotspot.id,
+          fromHotspotName: selectedFromHotspot.name,
+          toHotspotId: selectedToHotspot.id,
+          toHotspotName: selectedToHotspot.name,
+          departureTime: new Date(newRoute.departureTime).toISOString(),
+          suggestedPrice: newRoute.basePrice,
+          discountAmount: newRoute.discountAmount,
+          effectivePrice,
+          estimatedPointsCost: estimatedPoints,
+          status: 'OPEN',
+          bookingsCount: 0,
+        },
+      })
+      setNotice({ text: `已發佈路線：${routeDisplayName}`, tone: 'ok' })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤'
+      setNotice({ text: `發佈路線失敗: ${message}`, tone: 'error' })
+    } finally {
+      setPublishingRoute(false)
+    }
+  }
+
+  const handleUpdatePublishedRoute = async (
+    route: DriverPublishedRouteRecord,
+    patch: { departureTime?: string; effectivePrice?: number },
+  ) => {
+    if (!currentUser?.id || !route.id) return
+    if (route.bookingsCount > 0) {
+      setNotice({ text: '已有乘客參與，不能再調整時間或價格', tone: 'error' })
+      return
+    }
+    setProcessingRouteId(route.id)
+    try {
+      const nextPrice = Math.max(0, patch.effectivePrice ?? route.effectivePrice)
+      await updateDriverOfficialRoute({
+        routeId: route.id,
+        driverId: currentUser.id,
+        date: patch.departureTime,
+        pricePerSeat: nextPrice,
+        charterPrice: Math.max(nextPrice, route.suggestedPrice),
+      })
+      setNotice({
+        text: `已更新路線 ${route.routeName}`,
+        tone: 'ok',
+      })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤'
+      setNotice({ text: `更新路線失敗: ${message}`, tone: 'error' })
+    } finally {
+      setProcessingRouteId(null)
+    }
+  }
+
+  const handleCancelPublishedRoute = async (route: DriverPublishedRouteRecord) => {
+    if (!currentUser?.id || !route.id) return
+    if (route.bookingsCount > 0) {
+      setNotice({ text: '已有乘客參與，不能取消班次', tone: 'error' })
+      return
+    }
+    setProcessingRouteId(route.id)
+    try {
+      await cancelDriverOfficialRoute({ routeId: route.id, driverId: currentUser.id })
+      setNotice({
+        text: `已取消班次 ${route.routeName}`,
+        tone: 'ok',
+      })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤'
+      setNotice({ text: `取消班次失敗: ${message}`, tone: 'error' })
+    } finally {
+      setProcessingRouteId(null)
+    }
+  }
 
   const handleAcceptOrder = async (order: OrderRecord) => {
     if (!currentUser?.id || !order.id) return
@@ -197,6 +350,204 @@ export default function DriverDashboard() {
             我的行程
           </button>
         </div>
+
+        <section className="ui-card" style={{ padding: 12, display: 'grid', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <strong style={{ color: '#27483f' }}>提交路線（熱點模式）</strong>
+            <span style={{ fontSize: 12, color: '#5f7770' }}>
+              估算扣點: {estimatedPoints} 點
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 8 }}>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#5f7770' }}>
+              起點熱點
+              <select
+                className="ui-input"
+                value={newRoute.fromHotspotId}
+                onChange={(event) => {
+                  const nextFrom = event.target.value
+                  setNewRoute((prev) => {
+                    const nextTo =
+                      prev.toHotspotId === nextFrom
+                        ? DRIVER_ROUTE_HOTSPOTS.find((item) => item.id !== nextFrom)?.id || prev.toHotspotId
+                        : prev.toHotspotId
+                    return { ...prev, fromHotspotId: nextFrom, toHotspotId: nextTo }
+                  })
+                }}
+              >
+                {DRIVER_ROUTE_HOTSPOTS.map((hotspot) => (
+                  <option key={hotspot.id} value={hotspot.id}>
+                    {hotspot.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#5f7770' }}>
+              終點熱點
+              <select
+                className="ui-input"
+                value={newRoute.toHotspotId}
+                onChange={(event) =>
+                  setNewRoute((prev) => ({ ...prev, toHotspotId: event.target.value }))
+                }
+              >
+                {availableToHotspots.map((hotspot) => (
+                  <option key={hotspot.id} value={hotspot.id}>
+                    {hotspot.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#5f7770' }}>
+              建議價
+              <select
+                className="ui-input"
+                value={newRoute.basePrice}
+                onChange={(event) =>
+                  setNewRoute((prev) => ({ ...prev, basePrice: Number(event.target.value) || 0 }))
+                }
+              >
+                {SUGGESTED_PRICE_OPTIONS.map((price) => (
+                  <option key={price} value={price}>
+                    HK${price}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#5f7770' }}>
+              折扣（可選）
+              <input
+                type="number"
+                min={0}
+                max={newRoute.basePrice}
+                className="ui-input"
+                value={newRoute.discountAmount}
+                onChange={(event) =>
+                  setNewRoute((prev) => ({
+                    ...prev,
+                    discountAmount: Math.max(0, Math.min(prev.basePrice, Number(event.target.value) || 0)),
+                  }))
+                }
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 4, fontSize: 12, color: '#5f7770' }}>
+              出發時間
+              <input
+                type="datetime-local"
+                className="ui-input"
+                value={newRoute.departureTime}
+                onChange={(event) =>
+                  setNewRoute((prev) => ({ ...prev, departureTime: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 12, color: '#5f7770' }}>
+              路線名稱: <strong style={{ color: '#27483f' }}>{routeDisplayName}</strong> · 最終價格 HK${effectivePrice}
+            </div>
+            <button
+              className="ui-btn ui-btn-primary"
+              onClick={() => void handlePublishRoute()}
+              disabled={publishingRoute}
+              style={{ padding: '8px 12px' }}
+            >
+              {publishingRoute ? '發佈中...' : '發佈路線'}
+            </button>
+          </div>
+        </section>
+
+        <section className="ui-card" style={{ padding: 12, display: 'grid', gap: 8 }}>
+          <strong style={{ color: '#27483f' }}>我發佈的班次</strong>
+          {loadingRoutes ? (
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 14 }}>
+              載入中...
+            </div>
+          ) : publishedRoutes.length === 0 ? (
+            <div className="ui-empty-state" style={{ fontSize: 13, padding: 14 }}>
+              尚未發佈班次
+            </div>
+          ) : (
+            publishedRoutes.map((route) => (
+              <article
+                key={route.id}
+                className="ui-card-muted"
+                style={{ padding: 10, display: 'grid', gap: 6 }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <strong style={{ color: '#27483f' }}>
+                    {route.routeName || `${route.fromHotspotName} -> ${route.toHotspotName}`}
+                  </strong>
+                  <span className="ui-pill" style={{ fontSize: 11 }}>
+                    {route.bookingsCount > 0 ? `已參與 ${route.bookingsCount}` : '未有參與'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: '#5f7770' }}>
+                  出發: {route.departureTime ? new Date(route.departureTime).toLocaleString('zh-HK') : '-'}
+                </div>
+                <div style={{ fontSize: 12, color: '#5f7770' }}>
+                  價格: HK${route.effectivePrice} · 預計扣點: {route.estimatedPointsCost}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    className="ui-btn ui-btn-outline"
+                    disabled={processingRouteId === route.id || route.bookingsCount > 0}
+                    style={{ padding: '7px 10px' }}
+                    onClick={() => {
+                      const next = window.prompt('輸入新價格（HK$）', String(route.effectivePrice))
+                      if (next === null) return
+                      const parsed = Number(next)
+                      if (!Number.isFinite(parsed) || parsed < 0) {
+                        setNotice({ text: '價格格式錯誤', tone: 'error' })
+                        return
+                      }
+                      void handleUpdatePublishedRoute(route, { effectivePrice: Math.round(parsed) })
+                    }}
+                  >
+                    調整價格
+                  </button>
+                  <button
+                    className="ui-btn ui-btn-outline"
+                    disabled={processingRouteId === route.id || route.bookingsCount > 0}
+                    style={{ padding: '7px 10px' }}
+                    onClick={() => {
+                      const next = window.prompt(
+                        '輸入新出發時間（YYYY-MM-DDTHH:mm）',
+                        route.departureTime
+                          ? new Date(route.departureTime).toISOString().slice(0, 16)
+                          : '',
+                      )
+                      if (next === null) return
+                      const nextDate = new Date(next)
+                      if (Number.isNaN(nextDate.getTime())) {
+                        setNotice({ text: '時間格式錯誤', tone: 'error' })
+                        return
+                      }
+                      void handleUpdatePublishedRoute(route, {
+                        departureTime: nextDate.toISOString(),
+                      })
+                    }}
+                  >
+                    調整時間
+                  </button>
+                  <button
+                    className="ui-btn ui-btn-danger"
+                    disabled={processingRouteId === route.id || route.bookingsCount > 0}
+                    style={{ padding: '7px 10px' }}
+                    onClick={() => void handleCancelPublishedRoute(route)}
+                  >
+                    取消班次
+                  </button>
+                </div>
+                {route.bookingsCount > 0 && (
+                  <div style={{ fontSize: 11, color: '#7a5a1a' }}>
+                    已有乘客參與，系統已鎖定修改與取消。
+                  </div>
+                )}
+              </article>
+            ))
+          )}
+        </section>
 
         {activeTab === 'pool' ? (
           loadingPool ? (

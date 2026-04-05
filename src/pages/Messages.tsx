@@ -19,6 +19,7 @@ type ConversationItem = {
 }
 
 const SUPPORT_ID = 'SYSTEM_ADMIN'
+const SUPPORT_BROADCAST_ID = 'SYSTEM'
 
 const alertClass = 'ui-notice ui-notice-error'
 
@@ -40,6 +41,7 @@ export default function Messages({ orders = [] }: MessagesProps) {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const isDriver = currentUser?.role === 'driver'
 
   const toConversationSubtitle = (type: 'TEXT' | 'IMAGE' | 'SYSTEM', content: string) => {
     if (type === 'IMAGE') return '📷 圖片'
@@ -59,10 +61,14 @@ export default function Messages({ orders = [] }: MessagesProps) {
 
       if (!isRelated) return
 
-      const partnerId = m.receiverId === currentUser.id ? m.senderId : m.receiverId === 'ALL' ? 'SYSTEM' : m.receiverId
+      const partnerId =
+        m.receiverId === currentUser.id ? m.senderId : m.receiverId === 'ALL' ? SUPPORT_BROADCAST_ID : m.receiverId
       if (!partnerId || partnerId === currentUser.id) return
 
       const orderId = m.orderId || null
+      // Driver privacy guard: customer chats must be isolated per order
+      // so that passenger A/B never appear in the same thread.
+      if (isDriver && partnerId !== SUPPORT_ID && partnerId !== SUPPORT_BROADCAST_ID && !orderId) return
       const key = `${partnerId}::${orderId || 'general'}`
       const existing = map.get(key)
       const isUnread = m.receiverId === currentUser.id && !m.isRead
@@ -83,7 +89,10 @@ export default function Messages({ orders = [] }: MessagesProps) {
           orderInfo = `訂單 ${orderId.slice(0, 8)}`
         }
       }
-      const title = partnerId === SUPPORT_ID || partnerId === 'SYSTEM' ? '客服中心' : (orderInfo || `對話 ${partnerId.slice(0, 8)}`)
+      const title =
+        partnerId === SUPPORT_ID || partnerId === SUPPORT_BROADCAST_ID
+          ? '客服中心'
+          : (orderInfo || `對話 ${partnerId.slice(0, 8)}`)
       const preview = toConversationSubtitle(m.type, m.content)
       // Only show message preview in subtitle (order info is already in title)
       const subtitle = preview
@@ -110,7 +119,7 @@ export default function Messages({ orders = [] }: MessagesProps) {
     })
 
     return Array.from(map.values()).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-  }, [messages, currentUser?.id, orders])
+  }, [messages, currentUser?.id, orders, isDriver])
 
   const activeMessages = useMemo(() => {
     if (!currentUser?.id || !activePartnerId) return []
@@ -181,7 +190,7 @@ export default function Messages({ orders = [] }: MessagesProps) {
       }
     }
     
-    return match?.title || (activePartnerId === SUPPORT_ID ? '客服中心' : `對話 ${activePartnerId.slice(0, 8)}`)
+    return match?.title || (activePartnerId === SUPPORT_ID || activePartnerId === SUPPORT_BROADCAST_ID ? '客服中心' : `對話 ${activePartnerId.slice(0, 8)}`)
   }, [activePartnerId, activeOrderId, conversations, orders])
 
   return (
@@ -201,13 +210,24 @@ export default function Messages({ orders = [] }: MessagesProps) {
 
       {!activePartnerId ? (
         <section className="ui-card" style={{ padding: 12 }}>
-          <button
-            onClick={() => void openConversation(SUPPORT_ID, null)}
-            className="ui-btn ui-btn-secondary"
-            style={{ width: '100%', textAlign: 'left' }}
-          >
-            + 聯絡客服
-          </button>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <button
+              onClick={() => void openConversation(SUPPORT_ID, null)}
+              className="ui-btn ui-btn-secondary"
+              style={{ width: '100%', textAlign: 'left' }}
+            >
+              + 聯絡客服（私聊）
+            </button>
+            {isDriver && (
+              <button
+                onClick={() => void openConversation(SUPPORT_BROADCAST_ID, null)}
+                className="ui-btn ui-btn-outline"
+                style={{ width: '100%', textAlign: 'left' }}
+              >
+                查看客服公告
+              </button>
+            )}
+          </div>
 
           <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
             {loading ? (

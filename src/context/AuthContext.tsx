@@ -31,6 +31,7 @@ export interface AuthUser {
   email: string
   role: UserRole
   points: number
+  phoneVerified?: boolean
 }
 
 interface AuthContextValue {
@@ -39,6 +40,8 @@ interface AuthContextValue {
   loginWithPassword: (input: string, password: string, regionCode?: string) => Promise<{ ok: boolean; message: string }>
   sendOtp: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
   verifyOtp: (otpCode: string) => Promise<{ ok: boolean; message: string }>
+  triggerPhoneVerification: (regionCode: string, phone: string) => Promise<{ ok: boolean; message: string }>
+  confirmPhoneVerification: (otpCode: string) => Promise<{ ok: boolean; message: string }>
   registerUser: (params: {
     regionCode: string
     phone: string
@@ -152,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: data.email || fallbackEmail,
           role: normalizeUserRole(data.role, data.email || fallbackEmail),
           points: data.points || 0,
+          phoneVerified: Boolean((data as { phoneVerified?: boolean }).phoneVerified),
         })
       } else {
         const profile = defaultProfile(fbUser.uid, fallbackEmail)
@@ -160,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         await setDoc(ref, {
           ...profile,
+          phoneVerified: Boolean(fbUser.phoneNumber),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
@@ -227,9 +232,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: formatEmailFromPhone(otpSession.phone),
           role: 'passenger',
           points: 0,
+          phoneVerified: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
+      } else {
+        await setDoc(
+          ref,
+          {
+            phone: otpSession.phone,
+            phoneVerified: true,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true },
+        )
       }
       setOtpSession(null)
       return { ok: true, message: 'OTP 登入成功' }
@@ -260,6 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         role: isMaster ? 'admin' : role,
         points: isMaster ? 999999 : 0,
+        phoneVerified: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
@@ -300,12 +317,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth)
   }
 
+  const triggerPhoneVerification: AuthContextValue['triggerPhoneVerification'] = async (
+    regionCode,
+    phone,
+  ) => {
+    return sendOtp(regionCode, phone)
+  }
+
+  const confirmPhoneVerification: AuthContextValue['confirmPhoneVerification'] = async (otpCode) => {
+    return verifyOtp(otpCode)
+  }
+
   const value = {
     currentUser,
     loading,
     loginWithPassword,
     sendOtp,
     verifyOtp,
+    triggerPhoneVerification,
+    confirmPhoneVerification,
     registerUser,
     resetPasswordByPhone,
     logout,

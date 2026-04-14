@@ -1,0 +1,10 @@
+{
+  "baseImage": "ghcr.io/cursor-images/node-22:latest",
+  "install": "bash scripts/cloud-agent-install.sh",
+  "start": "bash scripts/cloud-agent-startup.sh",
+  "persistedDirectories": [
+    "node_modules",
+    ".npm"
+  ],
+  "terminals": []
+}

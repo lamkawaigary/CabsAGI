@@ -2,8 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ========== HELPER FUNCTIONS ==========
-    
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -12,16 +10,12 @@ service cloud.firestore {
       return request.auth.uid;
     }
     
-    // Check if user is in participants list
-    function isInParticipants(userId, participants) {
-      return participants.size() > 0 && 
-        (participants[0].oderId == userId || participants[1].oderId == userId);
-    }
-    
-    // Check message participant (same logic but for messages)
-    function isMessageParticipant(userId, participants) {
-      return participants.size() > 0 && 
-        (participants[0].oderId == userId || participants[1].oderId == userId);
+    // Check if user is in participantIds array (or participants array for old data)
+    function isRoomParticipant() {
+      return uid() in resource.data.participantIds || 
+        (resource.data.participants.size() > 0 && 
+         (resource.data.participants[0].oderId == uid() || 
+          resource.data.participants[1].oderId == uid()));
     }
     
     // ========== USERS ==========
@@ -56,21 +50,22 @@ service cloud.firestore {
     // ========== CHAT ROOMS ==========
     
     match /chatRooms/{roomId} {
-      allow read: if isAuthenticated() && 
-        isInParticipants(uid(), resource.data.participants);
+      allow read: if isAuthenticated() && isRoomParticipant();
       allow create: if isAuthenticated() && 
-        (request.resource.data.participants[0].oderId == uid() ||
-         request.resource.data.participants[1].oderId == uid());
-      allow update: if isAuthenticated() && 
-        isInParticipants(uid(), resource.data.participants);
+        (request.resource.data.participantIds[0] == uid() ||
+         request.resource.data.participantIds[1] == uid());
+      allow update: if isAuthenticated() && isRoomParticipant();
       allow delete: if false;
     }
     
     // ========== CHAT MESSAGES ==========
     
     match /chatMessages/{messageId} {
+      // Get the chat room and check if user is participant (supports both old and new structure)
       allow read: if isAuthenticated() && 
-        isMessageParticipant(uid(), get(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId)).data.participants);
+        uid() in get(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId)).data.participantIds ||
+        uid() == get(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId)).data.participants[0].oderId ||
+        uid() == get(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId)).data.participants[1].oderId;
       allow create: if isAuthenticated() && request.resource.data.senderId == uid();
       allow update: if false;
       allow delete: if false;

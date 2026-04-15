@@ -30,7 +30,9 @@ export default function DriverDashboard() {
   // State
   const [myTrips, setMyTrips] = useState<Trip[]>([])
   const [requests, setRequests] = useState<PassengerRequest[]>([])
+  const [myChats, setMyChats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   // Create Trip Modal
   const [showCreate, setShowCreate] = useState(false)
@@ -46,11 +48,22 @@ export default function DriverDashboard() {
 
   useEffect(() => {
     if (!currentUser?.id) return
+    
+    // Subscribe to user's chat rooms
+    const unsubChats = chatService.subscribeToUserRooms(currentUser!.id, (rooms) => {
+      setMyChats(rooms)
+    })
+    
     loadData()
+    
+    return () => {
+      unsubChats()
+    }
   }, [currentUser?.id])
 
   const loadData = async () => {
     try {
+      setError(null)
       setLoading(true)
       const [trips, reqs] = await Promise.all([
         tripService.getByDriver(currentUser!.id),
@@ -60,6 +73,7 @@ export default function DriverDashboard() {
       setRequests(reqs)
     } catch (error) {
       console.error('Error loading data:', error)
+      setError('載入失敗，請檢查網絡連接')
     } finally {
       setLoading(false)
     }
@@ -249,7 +263,9 @@ export default function DriverDashboard() {
 
         {activeTab === 'requests' && (
           <div>
-            {loading ? <p style={styles.center}>載入中...</p> :
+            {error ? (
+              <p style={{...styles.center, color: '#c62828'}}>{error}</p>
+            ) : loading ? <p style={styles.center}>載入中...</p> :
              requests.length === 0 ? (
               <p style={styles.center}>暫時沒有乘客需求</p>
             ) : (
@@ -277,6 +293,47 @@ export default function DriverDashboard() {
                   </button>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {activeTab === 'chats' && (
+          <div>
+            {loading ? <p style={styles.center}>載入中...</p> :
+             myChats.length === 0 ? (
+              <p style={styles.center}>
+                暫時沒有聊天記錄<br/>
+                <small>開始與乘客聊天吧！</small>
+              </p>
+            ) : (
+              myChats.map(room => {
+                const other = room.participants?.find((p: any) => p.oderId !== currentUser?.id)
+                return (
+                  <div 
+                    key={room.id} 
+                    style={styles.card}
+                    onClick={() => navigate(`/chat/${room.id}`)}
+                  >
+                    <div style={styles.cardHeader}>
+                      <span>{room.roomType === 'trip' ? '🚗 行程' : '📝 需求'}</span>
+                      <span style={room.status === 'active' ? styles.badgeOpen : styles.badgeClosed}>
+                        {room.status === 'active' ? '🟢 進行中' : '❌ 已關閉'}
+                      </span>
+                    </div>
+                    <div style={styles.route}>
+                      <Icon.Location /> {room.topicPickup}
+                      <br/>↓<br/>
+                      {room.topicDropoff}
+                    </div>
+                    <div style={styles.info}>
+                      <span><Icon.User /> {other?.name || '未知'} | {other?.role === 'driver' ? '司機' : '乘客'}</span>
+                    </div>
+                    <p style={styles.lastMsg}>
+                      💬 點擊進入聊天室
+                    </p>
+                  </div>
+                )
+              })
             )}
           </div>
         )}

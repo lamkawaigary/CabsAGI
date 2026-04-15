@@ -23,13 +23,15 @@ const Icon = {
 export default function PassengerHome() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const [activeTab, setActiveTab] = useState<'trips' | 'requests' | 'my'>('trips')
+  const [activeTab, setActiveTab] = useState<'trips' | 'requests' | 'my' | 'chats'>('trips')
   
   // State
   const [trips, setTrips] = useState<Trip[]>([])
   const [requests, setRequests] = useState<PassengerRequest[]>([])
   const [myRequests, setMyRequests] = useState<PassengerRequest[]>([])
+  const [myChats, setMyChats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   // Create Request Modal
   const [showCreate, setShowCreate] = useState(false)
@@ -43,11 +45,23 @@ export default function PassengerHome() {
   })
 
   useEffect(() => {
+    if (!currentUser?.id) return
+    
+    // Subscribe to user's chat rooms
+    const unsubChats = chatService.subscribeToUserRooms(currentUser!.id, (rooms) => {
+      setMyChats(rooms)
+    })
+    
     loadData()
+    
+    return () => {
+      unsubChats()
+    }
   }, [currentUser?.id])
 
   const loadData = async () => {
     try {
+      setError(null)
       setLoading(true)
       const [allTrips, allRequests] = await Promise.all([
         tripService.getPublicTrips(),
@@ -62,6 +76,7 @@ export default function PassengerHome() {
       }
     } catch (error) {
       console.error('Error loading data:', error)
+      setError('載入失敗，請檢查網絡連接')
     } finally {
       setLoading(false)
     }
@@ -184,6 +199,7 @@ export default function PassengerHome() {
           { key: 'trips', label: '📍 瀏覽行程' },
           { key: 'requests', label: '💬 乘客需求' },
           { key: 'my', label: '📋 我的需求' },
+          { key: 'chats', label: '💬 我的聊天' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -248,7 +264,9 @@ export default function PassengerHome() {
           <div>
             <p style={styles.sectionTitle}>其他乘客的需求</p>
             
-            {loading ? <p style={styles.center}>載入中...</p> :
+            {error ? (
+              <p style={{...styles.center, color: '#c62828'}}>{error}</p>
+            ) : loading ? <p style={styles.center}>載入中...</p> :
              requests.length === 0 ? (
               <p style={styles.center}>暫時沒有需求</p>
             ) : (
@@ -353,6 +371,47 @@ export default function PassengerHome() {
                   </button>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {activeTab === 'chats' && (
+          <div>
+            {loading ? <p style={styles.center}>載入中...</p> :
+             myChats.length === 0 ? (
+              <p style={styles.center}>
+                暫時沒有聊天記錄<br/>
+                <small>瀏覽行程或提出需求，司機會聯絡你！</small>
+              </p>
+            ) : (
+              myChats.map(room => {
+                const other = room.participants?.find((p: any) => p.oderId !== currentUser?.id)
+                return (
+                  <div 
+                    key={room.id} 
+                    style={styles.card}
+                    onClick={() => navigate(`/chat/${room.id}`)}
+                  >
+                    <div style={styles.cardHeader}>
+                      <span>{room.roomType === 'trip' ? '🚗 行程' : '📝 需求'}</span>
+                      <span style={room.status === 'active' ? styles.badgeOpen : styles.badgeClosed}>
+                        {room.status === 'active' ? '🟢 進行中' : '❌ 已關閉'}
+                      </span>
+                    </div>
+                    <div style={styles.route}>
+                      <Icon.Location /> {room.topicPickup}
+                      <br/>↓<br/>
+                      {room.topicDropoff}
+                    </div>
+                    <div style={styles.info}>
+                      <span><Icon.User /> {other?.name || '未知'} | {other?.role === 'driver' ? '司機' : '乘客'}</span>
+                    </div>
+                    <p style={styles.lastMsg}>
+                      💬 點擊進入聊天室
+                    </p>
+                  </div>
+                )
+              })
             )}
           </div>
         )}
@@ -520,6 +579,11 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#f8f8f8',
     padding: '8px 12px',
     borderRadius: 6,
+    marginTop: 8,
+  },
+  lastMsg: {
+    fontSize: 13,
+    color: '#1e56a3',
     marginTop: 8,
   },
   chatBtn: {

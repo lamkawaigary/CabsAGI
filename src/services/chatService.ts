@@ -47,6 +47,7 @@ export const chatService = {
         role: 'driver' as const,
         phone: trip.driverPhone
       }],
+      participantIds: [trip.driverId], // For easy querying
       topicPickup: trip.pickup,
       topicDropoff: trip.dropoff,
       topicTime: trip.departureTime,
@@ -81,6 +82,7 @@ export const chatService = {
         role: 'passenger' as const,
         phone: request.passengerPhone
       }],
+      participantIds: [request.passengerId], // For easy querying
       topicPickup: request.pickup,
       topicDropoff: request.dropoff,
       topicTime: request.departureDate,
@@ -106,6 +108,7 @@ export const chatService = {
     const roomRef = doc(db, CHAT_ROOMS_COLLECTION, roomId)
     await updateDoc(roomRef, {
       participants: arrayUnion(participant),
+      participantIds: arrayUnion(participant.oderId), // For easy querying
       updatedAt: new Date().toISOString(),
     })
   },
@@ -119,7 +122,7 @@ export const chatService = {
   ): () => void {
     const q = query(
       collection(db, CHAT_ROOMS_COLLECTION),
-      where('participants', 'array-contains', { oderId } as any),
+      where('participantIds', 'array-contains', oderId),
       orderBy('updatedAt', 'desc'),
       limit(50)
     )

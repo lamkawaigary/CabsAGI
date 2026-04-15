@@ -64,11 +64,10 @@ export const tripService = {
   /**
    * 獲取所有公開行程 (乘客瀏覽)
    */
-  async getPublicTrips(_date?: string): Promise<Trip[]> {
+  async getPublicTrips(): Promise<Trip[]> {
     let q = query(
       collection(db, TRIPS_COLLECTION),
-      where('status', '==', 'OPEN'),
-      orderBy('departureTime', 'asc')
+      where('status', '==', 'OPEN')
     )
     
     const snapshot = await getDocs(q)
@@ -198,8 +197,7 @@ export const requestService = {
   async getPublicRequests(): Promise<PassengerRequest[]> {
     const q = query(
       collection(db, REQUESTS_COLLECTION),
-      where('status', '==', 'OPEN'),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'OPEN')
     )
     const snapshot = await getDocs(q)
     return snapshot.docs.map(doc => ({
@@ -214,8 +212,7 @@ export const requestService = {
   async getByPassenger(passengerId: string): Promise<PassengerRequest[]> {
     const q = query(
       collection(db, REQUESTS_COLLECTION),
-      where('passengerId', '==', passengerId),
-      orderBy('createdAt', 'desc')
+      where('passengerId', '==', passengerId)
     )
     const snapshot = await getDocs(q)
     return snapshot.docs.map(doc => ({

@@ -122,9 +122,7 @@ export const chatService = {
   ): () => void {
     const q = query(
       collection(db, CHAT_ROOMS_COLLECTION),
-      where('participantIds', 'array-contains', oderId),
-      orderBy('updatedAt', 'desc'),
-      limit(50)
+      where('participantIds', 'array-contains', oderId)
     )
     
     return onSnapshot(q, (snapshot) => {

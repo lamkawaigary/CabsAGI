@@ -333,6 +333,24 @@ export default function PassengerHome() {
                     <span><Icon.User /> {req.passengerCount} 位 | 已有 {req.interestedDrivers.length} 位司機有興趣</span>
                   </div>
                   {req.notes && <p style={styles.notes}>📝 {req.notes}</p>}
+                  
+                  <button
+                    onClick={async () => {
+                      try {
+                        let roomId = await chatService.getRequestRoom(req.id)
+                        if (roomId) {
+                          navigate(`/chat/${roomId}`)
+                        } else {
+                          alert('暫時沒有司機聯絡你')
+                        }
+                      } catch (error) {
+                        console.error('Error:', error)
+                      }
+                    }}
+                    style={styles.chatBtn}
+                  >
+                    <Icon.Chat /> 進入聊天室
+                  </button>
                 </div>
               ))
             )}

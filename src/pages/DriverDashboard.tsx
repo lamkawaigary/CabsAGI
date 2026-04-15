@@ -115,6 +115,7 @@ export default function DriverDashboard() {
       // Get or create chat room
       let roomId = await chatService.getRequestRoom(request.id)
       if (!roomId) {
+        // Create room with passenger as first participant
         roomId = await chatService.createRequestChatRoom({
           requestId: request.id,
           passengerId: request.passengerId,
@@ -123,6 +124,14 @@ export default function DriverDashboard() {
           pickup: request.pickup.placeName,
           dropoff: request.dropoff.placeName,
           departureDate: request.departureDate,
+        })
+        
+        // Add driver as second participant
+        await chatService.joinChatRoom(roomId, {
+          oderId: currentUser!.id,
+          name: currentUser!.name || '司機',
+          role: 'driver',
+          phone: currentUser!.phone || '',
         })
         
         // Add driver as interested

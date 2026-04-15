@@ -126,35 +126,31 @@ export default function DriverDashboard() {
 
   const handleContactPassenger = async (request: PassengerRequest) => {
     try {
-      // Get or create chat room
-      let roomId = await chatService.getRequestRoom(request.id)
-      if (!roomId) {
-        // Create room with passenger as first participant
-        roomId = await chatService.createRequestChatRoom({
-          requestId: request.id,
-          passengerId: request.passengerId,
-          passengerName: request.passengerName,
-          passengerPhone: request.passengerPhone,
-          pickup: request.pickup.placeName,
-          dropoff: request.dropoff.placeName,
-          departureDate: request.departureDate,
-        })
-        
-        // Add driver as second participant
-        await chatService.joinChatRoom(roomId, {
-          oderId: currentUser!.id,
-          name: currentUser!.name || '司機',
-          role: 'driver',
-          phone: currentUser!.phone || '',
-        })
-        
-        // Add driver as interested
-        await requestService.addInterestedDriver(request.id, {
-          driverId: currentUser!.id,
-          driverName: currentUser!.name || '司機',
-          driverPhone: currentUser!.phone || '',
-        })
-      }
+      // Always create a new chat room for this driver-passenger pair
+      const roomId = await chatService.createRequestChatRoom({
+        requestId: request.id,
+        passengerId: request.passengerId,
+        passengerName: request.passengerName,
+        passengerPhone: request.passengerPhone,
+        pickup: request.pickup.placeName,
+        dropoff: request.dropoff.placeName,
+        departureDate: request.departureDate,
+      })
+      
+      // Add driver as participant
+      await chatService.joinChatRoom(roomId, {
+        oderId: currentUser!.id,
+        name: currentUser!.name || '司機',
+        role: 'driver',
+        phone: currentUser!.phone || '',
+      })
+      
+      // Add driver as interested
+      await requestService.addInterestedDriver(request.id, {
+        driverId: currentUser!.id,
+        driverName: currentUser!.name || '司機',
+        driverPhone: currentUser!.phone || '',
+      })
       
       navigate(`/chat/${roomId}`)
     } catch (error) {

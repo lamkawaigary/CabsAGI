@@ -64,7 +64,7 @@ export const tripService = {
   /**
    * 獲取所有公開行程 (乘客瀏覽)
    */
-  async getPublicTrips(date?: string): Promise<Trip[]> {
+  async getPublicTrips(_date?: string): Promise<Trip[]> {
     let q = query(
       collection(db, TRIPS_COLLECTION),
       where('status', '==', 'OPEN'),

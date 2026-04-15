@@ -47,7 +47,8 @@ export const chatService = {
         role: 'driver' as const,
         phone: trip.driverPhone
       }],
-      participantIds: [trip.driverId], // For easy querying
+      participantIds: [trip.driverId],
+      hostId: trip.driverId, // Driver is the host
       topicPickup: trip.pickup,
       topicDropoff: trip.dropoff,
       topicTime: trip.departureTime,
@@ -82,7 +83,8 @@ export const chatService = {
         role: 'passenger' as const,
         phone: request.passengerPhone
       }],
-      participantIds: [request.passengerId], // For easy querying
+      participantIds: [request.passengerId],
+      hostId: request.passengerId, // Passenger is the host
       topicPickup: request.pickup,
       topicDropoff: request.dropoff,
       topicTime: request.departureDate,

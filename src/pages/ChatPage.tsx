@@ -1,6 +1,5 @@
-// Cabs Carpool - Chat Page (Simplified)
-// Version: 3.0
-// 核心理念：聊天室是共乘的核心，雙方確認後記錄為共乘
+// Cabs Carpool - Chat Page v3.1
+// 核心理念：聊天室是共乘的核心，Host/Guest 角色，確認後記錄為共乘
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -17,15 +16,14 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [allConfirmed, setAllConfirmed] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!roomId) return
     
-    // Load room info
     loadRoom()
     
-    // Subscribe to messages
     const unsubMessages = messageService.subscribeToMessages(roomId, (msgs) => {
       setMessages(msgs)
     })
@@ -44,9 +42,20 @@ export default function ChatPage() {
     const roomData = await chatService.getRoom(roomId)
     if (roomData) {
       setRoom(roomData)
-      // Check if user already confirmed
       if (currentUser?.id && roomData.confirmedBy?.includes(currentUser.id)) {
         setConfirmed(true)
+      }
+      // Check if both driver and passenger confirmed
+      const driverConfirmed = roomData.confirmedBy?.some((id: string) => {
+        const p = roomData.participants?.find((pt: any) => pt.oderId === id)
+        return p?.role === 'driver'
+      })
+      const passengerConfirmed = roomData.confirmedBy?.some((id: string) => {
+        const p = roomData.participants?.find((pt: any) => pt.oderId === id)
+        return p?.role === 'passenger'
+      })
+      if (driverConfirmed && passengerConfirmed) {
+        setAllConfirmed(true)
       }
     }
   }
@@ -78,7 +87,6 @@ export default function ChatPage() {
       await chatService.confirmRide(roomId, currentUser.id)
       setConfirmed(true)
       
-      // Send system message
       await messageService.send({
         conversationId: roomId,
         senderId: 'system',
@@ -87,6 +95,9 @@ export default function ChatPage() {
         content: `✅ ${currentUser.name} 確認了共乘！`,
         messageType: 'system'
       })
+      
+      // Reload room to check if both confirmed
+      loadRoom()
     } catch (error) {
       console.error('Failed to confirm:', error)
     }
@@ -123,41 +134,59 @@ export default function ChatPage() {
         <div style={{ width: 40 }} />
       </div>
 
-      {/* Trip/Request Info */}
+      {/* Participant Info */}
       <div style={styles.infoBar}>
         <div style={styles.infoItem}>
-          <span style={styles.infoLabel}>路線：</span>
-          {room.topicPickup} → {room.topicDropoff}
+          <span style={styles.infoLabel}>👤 參與者：</span>
+          {room.participants?.map((p: any) => (
+            <span key={p.oderId} style={{
+              ...styles.participantTag,
+              background: p.oderId === room.hostId ? '#e3f2fd' : '#f5f5f5',
+              border: p.oderId === room.hostId ? '1px solid #1e88e5' : '1px solid #ddd',
+            }}>
+              {p.name} {p.oderId === room.hostId ? '(Host)' : '(Guest)'}
+            </span>
+          ))}
         </div>
         {room.topicTime && (
           <div style={styles.infoItem}>
-            <span style={styles.infoLabel}>時間：</span>
+            <span style={styles.infoLabel}>🕐 時間：</span>
             {room.topicTime}
           </div>
         )}
-        <div style={styles.infoItem}>
-          <span style={styles.infoLabel}>參與者：</span>
-          {room.participants?.map((p: any) => p.name).join(', ')}
-        </div>
       </div>
 
       {/* Confirm Status */}
-      {room.status === 'active' && (
+      {room.status === 'active' && !allConfirmed && (
         <div style={styles.confirmBar}>
+          <div style={styles.confirmInfo}>
+            <span>確認狀態：</span>
+            {room.participants?.map((p: any) => {
+              const isConfirmed = room.confirmedBy?.includes(p.oderId)
+              return (
+                <span key={p.oderId} style={{
+                  ...styles.confirmTag,
+                  background: isConfirmed ? '#c8e6c9' : '#ffecb3',
+                  color: isConfirmed ? '#2e7d32' : '#f57c00',
+                }}>
+                  {p.name}: {isConfirmed ? '✅' : '⏳'}
+                </span>
+              )
+            })}
+          </div>
           {confirmed ? (
-            <div style={styles.confirmed}>
-              ✅ 你已確認共乘
-            </div>
+            <div style={styles.confirmed}>✅ 你已確認</div>
           ) : (
             <button onClick={handleConfirm} style={styles.confirmBtn}>
               ✅ 確認共乘
             </button>
           )}
-          {room.confirmedBy?.length > 0 && (
-            <div style={styles.confirmCount}>
-              {room.confirmedBy?.length}/{room.participants?.length} 已確認
-            </div>
-          )}
+        </div>
+      )}
+
+      {allConfirmed && (
+        <div style={styles.successBar}>
+          🎉 雙方已確認！共乘達成！
         </div>
       )}
 
@@ -183,7 +212,10 @@ export default function ChatPage() {
                 }}
               >
                 {!isOwn(msg) && (
-                  <div style={styles.senderName}>{msg.senderName}</div>
+                  <div style={styles.senderName}>
+                    {msg.senderName}
+                    {msg.senderId === room.hostId && <span style={styles.hostBadge}>Host</span>}
+                  </div>
                 )}
                 <div style={styles.msgContent}>{msg.content}</div>
                 <div style={styles.msgTime}>{formatTime(msg.createdAt)}</div>
@@ -273,10 +305,31 @@ const styles: Record<string, React.CSSProperties> = {
   },
   infoItem: {
     marginBottom: 4,
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
   },
   infoLabel: {
     fontWeight: 500,
     color: '#666',
+  },
+  participantTag: {
+    padding: '2px 8px',
+    borderRadius: 12,
+    fontSize: 12,
+  },
+  confirmInfo: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+    flex: 1,
+  },
+  confirmTag: {
+    padding: '2px 8px',
+    borderRadius: 10,
+    fontSize: 12,
   },
   confirmBar: {
     display: 'flex',
@@ -285,6 +338,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 16px',
     background: '#fff8e1',
     borderBottom: '1px solid #ffe082',
+    flexWrap: 'wrap',
   },
   confirmBtn: {
     padding: '8px 16px',
@@ -301,9 +355,13 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#2e7d32',
     fontWeight: 500,
   },
-  confirmCount: {
-    fontSize: 12,
-    color: '#666',
+  successBar: {
+    textAlign: 'center',
+    padding: '12px 16px',
+    background: '#c8e6c9',
+    color: '#2e7d32',
+    fontWeight: 600,
+    fontSize: 14,
   },
   messages: {
     flex: 1,
@@ -350,6 +408,16 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     marginBottom: 2,
     opacity: 0.8,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hostBadge: {
+    fontSize: 10,
+    background: '#1e88e5',
+    color: '#fff',
+    padding: '1px 4px',
+    borderRadius: 4,
   },
   msgContent: {
     fontSize: 15,

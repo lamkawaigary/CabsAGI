@@ -11,7 +11,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   onSnapshot,
   arrayUnion
 } from 'firebase/firestore'
@@ -83,8 +82,7 @@ export const tripService = {
   async getByDriver(driverId: string): Promise<Trip[]> {
     const q = query(
       collection(db, TRIPS_COLLECTION),
-      where('driverId', '==', driverId),
-      orderBy('createdAt', 'desc')
+      where('driverId', '==', driverId)
     )
     const snapshot = await getDocs(q)
     return snapshot.docs.map(doc => ({

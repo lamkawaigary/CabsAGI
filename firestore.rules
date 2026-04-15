@@ -10,21 +10,12 @@ service cloud.firestore {
       return request.auth.uid;
     }
     
-    // Check if user is in participantIds array (or participants array for old data)
-    function isRoomParticipant() {
-      return uid() in resource.data.participantIds || 
-        (resource.data.participants.size() > 0 && 
-         (resource.data.participants[0].oderId == uid() || 
-          resource.data.participants[1].oderId == uid()));
-    }
-    
     // ========== USERS ==========
     
     match /users/{userId} {
       allow read: if isAuthenticated() && uid() == userId;
       allow update: if isAuthenticated() && uid() == userId;
-      allow create: if false;
-      allow delete: if false;
+      allow create, delete: if false;
     }
     
     // ========== TRIPS ==========
@@ -33,8 +24,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
         (resource.data.status == 'OPEN' || resource.data.driverId == uid());
       allow create: if isAuthenticated() && request.resource.data.driverId == uid();
-      allow update: if isAuthenticated() && resource.data.driverId == uid();
-      allow delete: if isAuthenticated() && resource.data.driverId == uid();
+      allow update, delete: if isAuthenticated() && resource.data.driverId == uid();
     }
     
     // ========== PASSENGER REQUESTS ==========
@@ -43,32 +33,33 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
         (resource.data.status == 'OPEN' || resource.data.passengerId == uid());
       allow create: if isAuthenticated() && request.resource.data.passengerId == uid();
-      allow update: if isAuthenticated() && resource.data.passengerId == uid();
-      allow delete: if isAuthenticated() && resource.data.passengerId == uid();
+      allow update, delete: if isAuthenticated() && resource.data.passengerId == uid();
     }
     
     // ========== CHAT ROOMS ==========
     
     match /chatRooms/{roomId} {
-      allow read: if isAuthenticated() && isRoomParticipant();
+      allow read: if isAuthenticated() && 
+        (uid() in resource.data.participantIds || 
+         uid() == resource.data.participants[0].oderId ||
+         uid() == resource.data.participants[1].oderId);
       allow create: if isAuthenticated() && 
         (request.resource.data.participantIds[0] == uid() ||
          request.resource.data.participantIds[1] == uid());
-      allow update: if isAuthenticated() && isRoomParticipant();
+      allow update: if isAuthenticated() && 
+        (uid() in resource.data.participantIds || 
+         uid() == resource.data.participants[0].oderId ||
+         uid() == resource.data.participants[1].oderId);
       allow delete: if false;
     }
     
     // ========== CHAT MESSAGES ==========
     
     match /chatMessages/{messageId} {
-      // Get the chat room and check if user is participant (supports both old and new structure)
-      allow read: if isAuthenticated() && 
-        uid() in get(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId)).data.participantIds ||
-        uid() == get(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId)).data.participants[0].oderId ||
-        uid() == get(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId)).data.participants[1].oderId;
+      // User can read if their uid is in participantIds array (stored in each message)
+      allow read: if isAuthenticated() && uid() in resource.data.participantIds;
       allow create: if isAuthenticated() && request.resource.data.senderId == uid();
-      allow update: if false;
-      allow delete: if false;
+      allow update, delete: if false;
     }
   }
 }

@@ -236,8 +236,9 @@ export const messageService = {
     senderRole: 'driver' | 'passenger'
     content: string
     messageType?: 'text' | 'image' | 'location' | 'system'
+    participantIds?: string[] // Include for security rules
   }): Promise<string> {
-    const message = {
+    const message: any = {
       conversationId: data.conversationId,
       senderId: data.senderId,
       senderName: data.senderName,
@@ -246,6 +247,11 @@ export const messageService = {
       messageType: data.messageType || 'text',
       readBy: [data.senderId],
       createdAt: new Date().toISOString(),
+    }
+    
+    // Include participantIds if provided (for security rules)
+    if (data.participantIds) {
+      message.participantIds = data.participantIds
     }
     
     const docRef = await addDoc(collection(db, MESSAGES_COLLECTION), message)

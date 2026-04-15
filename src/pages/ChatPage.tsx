@@ -70,7 +70,8 @@ export default function ChatPage() {
         senderId: currentUser.id,
         senderName: currentUser.name || 'User',
         senderRole: currentUser.role as 'driver' | 'passenger',
-        content: newMessage.trim()
+        content: newMessage.trim(),
+        participantIds: room?.participantIds || []
       })
       setNewMessage('')
     } catch (error) {
@@ -93,7 +94,8 @@ export default function ChatPage() {
         senderName: '系統',
         senderRole: 'passenger',
         content: `✅ ${currentUser.name} 確認了共乘！`,
-        messageType: 'system'
+        messageType: 'system',
+        participantIds: room?.participantIds || []
       })
       
       // Reload room to check if both confirmed

@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ========== HELPER FUNCTIONS ==========
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Get current user ID
+    function uid() {
+      return request.auth.uid;
+    }
+    
+    // Check if user is participant in the resource
+    function isParticipant() {
+      return isAuthenticated() && 
+        uid() in resource.data.participants[*].oderId;
+    }
+    
+    // ========== USERS ==========
+    
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if isAuthenticated() && uid() == userId;
+      // Users can update their own data (name, phone, etc.)
+      allow update: if isAuthenticated() && uid() == userId;
+      // Only system/admin can create users (via Firebase Auth triggers)
+      allow create: if false;
+      allow delete: if false;
+    }
+    
+    // ========== TRIPS ==========
+    
+    match /trips/{tripId} {
+      // Anyone can read OPEN trips
+      allow read: if isAuthenticated() && 
+        (resource.data.status == 'OPEN' || 
+         resource.data.driverId == uid());
+      // Only the driver can create/update/delete their trips
+      allow create: if isAuthenticated() && request.resource.data.driverId == uid();
+      allow update: if isAuthenticated() && resource.data.driverId == uid();
+      allow delete: if isAuthenticated() && resource.data.driverId == uid();
+    }
+    
+    // ========== PASSENGER REQUESTS ==========
+    
+    match /passengerRequests/{requestId} {
+      // Anyone can read OPEN requests
+      allow read: if isAuthenticated() && 
+        (resource.data.status == 'OPEN' || 
+         resource.data.passengerId == uid());
+      // Only the passenger can create/update/delete their requests
+      allow create: if isAuthenticated() && request.resource.data.passengerId == uid();
+      allow update: if isAuthenticated() && resource.data.passengerId == uid();
+      allow delete: if isAuthenticated() && resource.data.passengerId == uid();
+    }
+    
+    // ========== CHAT ROOMS (P2P) ==========
+    
+    match /chatRooms/{roomId} {
+      // Only participants can read the chat room
+      allow read: if isParticipant();
+      // Driver or passenger can create room when contacting
+      allow create: if isAuthenticated() && 
+        (request.resource.data.participants[0].oderId == uid() ||
+         request.resource.data.participants[1].oderId == uid());
+      // Participants can update (add messages, status changes)
+      allow update: if isParticipant();
+      allow delete: if false; // Don't allow deletion
+    }
+    
+    // ========== CHAT MESSAGES ==========
+    
+    match /chatMessages/{messageId} {
+      // Only participants of the conversation can read/write messages
+      allow read: if isAuthenticated() && 
+        exists(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId))
+        && uid() in get(/databases/$(database)/documents/chatRooms/$(resource.data.conversationId)).data.participants[*].oderId;
+      allow create: if isAuthenticated() && request.resource.data.senderId == uid();
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

@@ -102,6 +102,7 @@ export default function PassengerHome() {
       setShowCreate(false)
       setNewRequest({ pickup: '', dropoff: '', date: '', passengers: 1, notes: '' })
       loadData()
+      setActiveTab('my') // Switch to 'my' tab to show the new request
       alert('需求已發布！等司機聯絡你。')
     } catch (error) {
       console.error('Error:', error)

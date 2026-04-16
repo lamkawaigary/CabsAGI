@@ -25,6 +25,7 @@ export default function ProfilePage() {
   const [sendingOtp, setSendingOtp] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [otpError, setOtpError] = useState('')
+  const [verifySuccess, setVerifySuccess] = useState(false)
 
   useEffect(() => {
     if (currentUser?.name) {
@@ -94,12 +95,13 @@ export default function ProfilePage() {
     try {
       const result = await verifyOtp(otp)
       if (result.ok) {
-        // Update local user state - the AuthContext should handle this
-        setShowPhoneForm(false)
+        setVerifySuccess(true)
         setOtpError('')
-        alert('電話驗證成功！')
-        // Force refresh
-        window.location.reload()
+        setShowPhoneForm(false)
+        // Give Firebase a moment to sync, then refresh data
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
       } else {
         setOtpError(result.message)
       }
@@ -123,6 +125,13 @@ export default function ProfilePage() {
         <h1 style={styles.title}>個人資料</h1>
         <div style={{ width: 40 }} />
       </div>
+
+      {/* Success Banner */}
+      {verifySuccess && (
+        <div style={{...styles.successBanner}}>
+          ✅ 電話驗證成功！正在更新...
+        </div>
+      )}
 
       {/* Content */}
       <div style={styles.content}>
@@ -280,6 +289,14 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 16px',
     background: '#143b34',
     color: '#fff',
+  },
+  successBanner: {
+    background: '#c8e6c9',
+    color: '#2e7d32',
+    padding: '12px 16px',
+    textAlign: 'center',
+    fontWeight: 600,
+    fontSize: 14,
   },
   backBtn: {
     background: 'none',

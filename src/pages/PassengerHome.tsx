@@ -286,28 +286,19 @@ export default function PassengerHome() {
                   <button
                     onClick={async () => {
                       try {
-                        let roomId = await chatService.getRequestRoom(req.id)
-                        if (!roomId) {
-                          roomId = await chatService.createRequestChatRoom({
-                            requestId: req.id,
-                            passengerId: req.passengerId,
-                            passengerName: req.passengerName,
-                            passengerPhone: req.passengerPhone,
-                            pickup: req.pickup.placeName,
-                            dropoff: req.dropoff.placeName,
-                            departureDate: req.departureDate,
-                          })
-                        } else {
-                          await chatService.joinChatRoom(roomId, {
-                            oderId: currentUser!.id,
-                            name: currentUser!.name || '司機',
-                            role: 'driver',
-                            phone: currentUser!.phone || '',
-                          })
-                        }
+                        const roomId = await chatService.createRequestChatRoom({
+                          requestId: req.id,
+                          passengerId: req.passengerId,
+                          passengerName: req.passengerName,
+                          passengerPhone: req.passengerPhone,
+                          pickup: req.pickup.placeName,
+                          dropoff: req.dropoff.placeName,
+                          departureDate: req.departureDate,
+                        })
                         navigate(`/chat/${roomId}`)
                       } catch (error) {
                         console.error('Error:', error)
+                        alert('無法開啟聊天室，請重試')
                       }
                     }}
                     style={styles.chatBtn}
@@ -355,14 +346,19 @@ export default function PassengerHome() {
                   <button
                     onClick={async () => {
                       try {
-                        let roomId = await chatService.getRequestRoom(req.id)
-                        if (roomId) {
-                          navigate(`/chat/${roomId}`)
-                        } else {
-                          alert('暫時沒有司機聯絡你')
-                        }
+                        const roomId = await chatService.createRequestChatRoom({
+                          requestId: req.id,
+                          passengerId: req.passengerId,
+                          passengerName: req.passengerName,
+                          passengerPhone: req.passengerPhone,
+                          pickup: req.pickup.placeName,
+                          dropoff: req.dropoff.placeName,
+                          departureDate: req.departureDate,
+                        })
+                        navigate(`/chat/${roomId}`)
                       } catch (error) {
                         console.error('Error:', error)
+                        alert('無法開啟聊天室，請重試')
                       }
                     }}
                     style={styles.chatBtn}

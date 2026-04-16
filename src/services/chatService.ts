@@ -11,9 +11,7 @@ import {
   getDocs, 
   query, 
   where, 
-  orderBy, 
   onSnapshot,
-  limit,
   arrayUnion
 } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
@@ -271,9 +269,7 @@ export const messageService = {
   ): () => void {
     const q = query(
       collection(db, MESSAGES_COLLECTION),
-      where('conversationId', '==', conversationId),
-      orderBy('createdAt', 'asc'),
-      limit(100)
+      where('conversationId', '==', conversationId)
     )
     
     return onSnapshot(q, (snapshot) => {

@@ -3,34 +3,42 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
+  /* Warm Coral Theme */
+  --ui-bg: #fff9f5;
+  --ui-bg-card: #ffffff;
+  --ui-accent: #e07b4c;
+  --ui-accent-dark: #c4623a;
+  --ui-text: #4a3728;
+  --ui-text-secondary: #8b7355;
+  --ui-border: #f0e0d6;
+  --ui-success: #5a9a5a;
+
+  /* Spacing */
   --ui-space-1: 4px;
   --ui-space-2: 8px;
   --ui-space-3: 12px;
   --ui-space-4: 16px;
   --ui-space-5: 24px;
 
+  /* Border Radius */
   --ui-radius-sm: 10px;
   --ui-radius-md: 12px;
   --ui-radius-lg: 14px;
   --ui-radius-xl: 16px;
 
-  --ui-border: #dce6dd;
-  --ui-text-primary: #24463e;
-  --ui-text-secondary: #5f7770;
-  --ui-bg-card: #fff;
-  --ui-bg-muted: #f7faf8;
+  /* Semantic Colors */
+  --ui-primary-bg: var(--ui-accent);
+  --ui-primary-fg: #ffffff;
+  --ui-secondary-bg: var(--ui-bg);
+  --ui-secondary-fg: var(--ui-text);
+  --ui-danger-bg: #ffebee;
+  --ui-danger-fg: #c62828;
+  --ui-danger-border: #ffcdd2;
 
-  --ui-primary-bg: #1f4f43;
-  --ui-primary-fg: #effff7;
-  --ui-secondary-bg: #eef4f1;
-  --ui-secondary-fg: #32584d;
-  --ui-danger-bg: #fff5f1;
-  --ui-danger-fg: #9f4236;
-  --ui-danger-border: #e0d1cc;
-
-  --ui-shadow-soft: 0 10px 24px rgba(29, 54, 46, 0.12);
-  --ui-focus-ring: rgba(31, 79, 67, 0.22);
-  --ui-focus-ring-strong: rgba(31, 79, 67, 0.34);
+  /* Shadows */
+  --ui-shadow-soft: 0 4px 16px rgba(224, 123, 76, 0.15);
+  --ui-shadow-hover: 0 8px 24px rgba(224, 123, 76, 0.2);
+  --ui-focus-ring: rgba(224, 123, 76, 0.3);
 }
 
 * {
@@ -43,6 +51,8 @@ body {
   font-family: 'Outfit', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--ui-bg);
+  color: var(--ui-text);
 }
 
 .ui-page {

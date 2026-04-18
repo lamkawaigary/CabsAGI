@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cabs Carpool - 簡約版</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #ffffff;
+      color: #1a1a1a;
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+    
+    /* Light Minimal Theme */
+    :root {
+      --bg: #ffffff;
+      --bg-secondary: #fafafa;
+      --accent: #0066cc;
+      --accent-light: #e6f0ff;
+      --text: #1a1a1a;
+      --text-secondary: #888888;
+      --border: #e5e5e5;
+      --success: #00a300;
+    }
+    
+    .page { display: none; }
+    .page.active { display: block; }
+    
+    .page-login { padding: 80px 32px; text-align: center; }
+    .logo { font-size: 48px; margin-bottom: 8px; }
+    .brand { font-size: 24px; font-weight: 300; color: var(--text); margin-bottom: 64px; letter-spacing: 4px; }
+    
+    .input-group { margin-bottom: 16px; }
+    .input-group label { display: block; text-align: left; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; letter-spacing: 0.5px; }
+    .input-row { display: flex; gap: 8px; }
+    
+    input {
+      width: 100%;
+      padding: 14px 0;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      font-size: 16px;
+      color: var(--text);
+      background: transparent;
+      transition: border-color 0.3s;
+    }
+    input:focus { outline: none; border-bottom-color: var(--accent); }
+    input::placeholder { color: #cccccc; }
+    
+    .prefix {
+      width: 60px;
+      font-size: 16px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.3s;
+    }
+    .btn-primary { background: var(--text); color: white; }
+    .btn-primary:hover { background: #333; }
+    .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    
+    .header { background: var(--bg); padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+    .header-title { font-size: 18px; font-weight: 300; letter-spacing: 2px; }
+    .header-btn { width: 40px; height: 40px; border-radius: 50%; background: transparent; border: none; font-size: 20px; cursor: pointer; }
+    
+    .hero-section { padding: 64px 32px; }
+    
+    .mode-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-align: center;
+    }
+    .mode-card:hover { border-color: var(--accent); background: var(--accent-light); }
+    .mode-icon { font-size: 40px; margin-bottom: 12px; }
+    .mode-title { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+    .mode-subtitle { font-size: 13px; color: var(--text-secondary); }
+    
+    .browse-header { background: var(--bg); padding: 16px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+    .back-btn { font-size: 20px; background: none; border: none; cursor: pointer; }
+    .browse-title { font-size: 16px; font-weight: 500; }
+    
+    .trip-card {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .trip-route { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+    .trip-info { display: flex; gap: 8px; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+    .trip-status { display: inline-block; padding: 2px 8px; background: var(--accent-light); color: var(--accent); border-radius: 2px; font-size: 11px; }
+    .trip-bottom { display: flex; justify-content: space-between; align-items: center; }
+    .trip-price { font-size: 16px; font-weight: 600; }
+    .trip-seats { font-size: 12px; color: var(--text-secondary); }
+    
+    .trip-action {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 4px;
+      width: 100%;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+    
+    .page-chat { display: none; flex-direction: column; height: 100vh; }
+    .page-chat.active { display: flex; }
+    .chat-header { background: var(--bg); padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .chat-back { font-size: 20px; background: none; border: none; cursor: pointer; }
+    .chat-route { font-size: 14px; font-weight: 500; margin-top: 8px; }
+    .chat-participants { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+    .chat-messages { flex: 1; padding: 20px; overflow-y: auto; background: var(--bg-secondary); }
+    
+    .message { max-width: 75%; padding: 12px 16px; border-radius: 12px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; }
+    .message-other { background: var(--bg); border: 1px solid var(--border); color: var(--text); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .message-self { background: var(--accent); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .message-sender { font-size: 11px; font-weight: 600; margin-bottom: 4px; opacity: 0.7; }
+    .message-time { font-size: 10px; margin-top: 4px; opacity: 0.5; text-align: right; }
+    
+    .chat-confirm-bar { background: var(--bg); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); }
+    .confirm-status { font-size: 12px; color: var(--text-secondary); }
+    .btn-confirm { background: var(--text); color: white; border: none; padding: 10px 20px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; }
+    
+    .chat-input-area { background: var(--bg); padding: 12px 20px; display: flex; gap: 8px; border-top: 1px solid var(--border); }
+    .chat-input { flex: 1; padding: 12px 16px; border: 1px solid var(--border); border-radius: 20px; font-size: 14px; }
+    .chat-send { width: 44px; height: 44px; border-radius: 50%; background: var(--text); color: white; border: none; font-size: 16px; cursor: pointer; }
+    
+    .my-header { background: var(--bg); padding: 40px 24px; text-align: center; border-bottom: 1px solid var(--border); }
+    .my-avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 12px; }
+    .my-name { font-size: 18px; font-weight: 500; }
+    .my-phone { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+    
+    .my-section { padding: 24px; }
+    .my-section-title { font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; letter-spacing: 1px; }
+    
+    .my-item { padding: 16px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .my-item-title { font-size: 14px; }
+    .my-item-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .my-item-status { font-size: 12px; }
+    .status-open { color: var(--success); }
+    .status-confirmed { color: var(--accent); }
+    
+    .menu-item { padding: 16px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; cursor: pointer; }
+    .menu-item-text { font-size: 14px; }
+    .btn-logout { color: #cc0000; }
+    
+    .demo-nav { position: fixed; bottom: 0; left: 0; right: 0; max-width: 430px; margin: 0 auto; background: var(--bg); padding: 8px 16px; display: flex; gap: 4px; border-top: 1px solid var(--border); }
+    .demo-nav button { flex: 1; padding: 10px; background: transparent; color: var(--text-secondary); border: none; border-radius: 4px; font-size: 11px; cursor: pointer; }
+    .demo-nav button.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  </style>
+</head>
+<body>
+  
+  <div class="demo-nav">
+    <button onclick="showPage('page-login')" id="nav-login">登入</button>
+    <button onclick="showPage('page-home')" id="nav-home">首頁</button>
+    <button onclick="showPage('page-browse')" id="nav-browse">瀏覽</button>
+    <button onclick="showPage('page-chat')" id="nav-chat">聊天</button>
+    <button onclick="showPage('page-my')" id="nav-my">我的</button>
+  </div>
+  <div style="height: 50px;"></div>
+  
+  <div id="page-login" class="page page-login">
+    <div class="logo">🚗</div>
+    <div class="brand">CABS</div>
+    <div class="input-group">
+      <label>電話號碼</label>
+      <div class="input-row">
+        <div class="prefix">+852</div>
+        <input type="tel" placeholder="6123 4567">
+      </div>
+    </div>
+    <button class="btn btn-primary">發送驗證碼</button>
+    <div class="input-group" style="margin-top: 32px;">
+      <label>驗證碼</label>
+      <input type="text" placeholder="輸入6位驗證碼">
+    </div>
+    <button class="btn btn-primary">驗證登入</button>
+  </div>
+  
+  <div id="page-home" class="page page-home active">
+    <div class="header">
+      <div class="header-title">CABS</div>
+      <button class="header-btn">👤</button>
+    </div>
+    <div class="hero-section">
+      <div class="mode-card" onclick="showPage('page-browse')">
+        <div class="mode-icon">👤</div>
+        <div class="mode-title">我要乘車</div>
+        <div class="mode-subtitle">瀏覽司機行程</div>
+      </div>
+      <div class="mode-card" onclick="showPage('page-browse')">
+        <div class="mode-icon">🚗</div>
+        <div class="mode-title">我要接人</div>
+        <div class="mode-subtitle">瀏覽乘客需求</div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="page-browse" class="page page-browse">
+    <div class="browse-header">
+      <button class="back-btn" onclick="showPage('page-home')">←</button>
+      <div class="browse-title">瀏覽行程</div>
+    </div>
+    <div style="padding: 0 20px;">
+      <div class="trip-card" onclick="showPage('page-chat')">
+        <div class="trip-route">📍 香港國際機場 → 深圳灣口岸</div>
+        <div class="trip-info">
+          <span class="trip-status">開放中</span>
+          <span>4月20日 14:00</span>
+          <span>張先生</span>
+        </div>
+        <div class="trip-bottom">
+          <span class="trip-price">$280/位</span>
+          <span class="trip-seats">3位 · 4座位</span>
+        </div>
+        <button class="trip-action">加入聊天</button>
+      </div>
+      <div class="trip-card" onclick="showPage('page-chat')">
+        <div class="trip-route">📍 迪士尼 → 落馬洲</div>
+        <div class="trip-info">
+          <span class="trip-status">開放中</span>
+          <span>4月21日 09:00</span>
+          <span>李小姐</span>
+        </div>
+        <div class="trip-bottom">
+          <span class="trip-price">$300/位</span>
+          <span class="trip-seats">2位 · 4座位</span>
+        </div>
+        <button class="trip-action">加入聊天</button>
+      </div>
+    </div>
+    <div style="padding: 24px 20px;">
+      <button class="btn btn-secondary">+ 發布行程</button>
+    </div>
+  </div>
+  
+  <div id="page-chat" class="page page-chat">
+    <div class="chat-header">
+      <button class="chat-back" onclick="showPage('page-browse')">←</button>
+      <div class="chat-route">📍 香港國際機場 → 深圳灣口岸</div>
+      <div class="chat-participants">張先生 · 你</div>
+    </div>
+    <div class="chat-messages">
+      <div class="message message-other">
+        <div class="message-sender">張先生</div>
+        你好，請問幾位乘客？
+        <div class="message-time">14:30</div>
+      </div>
+      <div class="message message-self">
+        你好，我兩位乘客
+        <div class="message-time">14:32</div>
+      </div>
+    </div>
+    <div class="chat-confirm-bar">
+      <div class="confirm-status">張先生 ✅ 你 ⏳</div>
+      <button class="btn-confirm">確認共乘</button>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" class="chat-input" placeholder="輸入訊息...">
+      <button class="chat-send">➤</button>
+    </div>
+  </div>
+  
+  <div id="page-my" class="page page-my">
+    <div class="my-header">
+      <div class="my-avatar">張</div>
+      <div class="my-name">張小明</div>
+      <div class="my-phone">+852 6123 4567</div>
+    </div>
+    <div class="my-section">
+      <div class="my-section-title">我的行程</div>
+      <div class="my-item">
+        <div class="my-item-left">
+          <div class="my-item-title">📍 香港 → 深圳灣</div>
+          <div class="my-item-sub">4月20日</div>
+        </div>
+        <span class="my-item-status status-confirmed">已確認</span>
+      </div>
+    </div>
+    <div class="my-section">
+      <div class="my-section-title">設定</div>
+      <div class="menu-item"><span class="menu-item-text">編輯暱稱</span></div>
+      <div class="menu-item"><span class="menu-item-text">切換為司機模式</span></div>
+      <div class="menu-item btn-logout"><span class="menu-item-text">登出</span></div>
+    </div>
+  </div>
+  
+  <script>
+    function showPage(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+      document.querySelectorAll('.demo-nav button').forEach(b => b.classList.remove('active'));
+      document.getElementById('nav-' + pageId.replace('page-', '')).classList.add('active');
+    }
+  </script>
+</body>
+</html>

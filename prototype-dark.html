@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cabs Carpool - 深色版</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+    
+    /* Dark Theme Colors */
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #1a1a24;
+      --bg-card: #252532;
+      --accent: #00d4ff;
+      --accent-hover: #00a8cc;
+      --text-primary: #ffffff;
+      --text-secondary: #8888aa;
+      --border: #333344;
+      --success: #00ff88;
+      --warning: #ffaa00;
+    }
+    
+    .page { display: none; }
+    .page.active { display: block; }
+    
+    .page-login { padding: 60px 24px; text-align: center; }
+    .logo { font-size: 64px; margin-bottom: 12px; filter: drop-shadow(0 0 20px rgba(0,212,255,0.5)); }
+    .brand { font-size: 28px; font-weight: 700; color: var(--accent); margin-bottom: 48px; letter-spacing: 2px; }
+    
+    .input-group { margin-bottom: 20px; }
+    .input-group label { display: block; text-align: left; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; letter-spacing: 1px; }
+    .input-row { display: flex; gap: 8px; }
+    
+    input {
+      width: 100%;
+      padding: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 16px;
+      color: var(--text-primary);
+      transition: border-color 0.3s;
+    }
+    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 10px rgba(0,212,255,0.2); }
+    
+    .prefix {
+      width: 70px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: var(--accent);
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #0099cc);
+      color: #000;
+      box-shadow: 0 4px 20px rgba(0,212,255,0.3);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(0,212,255,0.4); }
+    .btn-secondary { background: transparent; color: var(--accent); border: 2px solid var(--accent); }
+    
+    .header { background: var(--bg-secondary); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+    .header-title { font-size: 20px; font-weight: 700; color: var(--accent); }
+    .header-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); font-size: 18px; cursor: pointer; }
+    
+    .hero-section { padding: 48px 24px; text-align: center; }
+    
+    .mode-card {
+      background: linear-gradient(145deg, var(--bg-card), #1e1e2a);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 24px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .mode-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0,212,255,0.15); }
+    .mode-icon { font-size: 56px; margin-bottom: 16px; }
+    .mode-title { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+    .mode-subtitle { font-size: 14px; color: var(--text-secondary); }
+    
+    .browse-header { background: var(--bg-secondary); padding: 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+    .back-btn { font-size: 24px; background: none; border: none; color: var(--accent); cursor: pointer; }
+    .browse-title { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+    
+    .trip-card {
+      background: var(--bg-card);
+      margin: 16px;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid var(--border);
+    }
+    .trip-route { font-size: 16px; font-weight: 500; color: var(--text-primary); margin-bottom: 12px; }
+    .trip-info { display: flex; gap: 12px; font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+    .trip-status { display: inline-block; padding: 4px 10px; background: rgba(0,255,136,0.15); color: var(--success); border-radius: 12px; font-size: 12px; }
+    .trip-price { font-size: 18px; font-weight: 700; color: var(--accent); }
+    .trip-seats { color: var(--text-secondary); font-size: 13px; }
+    
+    .trip-action {
+      background: linear-gradient(135deg, var(--accent), #0099cc);
+      color: #000;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      width: 100%;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    
+    .page-chat { display: none; flex-direction: column; height: 100vh; }
+    .page-chat.active { display: flex; }
+    .chat-header { background: var(--bg-secondary); padding: 16px; border-bottom: 1px solid var(--border); }
+    .chat-back { font-size: 24px; background: none; border: none; color: var(--accent); cursor: pointer; }
+    .chat-route { font-size: 15px; color: var(--text-primary); }
+    .chat-participants { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+    .chat-messages { flex: 1; padding: 16px; overflow-y: auto; background: var(--bg-primary); }
+    
+    .message { max-width: 80%; padding: 14px 18px; border-radius: 16px; margin-bottom: 10px; font-size: 15px; line-height: 1.5; }
+    .message-other { background: var(--bg-card); color: var(--text-primary); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--border); }
+    .message-self { background: linear-gradient(135deg, var(--accent), #0099cc); color: #000; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .message-sender { font-size: 12px; font-weight: 600; margin-bottom: 6px; opacity: 0.8; }
+    .message-time { font-size: 11px; margin-top: 6px; opacity: 0.7; text-align: right; }
+    
+    .chat-confirm-bar { background: rgba(0,212,255,0.1); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); }
+    .confirm-status { font-size: 13px; color: var(--text-secondary); }
+    .btn-confirm { background: linear-gradient(135deg, var(--success), #00cc66); color: #000; border: none; padding: 12px 24px; border-radius: 24px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    
+    .chat-input-area { background: var(--bg-secondary); padding: 12px 16px; display: flex; gap: 10px; border-top: 1px solid var(--border); }
+    .chat-input { flex: 1; padding: 14px 18px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 24px; font-size: 15px; color: var(--text-primary); }
+    .chat-send { width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #0099cc); color: #000; border: none; font-size: 20px; cursor: pointer; }
+    
+    .my-header { background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary)); padding: 32px 20px; text-align: center; border-bottom: 1px solid var(--border); }
+    .my-avatar { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #0099cc); display: flex; align-items: center; justify-content: center; font-size: 36px; color: #000; margin: 0 auto 16px; box-shadow: 0 0 30px rgba(0,212,255,0.3); }
+    .my-name { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+    .my-phone { font-size: 14px; color: var(--text-secondary); margin-top: 8px; }
+    
+    .my-section { padding: 20px; }
+    .my-section-title { font-size: 11px; color: var(--accent); margin-bottom: 14px; letter-spacing: 2px; text-transform: uppercase; }
+    
+    .my-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .my-item-title { font-size: 15px; font-weight: 500; color: var(--text-primary); }
+    .my-item-sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+    .my-item-status { padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .status-open { background: rgba(0,255,136,0.15); color: var(--success); }
+    .status-confirmed { background: rgba(0,212,255,0.15); color: var(--accent); }
+    
+    .menu-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: border-color 0.3s; }
+    .menu-item:hover { border-color: var(--accent); }
+    .menu-item-text { font-size: 15px; color: var(--text-primary); }
+    .menu-item-arrow { color: var(--text-secondary); }
+    .btn-logout { color: #ff6b6b; }
+    
+    .demo-nav { position: fixed; bottom: 0; left: 0; right: 0; max-width: 430px; margin: 0 auto; background: var(--bg-secondary); padding: 10px 16px; display: flex; gap: 8px; border-top: 1px solid var(--border); }
+    .demo-nav button { flex: 1; padding: 10px; background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; cursor: pointer; transition: all 0.3s; }
+    .demo-nav button.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  </style>
+</head>
+<body>
+  
+  <div class="demo-nav">
+    <button onclick="showPage('page-login')" id="nav-login">登入</button>
+    <button onclick="showPage('page-home')" id="nav-home">首頁</button>
+    <button onclick="showPage('page-browse')" id="nav-browse">瀏覽</button>
+    <button onclick="showPage('page-chat')" id="nav-chat">聊天</button>
+    <button onclick="showPage('page-my')" id="nav-my">我的</button>
+  </div>
+  <div style="height: 60px;"></div>
+  
+  <div id="page-login" class="page page-login">
+    <div class="logo">🚗</div>
+    <div class="brand">CABS</div>
+    <div class="input-group">
+      <label>電話號碼</label>
+      <div class="input-row">
+        <div class="prefix">+852</div>
+        <input type="tel" placeholder="6123 4567">
+      </div>
+    </div>
+    <button class="btn btn-primary">發送驗證碼</button>
+    <div class="input-group" style="margin-top: 24px;">
+      <label>驗證碼</label>
+      <input type="text" placeholder="輸入6位驗證碼">
+    </div>
+    <button class="btn btn-primary">驗證登入</button>
+  </div>
+  
+  <div id="page-home" class="page page-home active">
+    <div class="header">
+      <div class="header-title">🚗 CABS</div>
+      <button class="header-btn">👤</button>
+    </div>
+    <div class="hero-section">
+      <div class="mode-card" onclick="showPage('page-browse')">
+        <div class="mode-icon">👤</div>
+        <div class="mode-title">我要乘車</div>
+        <div class="mode-subtitle">瀏覽司機行程，加入聊天</div>
+      </div>
+      <div class="mode-card" onclick="showPage('page-browse')">
+        <div class="mode-icon">🚗</div>
+        <div class="mode-title">我要接人</div>
+        <div class="mode-subtitle">瀏覽乘客需求，確認共乘</div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="page-browse" class="page page-browse">
+    <div class="browse-header">
+      <button class="back-btn" onclick="showPage('page-home')">←</button>
+      <div class="browse-title">👤 瀏覽行程</div>
+    </div>
+    <div class="trip-card" onclick="showPage('page-chat')">
+      <div class="trip-route">📍 香港國際機場 → 深圳灣口岸</div>
+      <div class="trip-info">
+        <span class="trip-status">🟢 開放中</span>
+        <span>4月20日 14:00</span>
+        <span>張先生</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="trip-price">$280/位</span>
+        <span class="trip-seats">3位 · 4座位</span>
+      </div>
+      <button class="trip-action">💬 加入聊天</button>
+    </div>
+    <div class="trip-card" onclick="showPage('page-chat')">
+      <div class="trip-route">📍 迪士尼 → 落馬洲</div>
+      <div class="trip-info">
+        <span class="trip-status">🟢 開放中</span>
+        <span>4月21日 09:00</span>
+        <span>李小姐</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="trip-price">$300/位</span>
+        <span class="trip-seats">2位 · 4座位</span>
+      </div>
+      <button class="trip-action">💬 加入聊天</button>
+    </div>
+    <div style="padding: 16px;">
+      <button class="btn btn-secondary">+ 發布行程</button>
+    </div>
+  </div>
+  
+  <div id="page-chat" class="page page-chat">
+    <div class="chat-header">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button class="chat-back" onclick="showPage('page-browse')">←</button>
+        <div>
+          <div class="chat-route">📍 香港國際機場 → 深圳灣口岸</div>
+          <div class="chat-participants">張先生 (Host) · 你</div>
+        </div>
+      </div>
+    </div>
+    <div class="chat-messages">
+      <div class="message message-other">
+        <div class="message-sender">張先生 (Host)</div>
+        你好，請問幾位乘客？
+        <div class="message-time">14:30</div>
+      </div>
+      <div class="message message-self">
+        你好，我兩位乘客，兩件行李
+        <div class="message-time">14:32</div>
+      </div>
+      <div class="message message-other">
+        <div class="message-sender">張先生 (Host)</div>
+        好的，280一位，兩位一共560
+        <div class="message-time">14:33</div>
+      </div>
+    </div>
+    <div class="chat-confirm-bar">
+      <div class="confirm-status">張先生 ✅ 你 ⏳</div>
+      <button class="btn-confirm">✅ 確認共乘</button>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" class="chat-input" placeholder="輸入訊息...">
+      <button class="chat-send">➤</button>
+    </div>
+  </div>
+  
+  <div id="page-my" class="page page-my">
+    <div class="my-header">
+      <div class="my-avatar">張</div>
+      <div class="my-name">張小明</div>
+      <div class="my-phone">+852 6123 4567</div>
+    </div>
+    <div class="my-section">
+      <div class="my-section-title">我的行程</div>
+      <div class="my-item">
+        <div class="my-item-left">
+          <div class="my-item-title">📍 香港 → 深圳灣</div>
+          <div class="my-item-sub">4月20日 14:00 · 張司機</div>
+        </div>
+        <span class="my-item-status status-confirmed">✅ 已確認</span>
+      </div>
+    </div>
+    <div class="my-section">
+      <div class="my-section-title">設定</div>
+      <div class="menu-item"><span class="menu-item-text">✏️ 編輯暱稱</span><span class="menu-item-arrow">›</span></div>
+      <div class="menu-item"><span class="menu-item-text">🔄 切換為司機模式</span><span class="menu-item-arrow">›</span></div>
+      <div class="menu-item btn-logout"><span class="menu-item-text">🚪 登出</span></div>
+    </div>
+  </div>
+  
+  <script>
+    function showPage(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+      document.querySelectorAll('.demo-nav button').forEach(b => b.classList.remove('active'));
+      document.getElementById('nav-' + pageId.replace('page-', '')).classList.add('active');
+    }
+  </script>
+</body>
+</html>

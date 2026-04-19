@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { tripService, requestService } from '../services/tripService'
+import { tripService } from '../services/tripService'
 import { useAuth } from '../context/AuthContext'
 
 export default function BrowsePage() {

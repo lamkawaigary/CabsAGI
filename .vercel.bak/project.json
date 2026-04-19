@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_5NFVBDK4DsLvBdybCln2ZFK8rlun",
+  "orgId": "team_MDs43QinzHaPGAVz973AIOAB",
+  "projectName": "cabs-agi",
+  "settings": {
+    "createdAt": 1771790396681,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

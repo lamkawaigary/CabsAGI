@@ -172,10 +172,10 @@ export default function PassengerHome() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+    <div style={{ minHeight: '100vh', background: '#fff9f5' }}>
       {/* Header */}
       <div style={{
-        background: '#1e56a3',
+        background: '#e07b4c',
         color: 'white',
         padding: '16px',
         display: 'flex',
@@ -486,37 +486,37 @@ const styles: Record<string, React.CSSProperties> = {
   tabs: {
     display: 'flex',
     background: 'white',
-    borderBottom: '1px solid #e0e0e0',
+    borderBottom: '1px solid #f0e0d6',
   },
   tab: {
     flex: 1,
     padding: '14px 0',
     border: 'none',
     background: 'transparent',
-    color: '#666',
+    color: '#8b7355',
     fontSize: 14,
     fontWeight: 500,
     cursor: 'pointer',
   },
   tabActive: {
-    background: '#1e56a3',
+    background: '#e07b4c',
     color: 'white',
   },
   center: {
     textAlign: 'center',
     padding: 40,
-    color: '#666',
+    color: '#8b7355',
   },
   sectionTitle: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#666',
+    color: '#8b7355',
     margin: '0 0 12px 0',
   },
   requestBtn: {
     width: '100%',
     padding: 14,
-    background: '#143b34',
+    background: '#e07b4c',
     color: 'white',
     border: 'none',
     borderRadius: 12,
@@ -544,8 +544,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   badgeOpen: {
     padding: '2px 8px',
-    background: '#e8f5e9',
-    color: '#2e7d32',
+    background: '#e8f5e8',
+    color: '#5a9a5a',
     borderRadius: 10,
     fontSize: 12,
   },
@@ -557,7 +557,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
   },
   time: {
-    color: '#666',
+    color: '#8b7355',
   },
   route: {
     display: 'flex',
@@ -567,25 +567,25 @@ const styles: Record<string, React.CSSProperties> = {
   },
   info: {
     fontSize: 13,
-    color: '#666',
+    color: '#8b7355',
   },
   notes: {
     fontSize: 13,
-    color: '#444',
-    background: '#f8f8f8',
+    color: '#4a3728',
+    background: '#fff',
     padding: '8px 12px',
     borderRadius: 6,
     marginTop: 8,
   },
   lastMsg: {
     fontSize: 13,
-    color: '#1e56a3',
+    color: '#e07b4c',
     marginTop: 8,
   },
   chatBtn: {
     width: '100%',
     padding: 12,
-    background: '#1e56a3',
+    background: '#e07b4c',
     color: 'white',
     border: 'none',
     borderRadius: 8,
@@ -633,7 +633,7 @@ const styles: Record<string, React.CSSProperties> = {
   input: {
     width: '100%',
     padding: 12,
-    border: '1px solid #ddd',
+    border: '1px solid #f0e0d6',
     borderRadius: 8,
     fontSize: 15,
     boxSizing: 'border-box',
@@ -641,7 +641,7 @@ const styles: Record<string, React.CSSProperties> = {
   submitBtn: {
     width: '100%',
     padding: 14,
-    background: '#143b34',
+    background: '#e07b4c',
     color: 'white',
     border: 'none',
     borderRadius: 8,

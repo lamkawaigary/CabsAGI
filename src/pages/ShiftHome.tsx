@@ -252,7 +252,7 @@ export default function ShiftHome() {
       </section>
 
       {/* Driver Section - Separate flow for drivers */}
-      <section style={{ padding: '20px 16px', background: '#f8f7f4', borderTop: '1px solid #e8e2d6', marginTop: '8px' }}>
+      <section style={{ padding: '20px 16px', background: '#fff9f5', borderTop: '1px solid #f0e0d6', marginTop: '8px' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 12, color: '#8a8478', marginBottom: 8, fontWeight: 600, letterSpacing: '0.1em' }}>
             司機專區
@@ -263,12 +263,12 @@ export default function ShiftHome() {
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              border: '1px solid #d2dfd4',
+              border: '1px solid #f0e0d6',
               borderRadius: 12,
               padding: '12px 24px',
               fontWeight: 700,
               background: '#fff',
-              color: '#284a41',
+              color: '#4a3728',
               cursor: 'pointer',
               fontSize: 14,
             }}
@@ -323,7 +323,7 @@ export default function ShiftHome() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: 'linear-gradient(180deg, #f8f9fa 0%, #fff 100%)',
+    background: '#fff9f5',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif'
   },
   header: {
@@ -332,7 +332,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: '16px 20px',
     background: '#fff',
-    borderBottom: '1px solid #f0f0f0'
+    borderBottom: '2px solid #f0e0d6'
   },
   logo: {
     display: 'flex',
@@ -341,14 +341,14 @@ const styles: Record<string, React.CSSProperties> = {
   logoText: {
     fontSize: '22px',
     fontWeight: 700,
-    color: '#143b34'
+    color: '#e07b4c'
   },
   headerBtn: {
     padding: '8px 16px',
     borderRadius: '20px',
-    border: '1px solid #143b34',
+    border: '1px solid #e07b4c',
     background: '#fff',
-    color: '#143b34',
+    color: '#e07b4c',
     fontSize: '14px',
     fontWeight: 500,
     cursor: 'pointer'
@@ -504,7 +504,7 @@ const loggedInNavStyle: React.CSSProperties = {
   left: 0,
   right: 0,
   display: 'flex',
-  background: '#143b34',
+  background: '#e07b4c',
   padding: '10px 0',
   zIndex: 100
 }

@@ -158,7 +158,7 @@ export default function DriverLanding() {
                 borderRadius: 12,
                 padding: '10px 12px',
                 fontWeight: 700,
-                background: mode === 'login' ? '#143b34' : '#eef2ee',
+                background: mode === 'login' ? '#e07b4c' : '#eef2ee',
                 color: mode === 'login' ? '#ecfff9' : '#355149',
                 cursor: 'pointer',
               }}
@@ -173,7 +173,7 @@ export default function DriverLanding() {
                 borderRadius: 12,
                 padding: '10px 12px',
                 fontWeight: 700,
-                background: mode === 'register' ? '#143b34' : '#eef2ee',
+                background: mode === 'register' ? '#e07b4c' : '#eef2ee',
                 color: mode === 'register' ? '#ecfff9' : '#355149',
                 cursor: 'pointer',
               }}

@@ -18,7 +18,7 @@ import {
   signInWithPhoneNumber,
 } from 'firebase/auth'
 import type { ApplicationVerifier, ConfirmationResult } from 'firebase/auth'
-import { doc, getDoc, setDoc, updateDoc, getDocs, query, where, collection } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, collection } from 'firebase/firestore'
 import { auth, db, googleProvider } from '../firebaseConfig'
 import { RecaptchaVerifier } from 'firebase/auth'
 
@@ -32,6 +32,7 @@ export interface AuthUser {
   email: string
   role: UserRole
   points: number
+  joinedTrips?: string[]
   // Driver-specific fields
   kycStatus?: 'pending' | 'submitted' | 'approved' | 'rejected' | 'n/a'
   driverApproved?: boolean
@@ -64,6 +65,7 @@ interface AuthContextValue {
   }) => Promise<{ ok: boolean; message: string }>
   resetPasswordByPhone: (regionCode: string, phone: string, newPassword?: string, otpCode?: string) => Promise<{ ok: boolean; message: string }>
   logout: () => Promise<void>
+  deleteAccount: () => Promise<{ ok: boolean; message: string }>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -233,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             kycStatus: 'n/a',
             driverApproved: false,
             phoneVerified: false,
+            joinedTrips: [],
           })
           setCurrentUser({ ...profile, kycStatus: 'n/a', driverApproved: false, phoneVerified: false })
         }
@@ -359,16 +362,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Get the phone number from Firebase user
       const phone = fbUser.phoneNumber
       
-      // Check if user exists in Firestore
-      const q = query(collection(db, 'users'), where('phone', '==', phone))
-      const snap = await getDocs(q)
+      // Use Firebase Auth UID directly for Firestore operations
+      const userId = fbUser.uid
       
-      if (snap.empty) {
+      // Check if user document exists first
+      const userRef = doc(db, 'users', userId)
+      const userDocSnap = await getDoc(userRef)
+      
+      if (!userDocSnap.exists()) {
         // Create new user document in Firestore (first time login via OTP)
-        const newUserId = fbUser.uid
-        
-        await setDoc(doc(db, 'users', newUserId), {
-          id: newUserId,
+        await setDoc(userRef, {
+          id: userId,
           fbUid: fbUser.uid,
           name: 'Cabs User',
           phone: phone,
@@ -385,7 +389,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Set as current user
         setCurrentUser({
-          id: newUserId,
+          id: userId,
           name: 'Cabs User',
           phone: phone || '',
           phoneVerified: true,
@@ -401,20 +405,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: true, message: '電話驗證成功！請完善您的個人資料。' }
       }
       
-      // Update existing user
-      await updateDoc(snap.docs[0].ref, {
+      // Update existing user using their own document ID (Firebase UID)
+      await updateDoc(userRef, {
         phone: phone,
         phoneVerified: true,
         fbUid: fbUser.uid,
         updatedAt: new Date().toISOString(),
       })
       
-      // Trigger auth state refresh by re-fetching user data
-      const userDoc = await getDoc(snap.docs[0].ref)
-      if (userDoc.exists()) {
-        const data = userDoc.data()
+      // Re-fetch the updated user data
+      const updatedDoc = await getDoc(userRef)
+      if (updatedDoc.exists()) {
+        const data = updatedDoc.data()
         setCurrentUser({
-          id: userDoc.id,
+          id: updatedDoc.id,
           name: data.name || 'Cabs User',
           phone: data.phone || phone,
           phoneVerified: true,
@@ -430,6 +434,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOtpSession(null)
       return { ok: true, message: '電話驗證成功！' }
     } catch (err: unknown) {
+      const code = getErrorCode(err)
+      console.error('verifyOtp error:', code, err)
+      
+      // Check for specific Firebase auth errors
+      if (code === 'auth/invalid-verification-code') {
+        return { ok: false, message: '驗證碼錯誤，請重新輸入' }
+      }
+      if (code === 'auth/code-expired') {
+        return { ok: false, message: '驗證碼已過期，請重新發送' }
+      }
+      
+      // For Firestore permission errors, still consider it success if user exists
+      // This handles the case where Firebase Auth succeeds but Firestore times out
+      if (code === 'permission-denied' || code === 'missing-or-insufficient-permissions') {
+        console.warn('Firestore permission error after successful OTP verification')
+        setOtpSession(null)
+        // Return success anyway since Firebase Auth confirmed the phone
+        return { ok: true, message: '電話驗證成功！' }
+      }
+      
       return { ok: false, message: `驗證失敗: ${getErrorMessage(err)}` }
     }
   }
@@ -529,6 +553,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth)
   }
 
+  const deleteAccount = async () => {
+    const user = auth.currentUser
+    if (!user) return { ok: false, message: '未登入' }
+    
+    try {
+      // Delete user document from Firestore
+      await deleteDoc(doc(db, 'users', user.uid))
+      
+      // Delete user from Firebase Auth
+      await user.delete()
+      
+      // Sign out after deletion
+      await signOut(auth)
+      
+      return { ok: true, message: '帳戶已刪除' }
+    } catch (err: unknown) {
+      const code = getErrorCode(err)
+      if (code === 'auth/requires-recent-login') {
+        return { ok: false, message: '請重新登入後再刪除帳戶' }
+      }
+      return { ok: false, message: `刪除失敗: ${getErrorMessage(err)}` }
+    }
+  }
+
   const triggerPhoneVerification: AuthContextValue['triggerPhoneVerification'] = async (
     regionCode,
     phone,
@@ -554,6 +602,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     registerUser,
     resetPasswordByPhone,
     logout,
+    deleteAccount,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

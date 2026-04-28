@@ -1,12 +1,15 @@
-// Cabs Carpool - My Page v1.1
-// 暖色珊瑚主題
+// Cabs Carpool - My Page v1.2
+// 暖色珊瑚主題 + 登入功能
 
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import LoginModal from '../components/LoginModal'
 
 export default function MyPage() {
   const navigate = useNavigate()
   const { currentUser, logout } = useAuth()
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -33,7 +36,7 @@ export default function MyPage() {
           </p>
           <button 
             style={styles.loginBtn}
-            onClick={() => navigate('/profile')}
+            onClick={() => setShowLoginModal(true)}
           >
             登入 / 註冊
           </button>
@@ -45,12 +48,19 @@ export default function MyPage() {
             首頁
           </button>
           <button style={styles.navItem} onClick={() => navigate('/browse')}>
-            📍 瀏覽
+            📍 瀏览
           </button>
           <button style={styles.navItemActive} onClick={() => navigate('/my')}>
             👤 我的
           </button>
         </nav>
+
+        {/* Login Modal */}
+        <LoginModal 
+          isOpen={showLoginModal} 
+          onClose={() => setShowLoginModal(false)}
+          onLoginSuccess={() => setShowLoginModal(false)}
+        />
       </div>
     )
   }
@@ -68,28 +78,32 @@ export default function MyPage() {
         <div style={styles.avatar}>
           {currentUser.name?.charAt(0) || '?'}
         </div>
-        <div style={styles.userName}>{currentUser.name || '用戶'}</div>
-        <div style={styles.userPhone}>{currentUser.phone || '未設定電話'}</div>
+        <div style={styles.userName}>{currentUser.name || '用户'}</div>
+        <div style={styles.userPhone}>{currentUser.phone || '未设定电话'}</div>
       </div>
 
       {/* Quick Links */}
       <div style={styles.section}>
         <div style={styles.sectionTitle}>快捷操作</div>
         <div style={styles.menuItem} onClick={() => navigate('/browse')}>
-          <span>📍 瀏覽行程</span>
+          <span>📍 浏览行程</span>
+          <span style={styles.arrow}>›</span>
+        </div>
+        <div style={styles.menuItem} onClick={() => navigate('/trips')}>
+          <span>🚗 我的行程</span>
           <span style={styles.arrow}>›</span>
         </div>
       </div>
 
       {/* Settings */}
       <div style={styles.section}>
-        <div style={styles.sectionTitle}>設定</div>
+        <div style={styles.sectionTitle}>设定</div>
         <div style={styles.menuItem}>
-          <span>✏️ 編輯暱稱</span>
+          <span>✏️ 编辑昵称</span>
           <span style={styles.arrow}>›</span>
         </div>
         <div style={styles.menuItem}>
-          <span>🔄 切換為司機模式</span>
+          <span>🔄 切换为司机模式</span>
           <span style={styles.arrow}>›</span>
         </div>
         <div style={{...styles.menuItem, ...styles.logoutItem}} onClick={handleLogout}>
@@ -100,10 +114,10 @@ export default function MyPage() {
       {/* Bottom Navigation */}
       <nav style={styles.bottomNav}>
         <button style={styles.navItem} onClick={() => navigate('/')}>
-          首頁
+          首页
         </button>
         <button style={styles.navItem} onClick={() => navigate('/browse')}>
-          📍 瀏覽
+          📍 浏览
         </button>
         <button style={styles.navItemActive} onClick={() => navigate('/my')}>
           👤 我的

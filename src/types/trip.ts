@@ -14,10 +14,12 @@ export interface Location {
 // ==================== Trip (司機發佈行程 = 聊天話題) ====================
 
 export type TripStatus = 
-  | 'OPEN'        // 開放聊天
-  | 'CONFIRMED'   // 已確認共乘
-  | 'COMPLETED'   // 已完成
-  | 'CANCELLED'   // 已取消
+  | 'OPEN'           // 🟢 開放中（等待乘客報名）
+  | 'CONFIRMED'      // 🟡 已確認（人數足夠，可以出發）
+  | 'IN_PROGRESS'    // 🔵 行程中
+  | 'COMPLETED'      // ✅ 已完成
+  | 'CANCELLED'      // ❌ 已取消
+  | 'EXPIRED'        // ⏰ 已過期
 
 export interface Trip {
   id: string
@@ -38,13 +40,42 @@ export interface Trip {
   
   // 座位
   totalSeats: number
+  availableSeats: number  // 剩餘座位
   
-  // 乘客名單 (聊天參與者)
+  // 乘客名單 (已批准的聊天參與者)
   passengers: {
     oderId: string
     name: string
     phone: string
-    confirmed: boolean  // 是否已確認共乘
+    confirmed: boolean       // 是否已確認共乘
+    onboarded: boolean       // 是否已上車（司機標記）
+    qrCode?: string         // 上車驗證碼
+    qrCodeExpiry?: string   // 驗證碼過期時間
+  }[]
+  
+  // 待批准的乘客（pending approval）
+  pendingPassengers: {
+    oderId: string
+    name: string
+    phone: string
+    joinedAt: string  // 加入時間
+  }[]
+  
+  // 已拒絕的乘客（拒絕後不再顯示）
+  rejectedPassengers: string[]  // oderId 列表
+  
+  // 已離開的乘客（乘客主動離開）
+  leftPassengers: {
+    oderId: string
+    leftAt: string
+    reason?: string
+  }[]
+  
+  // 司機標記的未到乘客
+  noShowPassengers: {
+    oderId: string
+    markedAt: string
+    markedBy: string
   }[]
   
   // 狀態
@@ -83,6 +114,15 @@ export interface PassengerRequest {
   departureDate: string
   passengerCount: number
   
+  // 車輛類型
+  vehicleType: 'sedan' | '7seater'
+  
+  // 是否共乘（true=共乘，false=包車）
+  isCarpool: boolean
+  
+  // 備註
+  notes: string | null
+  
   // 有興趣的司機
   interestedDrivers: {
     driverId: string
@@ -101,9 +141,6 @@ export interface PassengerRequest {
   
   // 狀態
   status: RequestStatus
-  
-  // 備註
-  notes?: string
   
   // Metadata
   createdAt: string

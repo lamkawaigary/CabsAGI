@@ -23,9 +23,9 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 
 const ORDER_STATUS_STYLES: Record<string, React.CSSProperties> = {
   pending: { background: '#fff3cd', color: '#7a5a1a' },
-  accepted: { background: '#d6ebff', color: '#1e56a3' },
+  accepted: { background: '#d6ebff', color: '#e07b4c' },
   in_progress: { background: '#d4edda', color: '#1a7a3a' },
-  completed: { background: '#c8e6c9', color: '#2e7d32' },
+  completed: { background: '#c8e6c9', color: '#e07b4c' },
   cancelled: { background: '#f8d7da', color: '#c62828' },
 }
 

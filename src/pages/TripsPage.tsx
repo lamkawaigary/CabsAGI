@@ -1,5 +1,5 @@
-// Cabs Carpool - Trips Page v1.0
-// 暖色珊瑚主題
+// Cabs Carpool - Trips Page v1.3
+// 暖色珊瑚主題 + 司機視圖
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -9,50 +9,75 @@ import { useAuth } from '../context/AuthContext'
 export default function TripsPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const [_trips, setTrips] = useState<any[]>([])
-  const [_requests, setRequests] = useState<any[]>([])
+  const [trips, setTrips] = useState<any[]>([])
+  const [requests, setRequests] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (currentUser) {
       loadUserTrips()
+    } else {
+      setLoading(false)
     }
   }, [currentUser])
 
   const loadUserTrips = async () => {
     try {
       setLoading(true)
-      const [myTrips, myRequests] = await Promise.all([
-        currentUser?.role === 'driver' 
-          ? tripService.getByDriver(currentUser.id)
-          : Promise.resolve([]),
-        currentUser?.role === 'passenger'
-          ? requestService.getByPassenger(currentUser.id)
-          : Promise.resolve([])
-      ])
-      setTrips(myTrips || [])
-      setRequests(myRequests || [])
+      
+      if (currentUser?.role === 'driver') {
+        // 司機：載入行程
+        const myTrips = await tripService.getByDriver(currentUser.id)
+        setTrips(myTrips || [])
+        setRequests([])
+      } else {
+        // 乘客：載入需求
+        const myRequests = await requestService.getByPassenger(currentUser?.id || '')
+        setRequests(myRequests || [])
+        setTrips([])
+      }
     } catch (error) {
-      console.error('Error loading:', error)
+      console.error('Error loading trips:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleChat = (_item: any) => {
+  const handleChat = () => {
     if (!currentUser) {
-      alert('請先登入')
+      navigate('/profile')
       return
     }
     navigate('/chat/demo')
   }
+
+  // Helper to extract pickup/dropoff from different data formats
+  const getPickup = (item: any) => {
+    if (item.route?.pickup?.placeName) return item.route.pickup.placeName
+    if (item.route?.pickup) return item.route.pickup
+    if (item.pickup?.placeName) return item.pickup.placeName
+    if (item.pickup) return item.pickup
+    return '未知'
+  }
+
+  const getDropoff = (item: any) => {
+    if (item.route?.dropoff?.placeName) return item.route.dropoff.placeName
+    if (item.route?.dropoff) return item.route.dropoff
+    if (item.dropoff?.placeName) return item.dropoff.placeName
+    if (item.dropoff) return item.dropoff
+    return '未知'
+  }
+
+  const isDriver = currentUser?.role === 'driver'
 
   return (
     <div style={styles.container}>
       {/* Header */}
       <header style={styles.header}>
         <button style={styles.backBtn} onClick={() => navigate('/')}>←</button>
-        <div style={styles.title}>🚗 我的行程</div>
+        <div style={styles.title}>
+          {isDriver ? '🚗 我的行程' : '📋 我的需求'}
+        </div>
         <div style={{width: 40}} />
       </header>
 
@@ -60,70 +85,89 @@ export default function TripsPage() {
       <div style={styles.content}>
         {loading ? (
           <div style={styles.empty}>載入中...</div>
+        ) : isDriver ? (
+          // === 司機視圖 ===
+          trips.length === 0 ? (
+            <div style={styles.empty}>
+              <div style={styles.emptyIcon}>🚗</div>
+              <div>暫時沒有行程</div>
+              <div style={styles.emptySubtext}>去發布你的第一個行程吧！</div>
+              <button 
+                style={styles.createBtn}
+                onClick={() => navigate('/create-trip')}
+              >
+                + 發布行程
+              </button>
+            </div>
+          ) : (
+            trips.map(trip => (
+              <div key={trip.id} style={styles.tripCard}>
+                <div style={styles.tripHeader}>
+                  <div style={styles.tripRoute}>
+                    📍 {getPickup(trip)} → {getDropoff(trip)}
+                  </div>
+                  <span style={trip.status === 'OPEN' ? styles.badgeOpen : styles.badgeDone}>
+                    {trip.status === 'OPEN' ? '🟢 進行中' : '✓ 已完成'}
+                  </span>
+                </div>
+                <div style={styles.tripDetails}>
+                  <div>🕐 <strong>{trip.departureTime || '時間待定'}</strong></div>
+                  <div>💺 {trip.totalSeats || 0} 位 · 已加入 {trip.passengers?.length || 0} 位</div>
+                </div>
+                <div style={styles.tripActions}>
+                  <button style={styles.chatBtn} onClick={handleChat}>
+                    💬 進入聊天
+                  </button>
+                </div>
+              </div>
+            ))
+          )
         ) : (
-          <>
-            {/* Active Trips */}
-            <div style={styles.section}>
-              <div style={styles.sectionTitle}>進行中的行程</div>
-              
-              {/* Demo card - confirmed */}
-              <div style={styles.tripCard}>
+          // === 乘客視圖 ===
+          requests.length === 0 ? (
+            <div style={styles.empty}>
+              <div style={styles.emptyIcon}>📋</div>
+              <div>暫時沒有需求</div>
+              <div style={styles.emptySubtext}>你可以發布乘車需求</div>
+            </div>
+          ) : (
+            requests.map(req => (
+              <div key={req.id} style={styles.tripCard}>
                 <div style={styles.tripHeader}>
-                  <div style={styles.tripRoute}>📍 香港國際機場 → 深圳灣口岸</div>
-                  <span style={styles.badgeConfirmed}>✅ 已確認</span>
+                  <div style={styles.tripRoute}>
+                    📍 {getPickup(req)} → {getDropoff(req)}
+                  </div>
+                  <span style={req.status === 'OPEN' ? styles.badgeOpen : styles.badgeDone}>
+                    {req.status === 'OPEN' ? '🟢 開放中' : '✓ 已關閉'}
+                  </span>
                 </div>
                 <div style={styles.tripDetails}>
-                  <div>🕐 <strong>4月20日 14:00</strong></div>
-                  <div>👤 司機：張先生</div>
-                  <div>💰 <strong>$280 × 2位 = $560</strong></div>
+                  <div>🕐 <strong>{req.departureDate || '時間待定'}</strong></div>
+                  <div>👥 {req.passengerCount || 1} 位</div>
                 </div>
                 <div style={styles.tripActions}>
-                  <button style={styles.chatBtn} onClick={() => handleChat(null)}>
-                    💬 聯絡司機
+                  <button style={styles.chatBtn} onClick={handleChat}>
+                    💬 進入聊天
                   </button>
                 </div>
               </div>
-
-              {/* Demo card - pending */}
-              <div style={styles.tripCard}>
-                <div style={styles.tripHeader}>
-                  <div style={styles.tripRoute}>📍 迪士尼 → 落馬洲</div>
-                  <span style={styles.badgePending}>⏳ 等待中</span>
-                </div>
-                <div style={styles.tripDetails}>
-                  <div>🕐 <strong>4月21日 09:00</strong></div>
-                  <div>👤 司機：李小姐</div>
-                  <div>💰 <strong>$300 × 1位 = $300</strong></div>
-                </div>
-                <div style={styles.tripActions}>
-                  <button style={styles.chatBtn} onClick={() => handleChat(null)}>
-                    💬 聯絡司機
-                  </button>
-                  <button style={styles.cancelBtn}>
-                    取消
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Past Trips */}
-            <div style={styles.section}>
-              <div style={styles.sectionTitle}>歷史記錄</div>
-              
-              <div style={{...styles.tripCard, opacity: 0.7}}>
-                <div style={styles.tripHeader}>
-                  <div style={styles.tripRoute}>📍 澳門 → 香港機場</div>
-                  <span style={styles.badgeDone}>✓ 已完成</span>
-                </div>
-                <div style={styles.tripDetails}>
-                  <div>4月15日 08:00 · 王司機</div>
-                  <div style={{color: '#5a9a5a'}}>+$700 已收款</div>
-                </div>
-              </div>
-            </div>
-          </>
+            ))
+          )
         )}
       </div>
+
+      {/* Bottom Navigation */}
+      <nav style={styles.bottomNav}>
+        <button style={styles.navItem} onClick={() => navigate('/')}>
+          首頁
+        </button>
+        <button style={styles.navItem} onClick={() => navigate('/browse')}>
+          📍 瀏覽
+        </button>
+        <button style={styles.navItemActive} onClick={() => navigate('/trips')}>
+          🚗 行程
+        </button>
+      </nav>
     </div>
   )
 }
@@ -132,6 +176,7 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
     background: '#fff9f5',
+    paddingBottom: 80,
   },
   header: {
     display: 'flex',
@@ -156,16 +201,6 @@ const styles: Record<string, React.CSSProperties> = {
   content: {
     padding: 16,
   },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: '#e07b4c',
-    marginBottom: 12,
-    letterSpacing: 1,
-  },
   tripCard: {
     background: '#fff',
     border: '2px solid #f0e0d6',
@@ -183,18 +218,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 16,
     fontWeight: 600,
     color: '#4a3728',
+    flex: 1,
   },
-  badgeConfirmed: {
-    background: '#c8e6c9',
-    color: '#2e7d32',
-    padding: '4px 10px',
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  badgePending: {
-    background: '#fff3e0',
-    color: '#e65100',
+  badgeOpen: {
+    background: '#e8f5e8',
+    color: '#e07b4c',
     padding: '4px 10px',
     borderRadius: 12,
     fontSize: 12,
@@ -229,19 +257,67 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
   },
-  cancelBtn: {
-    padding: '10px 16px',
-    background: '#ffebee',
-    color: '#c62828',
-    border: 'none',
-    borderRadius: 10,
-    fontSize: 13,
-    fontWeight: 500,
-    cursor: 'pointer',
-  },
   empty: {
     textAlign: 'center' as const,
     padding: 40,
     color: '#8b7355',
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    marginTop: 8,
+    marginBottom: 20,
+    color: '#8b7355',
+  },
+  createBtn: {
+    padding: '12px 24px',
+    background: 'linear-gradient(135deg, #e07b4c, #c4623a)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 12,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  bottomNav: {
+    position: 'fixed' as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    display: 'flex',
+    background: '#fff',
+    padding: '10px 0',
+    borderTop: '2px solid #f0e0d6',
+    zIndex: 100,
+  },
+  navItem: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: 4,
+    padding: '8px',
+    background: 'none',
+    border: 'none',
+    fontSize: 12,
+    color: '#8b7355',
+    cursor: 'pointer',
+  },
+  navItemActive: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: 4,
+    padding: '8px',
+    background: 'none',
+    border: 'none',
+    fontSize: 12,
+    color: '#e07b4c',
+    fontWeight: 600,
+    cursor: 'pointer',
   },
 }

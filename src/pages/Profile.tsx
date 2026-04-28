@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 
 // Role display mapping
 const roleLabels: Record<string, { label: string; color: string; bg: string }> = {
-  passenger: { label: '乘客', color: '#1e56a3', bg: '#e6f0ff' },
+  passenger: { label: '乘客', color: '#e07b4c', bg: '#e6f0ff' },
   driver: { label: '司機', color: '#1a7a3a', bg: '#e6f7ed' },
   admin: { label: '管理員', color: '#7a1a5a', bg: '#f7e6f0' },
 }

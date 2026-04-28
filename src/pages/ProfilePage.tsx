@@ -98,10 +98,7 @@ export default function ProfilePage() {
         setVerifySuccess(true)
         setOtpError('')
         setShowPhoneForm(false)
-        // Give Firebase a moment to sync, then refresh data
-        setTimeout(() => {
-          window.location.reload()
-        }, 1500)
+        // No reload needed - AuthContext already updated the user state
       } else {
         setOtpError(result.message)
       }
@@ -158,7 +155,7 @@ export default function ProfilePage() {
             disabled={saving || !name.trim()}
             style={{
               ...styles.saveBtn,
-              background: saving ? '#ccc' : saved ? '#2e7d32' : '#143b34',
+              background: saving ? '#ccc' : saved ? '#e07b4c' : '#e07b4c',
             }}
           >
             {saving ? '儲存中...' : saved ? '✓ 已儲存' : '儲存'}
@@ -280,19 +277,19 @@ export default function ProfilePage() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: '#f5f5f5',
+    background: '#fff9f5',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 16px',
-    background: '#143b34',
-    color: '#fff',
+    padding: '14px 18px',
+    background: '#fff',
+    borderBottom: '2px solid #f0e0d6',
   },
   successBanner: {
-    background: '#c8e6c9',
-    color: '#2e7d32',
+    background: '#e8f5e8',
+    color: '#e07b4c',
     padding: '12px 16px',
     textAlign: 'center',
     fontWeight: 600,
@@ -301,14 +298,15 @@ const styles: Record<string, React.CSSProperties> = {
   backBtn: {
     background: 'none',
     border: 'none',
-    color: '#fff',
+    color: '#e07b4c',
     fontSize: 24,
     cursor: 'pointer',
   },
   title: {
     margin: 0,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 600,
+    color: '#4a3728',
   },
   content: {
     padding: 20,
@@ -319,7 +317,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 80,
     height: 80,
     borderRadius: '50%',
-    background: '#143b34',
+    background: 'linear-gradient(135deg, #e07b4c, #c4623a)',
     color: '#fff',
     display: 'grid',
     placeItems: 'center',
@@ -329,17 +327,19 @@ const styles: Record<string, React.CSSProperties> = {
   },
   form: {
     background: '#fff',
-    borderRadius: 12,
+    border: '2px solid #f0e0d6',
+    borderRadius: 16,
     padding: 20,
   },
   sectionTitle: {
     margin: '0 0 8px',
     fontSize: 16,
     fontWeight: 600,
+    color: '#4a3728',
   },
   sectionHint: {
     fontSize: 13,
-    color: '#666',
+    color: '#8b7355',
     margin: '0 0 16px',
   },
   label: {
@@ -347,15 +347,16 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 500,
     marginBottom: 8,
-    color: '#333',
+    color: '#8b7355',
   },
   input: {
     width: '100%',
     padding: '12px 16px',
-    border: '1px solid #ddd',
-    borderRadius: 8,
+    border: '2px solid #f0e0d6',
+    borderRadius: 12,
     fontSize: 16,
     boxSizing: 'border-box' as any,
+    color: '#4a3728',
   },
   phoneRow: {
     display: 'flex',
@@ -365,14 +366,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   phonePrefix: {
     padding: '12px 8px',
-    background: '#f5f5f5',
-    borderRadius: 8,
+    background: '#f0e0d6',
+    borderRadius: 12,
     fontSize: 16,
-    color: '#666',
+    color: '#8b7355',
   },
   hint: {
     fontSize: 12,
-    color: '#666',
+    color: '#8b7355',
     margin: '8px 0 16px',
   },
   errorText: {
@@ -385,19 +386,20 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '14px',
     color: '#fff',
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 12,
     fontSize: 16,
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'background 0.2s',
+    background: '#e07b4c',
   },
   sendBtn: {
     width: '100%',
     padding: '14px',
-    background: '#1e56a3',
+    background: '#e07b4c',
     color: '#fff',
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 12,
     fontSize: 16,
     fontWeight: 600,
     cursor: 'pointer',
@@ -411,10 +413,10 @@ const styles: Record<string, React.CSSProperties> = {
   verifyBtn: {
     flex: 1,
     padding: '14px',
-    background: '#2e7d32',
+    background: '#e07b4c',
     color: '#fff',
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 12,
     fontSize: 16,
     fontWeight: 600,
     cursor: 'pointer',
@@ -422,43 +424,46 @@ const styles: Record<string, React.CSSProperties> = {
   resendBtn: {
     padding: '14px 16px',
     background: '#fff',
-    color: '#666',
-    border: '1px solid #ddd',
-    borderRadius: 8,
+    color: '#8b7355',
+    border: '2px solid #f0e0d6',
+    borderRadius: 12,
     fontSize: 14,
     cursor: 'pointer',
   },
   infoCard: {
     background: '#fff',
-    borderRadius: 12,
+    border: '2px solid #f0e0d6',
+    borderRadius: 16,
     padding: 20,
   },
   infoTitle: {
     margin: '0 0 16px',
     fontSize: 15,
     fontWeight: 600,
+    color: '#4a3728',
   },
   infoRow: {
     display: 'flex',
     justifyContent: 'space-between',
     padding: '10px 0',
-    borderBottom: '1px solid #f0f0f0',
+    borderBottom: '1px solid #f0e0d6',
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#8b7355',
   },
   infoValue: {
     fontSize: 14,
     fontWeight: 500,
+    color: '#4a3728',
   },
   editBtn: {
     width: '100%',
     padding: '10px',
-    background: '#f5f5f5',
-    color: '#1e56a3',
-    border: 'none',
-    borderRadius: 8,
+    background: '#fff9f5',
+    color: '#e07b4c',
+    border: '2px solid #e07b4c',
+    borderRadius: 12,
     fontSize: 14,
     fontWeight: 500,
     cursor: 'pointer',
@@ -469,8 +474,8 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '14px',
     background: '#fff',
     color: '#c62828',
-    border: '1px solid #c62828',
-    borderRadius: 8,
+    border: '2px solid #c62828',
+    borderRadius: 12,
     fontSize: 16,
     fontWeight: 500,
     cursor: 'pointer',

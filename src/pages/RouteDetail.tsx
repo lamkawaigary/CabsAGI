@@ -47,11 +47,11 @@ const sceneLabelByType: Record<string, string> = {
 }
 
 const statusChipByShift: Record<string, { label: string; bg: string; color: string }> = {
-  OPEN: { label: '可加入', bg: '#e3f2fd', color: '#1e56a3' },
+  OPEN: { label: '可加入', bg: '#e3f2fd', color: '#e07b4c' },
   SCHEDULED: { label: '可加入', bg: '#fff3cd', color: '#7a5a1a' },
   IN_PROGRESS: { label: '進行中', bg: '#d4edda', color: '#1a7a3a' },
   FULL: { label: '已滿', bg: '#eceff1', color: '#5f6368' },
-  COMPLETED: { label: '已完成', bg: '#c8e6c9', color: '#2e7d32' },
+  COMPLETED: { label: '已完成', bg: '#c8e6c9', color: '#e07b4c' },
   CANCELLED: { label: '已取消', bg: '#f8d7da', color: '#c62828' },
 }
 

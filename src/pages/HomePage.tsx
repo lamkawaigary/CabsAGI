@@ -1,10 +1,14 @@
-// Cabs Carpool - Simplified Home Page v1.1
-// 暖色珊瑚主題
+// Cabs Carpool - Home Page v1.2
+// 暖色珊瑚主題 + 司機/乘客分流
 
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 export default function HomePage() {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
+
+  const isDriver = currentUser?.role === 'driver'
 
   return (
     <div style={styles.container}>
@@ -45,6 +49,18 @@ export default function HomePage() {
           <div style={styles.modeTitle}>我要接人</div>
           <div style={styles.modeSubtitle}>瀏覽乘客需求</div>
         </button>
+
+        {/* Quick access to user's trips/requests */}
+      {isDriver && (
+        <button 
+          style={styles.modeCard}
+          onClick={() => navigate('/driver')}
+        >
+          <div style={styles.modeIcon}>📊</div>
+          <div style={styles.modeTitle}>司機儀表板</div>
+          <div style={styles.modeSubtitle}>管理行程和聊天</div>
+        </button>
+      )}
       </div>
 
       {/* Bottom Navigation */}
@@ -55,8 +71,8 @@ export default function HomePage() {
         <button style={styles.navItem} onClick={() => navigate('/browse')}>
           📍 瀏覽
         </button>
-        <button style={styles.navItem} onClick={() => navigate('/my')}>
-          👤 我的
+        <button style={styles.navItem} onClick={() => navigate('/trips')}>
+          🚗 行程
         </button>
       </nav>
     </div>
@@ -81,16 +97,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 20,
     fontWeight: 700,
     color: '#e07b4c',
-  },
-  loginBtn: {
-    padding: '8px 16px',
-    borderRadius: 20,
-    border: '1px solid #e07b4c',
-    background: '#fff',
-    color: '#e07b4c',
-    fontSize: 14,
-    fontWeight: 500,
-    cursor: 'pointer',
   },
   profileBtn: {
     width: 40,
@@ -186,46 +192,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     fontSize: 12,
     color: '#e07b4c',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  modal: {
-    background: '#fff',
-    borderRadius: 20,
-    padding: 32,
-    margin: 20,
-    textAlign: 'center',
-    maxWidth: 320,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: '#4a3728',
-    marginBottom: 16,
-  },
-  modalText: {
-    fontSize: 14,
-    color: '#8b7355',
-    lineHeight: 1.8,
-    marginBottom: 24,
-  },
-  modalBtn: {
-    width: '100%',
-    padding: 16,
-    background: 'linear-gradient(135deg, #e07b4c, #c4623a)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 16,
-    fontSize: 16,
     fontWeight: 600,
     cursor: 'pointer',
   },

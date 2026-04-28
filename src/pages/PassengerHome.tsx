@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { tripService, requestService } from '../services/tripService'
+import QRPassenger from '../components/QRPassenger'
 import { chatService } from '../services/chatService'
 import type { Trip, PassengerRequest } from '../types/trip'
 
@@ -32,6 +33,8 @@ export default function PassengerHome() {
   const [myChats, setMyChats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showQRModal, setShowQRModal] = useState(false)
+  const [selectedTripForQR, setSelectedTripForQR] = useState<any>(null)
   
   // Create Request Modal
   const [showCreate, setShowCreate] = useState(false)
@@ -130,7 +133,7 @@ export default function PassengerHome() {
   const handleJoinTrip = async (trip: Trip) => {
     try {
       // Add passenger to trip
-      await tripService.join(trip.id, {
+      await tripService.requestJoin(trip.id, {
         oderId: currentUser!.id,
         name: currentUser!.name || '乘客',
         phone: currentUser!.phone || '',
@@ -474,6 +477,22 @@ export default function PassengerHome() {
                 {creating ? '發布中...' : '✅ 發布需求'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal for Trips */}
+      {showQRModal && selectedTripForQR && (
+        <div style={styles.modalOverlay} onClick={() => setShowQRModal(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'flex-end'}}>
+              <button onClick={() => setShowQRModal(false)} style={{background:'none',border:'none',fontSize:18,cursor:'pointer'}}>✕</button>
+            </div>
+            <QRPassenger 
+              tripId={selectedTripForQR.id}
+              passengerId={currentUser?.id || ''}
+              passengerName={currentUser?.name || ''}
+            />
           </div>
         </div>
       )}

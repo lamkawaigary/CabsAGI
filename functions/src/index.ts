@@ -3,12 +3,115 @@ import * as admin from 'firebase-admin'
 
 admin.initializeApp()
 
+const db = admin.firestore()
+
+// ============================================
+// Scheduled Function: Auto-expire old trips
+// Runs every hour
+// ============================================
+export const expireOldTrips = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('Asia/Hong_Kong')
+  .onRun(async () => {
+    console.log('Running expireOldTrips function...')
+    
+    const now = new Date()
+    const cutoffTime = new Date(now.getTime() - 2 * 60 * 60 * 1000) // 2 hours ago
+    
+    try {
+      // Find trips that:
+      // 1. Status is OPEN or CONFIRMED
+      // 2. Departure time is more than 2 hours ago
+      const tripsSnapshot = await db
+        .collection('trips')
+        .where('status', 'in', ['OPEN', 'CONFIRMED'])
+        .get()
+      
+      let expiredCount = 0
+      
+      for (const doc of tripsSnapshot.docs) {
+        const trip = doc.data()
+        const departureTime = trip.departureTime ? new Date(trip.departureTime) : null
+        
+        // If departure time exists and is in the past (more than 2 hours ago)
+        if (departureTime && departureTime < cutoffTime) {
+          console.log(`Expiring trip: ${doc.id} - ${trip.route?.pickup?.placeName} → ${trip.route?.dropoff?.placeName}`)
+          
+          await doc.ref.update({
+            status: 'EXPIRED',
+            updatedAt: now.toISOString(),
+            expiredAt: now.toISOString(),
+          })
+          
+          expiredCount++
+        }
+      }
+      
+      console.log(`Expired ${expiredCount} trips`)
+      return { success: true, expiredCount }
+    } catch (error) {
+      console.error('Error expiring trips:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+// ============================================
+// Scheduled Function: Auto-complete stale trips
+// Runs every hour
+// If trip is IN_PROGRESS and departure was more than 4 hours ago, auto-complete
+// ============================================
+export const completeStaleTrips = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('Asia/Hong_Kong')
+  .onRun(async () => {
+    console.log('Running completeStaleTrips function...')
+    
+    const now = new Date()
+    const cutoffTime = new Date(now.getTime() - 4 * 60 * 60 * 1000) // 4 hours ago
+    
+    try {
+      const tripsSnapshot = await db
+        .collection('trips')
+        .where('status', '==', 'IN_PROGRESS')
+        .get()
+      
+      let completedCount = 0
+      
+      for (const doc of tripsSnapshot.docs) {
+        const trip = doc.data()
+        const departureTime = trip.departureTime ? new Date(trip.departureTime) : null
+        
+        // If departure time is more than 4 hours ago, auto-complete
+        if (departureTime && departureTime < cutoffTime) {
+          console.log(`Auto-completing trip: ${doc.id}`)
+          
+          await doc.ref.update({
+            status: 'COMPLETED',
+            updatedAt: now.toISOString(),
+            completedAt: now.toISOString(),
+          })
+          
+          completedCount++
+        }
+      }
+      
+      console.log(`Completed ${completedCount} stale trips`)
+      return { success: true, completedCount }
+    } catch (error) {
+      console.error('Error completing trips:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+// ============================================
+// Existing: Set User Password Function
+// ============================================
 interface SetUserPasswordInput {
   uid: string
   newPassword: string
 }
 
-export const setUserPassword = functions.https.onCall({ region: 'us-central1' }, async (data, context) => {
+export const setUserPassword = functions.https.onCall(async (data, context) => {
   // Check authentication
   if (!context.auth) {
     throw new functions.https.HttpsError(

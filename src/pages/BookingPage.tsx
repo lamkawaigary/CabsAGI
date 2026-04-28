@@ -535,7 +535,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 62,
     height: 62,
     borderRadius: '50%',
-    background: '#2e7d32',
+    background: '#e07b4c',
     color: '#fff',
     fontSize: 30,
     fontWeight: 900,

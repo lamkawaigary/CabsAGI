@@ -62,7 +62,7 @@ const Icons = {
 
 const serviceTypes: { type: RouteType; label: string; icon: keyof typeof Icons; color: string }[] = [
   { type: 'AIRPORT', label: '機場接送', icon: 'Airport', color: '#1976D2' },
-  { type: 'CROSS_BORDER', label: '跨境直通', icon: 'CrossBorder', color: '#388E3C' },
+  { type: 'CROSS_BORDER', label: '跨境直通', icon: 'CrossBorder', color: '#e07b4c' },
   { type: 'THEME_PARK', label: '主題公園', icon: 'ThemePark', color: '#F57C00' },
   { type: 'EVENT', label: '演唱會直通', icon: 'Event', color: '#7B1FA2' }
 ]

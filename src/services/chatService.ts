@@ -12,6 +12,7 @@ import {
   query, 
   where, 
   onSnapshot,
+  deleteDoc,
   arrayUnion
 } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
@@ -138,6 +139,49 @@ export const chatService = {
   },
 
   /**
+   * 獲取用戶的所有聊天室（非訂閱）
+   */
+  async getUserRooms(oderId: string): Promise<ChatRoom[]> {
+    try {
+      const q = query(
+        collection(db, CHAT_ROOMS_COLLECTION),
+        where('participantIds', 'array-contains', oderId)
+      )
+      const snapshot = await getDocs(q)
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+        updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt,
+      })) as ChatRoom[]
+    } catch (e) {
+      console.warn('getUserRooms failed:', e)
+      return []
+    }
+  },
+
+  /**
+   * 獲取聊天室的訊息
+   */
+  async getRoomMessages(roomId: string): Promise<any[]> {
+    try {
+      const q = query(
+        collection(db, 'chatMessages'),
+        where('conversationId', '==', roomId)
+      )
+      const snapshot = await getDocs(q)
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
+      }))
+    } catch (e) {
+      console.warn('getRoomMessages failed:', e)
+      return []
+    }
+  },
+
+  /**
    * 獲取單個聊天室
    */
   async getRoom(roomId: string): Promise<ChatRoom | null> {
@@ -194,30 +238,71 @@ export const chatService = {
   },
 
   /**
+   * 刪除聊天室
+   */
+  async deleteRoom(roomId: string): Promise<void> {
+    const roomRef = doc(db, CHAT_ROOMS_COLLECTION, roomId)
+    await deleteDoc(roomRef)
+  },
+
+  /**
+   * 獲取所有聊天室（管理員用）
+   */
+  async getAllRooms(): Promise<any[]> {
+    try {
+      const snapshot = await getDocs(collection(db, CHAT_ROOMS_COLLECTION))
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    } catch (e) {
+      console.error('Error getting all rooms:', e)
+      return []
+    }
+  },
+
+  /**
    * 獲取 Trip 相關的聊天室
    */
   async getTripRoom(tripId: string): Promise<string | null> {
-    const q = query(
-      collection(db, CHAT_ROOMS_COLLECTION),
-      where('roomType', '==', 'trip'),
-      where('roomTypeId', '==', tripId)
-    )
-    const snapshot = await getDocs(q)
-    return snapshot.empty ? null : snapshot.docs[0].id
+    try {
+      const q = query(
+        collection(db, CHAT_ROOMS_COLLECTION),
+        where('roomType', '==', 'trip'),
+        where('roomTypeId', '==', tripId)
+      )
+      const snapshot = await getDocs(q)
+      return snapshot.empty ? null : snapshot.docs[0].id
+    } catch (e) {
+      // If index doesn't exist, try single field query
+      console.warn('Composite query failed, trying fallback:', e)
+      const allRooms = await getDocs(collection(db, CHAT_ROOMS_COLLECTION))
+      const room = allRooms.docs.find(d => 
+        d.data().roomType === 'trip' && d.data().roomTypeId === tripId
+      )
+      return room?.id || null
+    }
   },
 
   /**
    * 獲取 Request 相關的聊天室
    */
   async getRequestRoom(requestId: string): Promise<string | null> {
-    const q = query(
-      collection(db, CHAT_ROOMS_COLLECTION),
-      where('roomType', '==', 'request'),
-      where('roomTypeId', '==', requestId)
-    )
-    const snapshot = await getDocs(q)
-    return snapshot.empty ? null : snapshot.docs[0].id
-  }
+    try {
+      const q = query(
+        collection(db, CHAT_ROOMS_COLLECTION),
+        where('roomType', '==', 'request'),
+        where('roomTypeId', '==', requestId)
+      )
+      const snapshot = await getDocs(q)
+      return snapshot.empty ? null : snapshot.docs[0].id
+    } catch (e) {
+      // If index doesn't exist, try single field query
+      console.warn('Composite query failed, trying fallback:', e)
+      const allRooms = await getDocs(collection(db, CHAT_ROOMS_COLLECTION))
+      const room = allRooms.docs.find(d => 
+        d.data().roomType === 'request' && d.data().roomTypeId === requestId
+      )
+      return room?.id || null
+    }
+  },
 }
 
 // ==================== Message Service ====================

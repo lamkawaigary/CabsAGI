@@ -168,7 +168,7 @@ export default function DriverDashboard() {
     <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       {/* Header */}
       <div style={{
-        background: '#143b34',
+        background: '#e07b4c',
         color: 'white',
         padding: '16px',
         display: 'flex',
@@ -219,11 +219,26 @@ export default function DriverDashboard() {
              myTrips.length === 0 ? (
               <p style={styles.center}>暫時沒有行程<br/><small>發布行程讓乘客聯絡你</small></p>
             ) : (
-              myTrips.map(trip => (
+              myTrips.map(trip => {
+                const statusBadge = {
+                  'OPEN': '🟢 開放中',
+                  'CONFIRMED': '✅ 已確認',
+                  'IN_PROGRESS': '🔵 行程中',
+                  'COMPLETED': '✅ 已完成',
+                  'CANCELLED': '❌ 已取消',
+                  'EXPIRED': '⏰ 已過期',
+                }[trip.status] || trip.status
+                
+                return (
                 <div key={trip.id} style={styles.card}>
                   <div style={styles.cardHeader}>
-                    <span style={trip.status === 'OPEN' ? styles.badgeOpen : styles.badgeClosed}>
-                      {trip.status === 'OPEN' ? '🟢 開放聊天' : trip.status === 'CONFIRMED' ? '✅ 已確認' : '❌ 已取消'}
+                    <span style={{
+                      ...styles.badge,
+                      background: trip.status === 'OPEN' ? '#4caf50' : 
+                                 trip.status === 'IN_PROGRESS' ? '#2196f3' :
+                                 trip.status === 'COMPLETED' ? '#9e9e9e' : '#f44336'
+                    }}>
+                      {statusBadge}
                     </span>
                     <span style={styles.time}>{formatDateTime(trip.departureTime)}</span>
                   </div>
@@ -233,26 +248,83 @@ export default function DriverDashboard() {
                     {trip.route.dropoff.placeName}
                   </div>
                   <div style={styles.info}>
-                    <span><Icon.User /> {trip.passengers.length} 位乘客 | {trip.totalSeats} 座位</span>
+                    <span><Icon.User /> {trip.passengers?.length || 0} 位乘客 | 💺 {trip.availableSeats || trip.totalSeats} 剩餘 / {trip.totalSeats} 總位</span>
                   </div>
                   {trip.notes && <p style={styles.notes}>📝 {trip.notes}</p>}
                   
-                  {/* Passengers list */}
-                  {trip.passengers.length > 0 && (
+                  {/* Status Change Buttons */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    {trip.status === 'OPEN' && (
+                      <button 
+                        onClick={() => tripService.updateStatus(trip.id, 'IN_PROGRESS')}
+                        style={{...styles.actionBtn, background: '#2196f3'}}
+                      >
+                        🚗 開始行程
+                      </button>
+                    )}
+                    {trip.status === 'IN_PROGRESS' && (
+                      <button 
+                        onClick={() => tripService.updateStatus(trip.id, 'COMPLETED')}
+                        style={{...styles.actionBtn, background: '#4caf50'}}
+                      >
+                        ✅ 完成行程
+                      </button>
+                    )}
+                    {trip.status !== 'CANCELLED' && trip.status !== 'COMPLETED' && trip.status !== 'EXPIRED' && (
+                      <button 
+                        onClick={() => tripService.updateStatus(trip.id, 'CANCELLED')}
+                        style={{...styles.actionBtn, background: '#f44336'}}
+                      >
+                        ❌ 取消行程
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Pending Passengers */}
+                  {trip.pendingPassengers?.length > 0 && (
                     <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #eee' }}>
-                      <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>👥 已加入的乘客：</p>
+                      <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#e07b4c' }}>
+                        ⏳ 待批准乘客：
+                      </p>
+                      {trip.pendingPassengers.map(p => (
+                        <div key={p.oderId} style={styles.participant}>
+                          <span>{p.name}</span>
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button 
+                              onClick={() => tripService.approvePassenger(trip.id, p.oderId)}
+                              style={{...styles.smallBtn, background: '#4caf50'}}
+                            >
+                              ✅ 批准
+                            </button>
+                            <button 
+                              onClick={() => tripService.rejectPassenger(trip.id, p.oderId)}
+                              style={{...styles.smallBtn, background: '#f44336'}}
+                            >
+                              ❌ 拒絕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Approved Passengers list */}
+                  {trip.passengers?.length > 0 && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #eee' }}>
+                      <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>👥 已批准乘客：</p>
                       {trip.passengers.map(p => (
                         <div key={p.oderId} style={styles.participant}>
                           <span>{p.name}</span>
-                          <span style={{ fontSize: 12, color: p.confirmed ? '#2e7d32' : '#666' }}>
-                            {p.confirmed ? '✅ 已確認' : '⏳ 待確認'}
+                          <span style={{ fontSize: 12, color: p.confirmed ? '#4caf50' : '#666' }}>
+                            {p.confirmed ? '✅ 已確認乘車' : '⏳ 待乘車確認'}
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-              ))
+                )
+              })
             )}
           </div>
         )}
@@ -437,13 +509,13 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   tabActive: {
-    background: '#143b34',
+    background: '#e07b4c',
     color: 'white',
   },
   createBtn: {
     width: '100%',
     padding: 14,
-    background: '#143b34',
+    background: '#e07b4c',
     color: 'white',
     border: 'none',
     borderRadius: 12,
@@ -473,10 +545,17 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  badge: {
+    padding: '4px 10px',
+    color: 'white',
+    borderRadius: 20,
+    fontSize: 12,
+    fontWeight: 500,
+  },
   badgeOpen: {
     padding: '4px 10px',
     background: '#e8f5e9',
-    color: '#2e7d32',
+    color: '#e07b4c',
     borderRadius: 20,
     fontSize: 12,
     fontWeight: 500,
@@ -488,6 +567,23 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 20,
     fontSize: 12,
     fontWeight: 500,
+  },
+  actionBtn: {
+    padding: '6px 12px',
+    color: 'white',
+    border: 'none',
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  smallBtn: {
+    padding: '4px 8px',
+    color: 'white',
+    border: 'none',
+    borderRadius: 4,
+    fontSize: 11,
+    cursor: 'pointer',
   },
   time: {
     fontSize: 13,
@@ -520,7 +616,7 @@ const styles: Record<string, React.CSSProperties> = {
   chatBtn: {
     width: '100%',
     padding: 10,
-    background: '#1e56a3',
+    background: '#e07b4c',
     color: 'white',
     border: 'none',
     borderRadius: 8,
@@ -575,7 +671,7 @@ const styles: Record<string, React.CSSProperties> = {
   submitBtn: {
     width: '100%',
     padding: 14,
-    background: '#143b34',
+    background: '#e07b4c',
     color: 'white',
     border: 'none',
     borderRadius: 8,

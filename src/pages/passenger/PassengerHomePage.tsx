@@ -1,13 +1,62 @@
-// Cabs Carpool - Passenger Home Page v1.0
-// 乘客專屬首頁
+// Cabs Carpool - Passenger Home Page v2.0
+// 乘客專屬首頁 - 整合行程管理
 
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { tripService } from '../../services/tripService'
 import BottomNav from '../../components/BottomNav'
+import QRPassenger from '../../components/QRPassenger'
 
 export default function PassengerHomePage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
+  const [myTrips, setMyTrips] = useState<any[]>([])
+  const [showQRModal, setShowQRModal] = useState(false)
+  const [selectedTrip, setSelectedTrip] = useState<any>(null)
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      loadMyTrips()
+    }
+  }, [currentUser?.id])
+
+  const loadMyTrips = async () => {
+    try {
+      const trips = await tripService.getByPassenger(currentUser!.id)
+      setMyTrips(trips || [])
+    } catch (error) {
+      console.error('Error loading trips:', error)
+    }
+  }
+
+  const formatDate = (iso: string) => {
+    if (!iso) return '未知'
+    return new Date(iso).toLocaleDateString('zh-HK', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const getPassengerStatus = (trip: any) => {
+    const oderId = currentUser?.id
+    if (trip.pendingPassengers?.some((p: any) => p.oderId === oderId)) {
+      return { label: '⏳ 待批准', color: '#ff9800', bg: '#fff3e0' }
+    }
+    if (trip.passengers?.some((p: any) => p.oderId === oderId)) {
+      const passenger = trip.passengers?.find((p: any) => p.oderId === oderId)
+      if (passenger?.onboarded) {
+        return { label: '🔵 已上車', color: '#2196f3', bg: '#e3f2fd' }
+      }
+      if (trip.confirmedByPassengers?.includes(oderId)) {
+        return { label: '🟡 已確認', color: '#4caf50', bg: '#e8f5e9' }
+      }
+      return { label: '🟢 已批准', color: '#4caf50', bg: '#e8f5e9' }
+    }
+    return { label: '❓ 未知', color: '#666', bg: '#f5f5f5' }
+  }
 
   return (
     <div style={styles.container}>
@@ -57,6 +106,80 @@ export default function PassengerHomePage() {
           <span style={styles.arrow}>›</span>
         </button>
       </div>
+
+      {/* My Trips Section */}
+      {myTrips.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>🚗 我的參與</div>
+          {myTrips.map(trip => {
+            const status = getPassengerStatus(trip)
+            return (
+              <div key={trip.id} style={styles.tripCard}>
+                <div style={styles.tripHeader}>
+                  <span style={{...styles.badge, background: status.bg, color: status.color}}>
+                    {status.label}
+                  </span>
+                  <span style={styles.tripTime}>{formatDate(trip.departureTime)}</span>
+                </div>
+                <div style={styles.tripRoute}>
+                  📍 {trip.route?.pickup?.placeName || '未知'} → {trip.route?.dropoff?.placeName || '未知'}
+                </div>
+                <div style={styles.tripInfo}>
+                  👤 司機：{trip.driverName || '未知'} | 💺 座位：{trip.availableSeats || 0}/{trip.totalSeats || 0}
+                </div>
+                <div style={styles.tripActions}>
+                  <button
+                    onClick={() => navigate(`/chat/${trip.id}`)}
+                    style={styles.chatBtn}
+                  >
+                    💬 進入聊天
+                  </button>
+                  {(trip.status === 'CONFIRMED' || trip.status === 'IN_PROGRESS' || trip.status === 'OPEN') && (
+                    <button
+                      onClick={() => {
+                        setSelectedTrip(trip)
+                        setShowQRModal(true)
+                      }}
+                      style={styles.qrBtn}
+                    >
+                      🎫 上車令牌
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {myTrips.length === 0 && (
+        <div style={styles.emptyState}>
+          <div style={styles.emptyIcon}>🚗</div>
+          <div>還沒有參與的行程</div>
+          <div style={styles.emptySubtext}>瀏覽行程或發布需求開始</div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && selectedTrip && (
+        <div style={styles.modalOverlay} onClick={() => setShowQRModal(false)}>
+          <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
+            <div style={{display:'flex',justifyContent:'flex-end',padding:8}}>
+              <button 
+                onClick={() => setShowQRModal(false)}
+                style={{background:'none',border:'none',fontSize:18,cursor:'pointer'}}
+              >
+                ✕
+              </button>
+            </div>
+            <QRPassenger 
+              tripId={selectedTrip.id}
+              passengerId={currentUser?.id || ''}
+              passengerName={currentUser?.name || ''}
+            />
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>
@@ -153,6 +276,102 @@ const styles: Record<string, React.CSSProperties> = {
   arrow: {
     fontSize: 20,
     color: '#8b7355',
+  },
+  tripCard: {
+    background: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+  },
+  tripHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  badge: {
+    padding: '3px 8px',
+    borderRadius: 10,
+    fontSize: 11,
+    fontWeight: 600,
+  },
+  tripTime: {
+    fontSize: 12,
+    color: '#8b7355',
+  },
+  tripRoute: {
+    fontSize: 13,
+    color: '#4a3728',
+    marginBottom: 6,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  tripInfo: {
+    fontSize: 12,
+    color: '#8b7355',
+    marginBottom: 10,
+  },
+  tripActions: {
+    display: 'flex',
+    gap: 8,
+  },
+  chatBtn: {
+    flex: 1,
+    padding: '10px 12px',
+    background: '#e07b4c',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  qrBtn: {
+    flex: 1,
+    padding: '10px 12px',
+    background: '#9c27b0',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  emptyState: {
+    textAlign: 'center',
+    padding: '40px 20px',
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: '#8b7355',
+    marginTop: 4,
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: 20,
+  },
+  modalContent: {
+    background: '#fff',
+    borderRadius: 16,
+    maxWidth: 360,
+    width: '100%',
+    maxHeight: '80vh',
+    overflow: 'auto',
   },
   bottomNav: {
     position: 'fixed',

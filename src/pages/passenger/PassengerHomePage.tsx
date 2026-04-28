@@ -2,7 +2,7 @@
 // 乘客專屬首頁 - 整合行程管理
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { tripService } from '../../services/tripService'
 import BottomNav from '../../components/BottomNav'
@@ -10,10 +10,15 @@ import QRPassenger from '../../components/QRPassenger'
 
 export default function PassengerHomePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { currentUser } = useAuth()
   const [myTrips, setMyTrips] = useState<any[]>([])
   const [showQRModal, setShowQRModal] = useState(false)
   const [selectedTrip, setSelectedTrip] = useState<any>(null)
+
+  // Auto-scroll to trips section if navigated from /passenger-trips
+  const isTripsView = location.pathname === '/passenger-trips' || 
+                       location.search.includes('view=trips')
 
   useEffect(() => {
     if (currentUser?.id) {

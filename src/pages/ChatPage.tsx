@@ -520,6 +520,60 @@ export default function ChatPage() {
             由 {confirmedQuote.oderName} 提供，{confirmedQuote.acceptedByName} 接受
           </div>
         </div>
+        
+        {/* Trip Created Guidance */}
+        <div style={styles.tripCreatedGuidance}>
+          <div style={styles.tripCreatedTitle}>🎉 行程已創建！</div>
+          <div style={styles.tripCreatedSteps}>
+            {currentUser?.role === 'passenger' ? (
+              <>
+                <div style={styles.stepItem}>
+                  <span style={styles.stepNum}>1</span>
+                  <span>等待司機確認並開始行程</span>
+                </div>
+                <div style={styles.stepItem}>
+                  <span style={styles.stepNum}>2</span>
+                  <span>行程開始時出示上車令牌</span>
+                </div>
+                <div style={styles.stepItem}>
+                  <span style={styles.stepNum}>3</span>
+                  <span>抵達目的地後現金/FPS付款</span>
+                </div>
+                <button
+                  style={styles.qrGuidanceBtn}
+                  onClick={() => {
+                    setShowQRModal(true)
+                  }}
+                >
+                  🎫 查看上車令牌
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={styles.stepItem}>
+                  <span style={styles.stepNum}>1</span>
+                  <span>確認乘客已上車（掃描QR）</span>
+                </div>
+                <div style={styles.stepItem}>
+                  <span style={styles.stepNum}>2</span>
+                  <span>抵達目的地後收款</span>
+                </div>
+                <div style={styles.stepItem}>
+                  <span style={styles.stepNum}>3</span>
+                  <span>行程完成後標記完成</span>
+                </div>
+                <button
+                  style={styles.qrGuidanceBtn}
+                  onClick={() => {
+                    setShowQRModal(true)
+                  }}
+                >
+                  📷 掃描乘客上車
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )}
       
       {/* Both Confirmed Banner (if no price quote) */}
@@ -954,6 +1008,56 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 16,
     fontWeight: 700,
     borderBottom: '2px solid #81c784',
+  },
+  tripCreatedGuidance: {
+    background: '#fff',
+    padding: 16,
+    margin: 8,
+    borderRadius: 12,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  tripCreatedTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: '#4caf50',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  tripCreatedSteps: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  stepItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    fontSize: 14,
+    color: '#4a3728',
+  },
+  stepNum: {
+    width: 24,
+    height: 24,
+    borderRadius: '50%',
+    background: '#e07b4c',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  qrGuidanceBtn: {
+    marginTop: 12,
+    width: '100%',
+    padding: '12px 16px',
+    background: '#9c27b0',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
   },
   confirmedPrice: {
     fontSize: 18,

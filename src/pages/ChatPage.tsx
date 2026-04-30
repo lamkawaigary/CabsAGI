@@ -84,6 +84,7 @@ export default function ChatPage() {
         } catch (e) {
           console.warn('Failed to load trip info:', e)
         }
+        <>
       }
       
       // Load messages using simple query
@@ -118,6 +119,7 @@ export default function ChatPage() {
             setShowRatingModal(true)
           }
         }
+        <>
       }
     } catch (err: any) {
       console.error('Error loading chat:', err)
@@ -505,6 +507,7 @@ export default function ChatPage() {
 
       {/* Confirmed Banner */}
       {hasConfirmedQuote && (
+        <>
         <div style={styles.priceConfirmedBanner}>
           <div style={styles.confirmedPrice}>
             💰 價格已確認：HK$ {confirmedQuote.pricePerSeat}/位
@@ -574,6 +577,7 @@ export default function ChatPage() {
             )}
           </div>
         </div>
+        <>
       )}
       
       {/* Both Confirmed Banner (if no price quote) */}

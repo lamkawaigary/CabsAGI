@@ -520,9 +520,8 @@ export default function ChatPage() {
             由 {confirmedQuote.oderName} 提供，{confirmedQuote.acceptedByName} 接受
           </div>
         </div>
-      )}
-
-      {/* Trip Created Guidance */}
+        
+        {/* Trip Created Guidance */}
         <div style={styles.tripCreatedGuidance}>
           <div style={styles.tripCreatedTitle}>🎉 行程已創建！</div>
           <div style={styles.tripCreatedSteps}>

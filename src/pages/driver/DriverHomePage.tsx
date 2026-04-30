@@ -67,11 +67,11 @@ export default function DriverHomePage() {
           <span style={styles.arrow}>›</span>
         </button>
 
-        <button style={styles.actionCard} onClick={() => navigate('/chats')}>
+        <button style={styles.actionCard} onClick={() => navigate('/driver-trips')}>
           <div style={styles.actionIcon}>🚗</div>
           <div style={styles.actionContent}>
-            <div style={styles.actionTitle}>我的行程</div>
-            <div style={styles.actionSubtitle}>查看和管理行程</div>
+            <div style={styles.actionTitle}>行程管理</div>
+            <div style={styles.actionSubtitle}>查看和管理所有行程</div>
           </div>
           <span style={styles.arrow}>›</span>
         </button>

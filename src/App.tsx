@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 
 // ============ Driver Pages ============
 const DriverHomePage = lazy(() => import('./pages/driver/DriverHomePage'))
+const DriverTripsManager = lazy(() => import('./pages/driver/DriverTripsManager'))
 const DriverBrowsePage = lazy(() => import('./pages/driver/DriverBrowsePage'))
 const DriverSettingsPage = lazy(() => import('./pages/driver/DriverSettingsPage'))
 const EditTripPage = lazy(() => import('./pages/driver/EditTripPage'))
@@ -100,6 +101,7 @@ function AppShell() {
           {userRole === 'driver' && (
             <>
               <Route path="/driver-home" element={<DriverHomePage />} />
+              <Route path="/driver-trips" element={<DriverTripsManager />} />
               <Route path="/browse-requests" element={<DriverBrowsePage />} />
               <Route path="/driver-settings" element={<DriverSettingsPage />} />
               <Route path="/create-trip" element={<CreateTripPage />} />

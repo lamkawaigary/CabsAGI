@@ -14,11 +14,11 @@ export default function BottomNav() {
   const role = currentUser.role
   
   // Define nav items based on role
-  // 乘客流程：找車 → 發需求 → 聊天 → 行程 → 設定
+  // 司機流程：行程 → 需求 → 聊天 → 設定
   const navItems = role === 'driver' ? [
+    { path: '/driver-trips', label: '🚗 行程', icon: '🚗' },
     { path: '/browse-requests', label: '📋 需求', icon: '📋' },
     { path: '/chats', label: '💬 聊天', icon: '💬' },
-    { path: '/driver-home', label: '📊 統計', icon: '📊' },
     { path: '/driver-settings', label: '⚙️', icon: '⚙️' },
   ] : [
     { path: '/passenger-home', label: '🔍 找車', icon: '🔍' },
@@ -29,6 +29,7 @@ export default function BottomNav() {
   
   // Check if current path matches nav item
   const isActive = (path: string) => {
+    if (path === '/driver-trips' && location.pathname === '/driver-trips') return true
     if (path === '/driver-home' && location.pathname === '/driver-home') return true
     if (path === '/passenger-home' && location.pathname === '/passenger-home') return true
     return location.pathname.startsWith(path)

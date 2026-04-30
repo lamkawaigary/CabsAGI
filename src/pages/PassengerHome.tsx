@@ -134,7 +134,7 @@ export default function PassengerHome() {
     try {
       // Add passenger to trip
       await tripService.requestJoin(trip.id, {
-        oderId: currentUser!.id,
+        passengerId: currentUser!.id,
         name: currentUser!.name || '乘客',
         phone: currentUser!.phone || '',
       })
@@ -154,7 +154,7 @@ export default function PassengerHome() {
       } else {
         // Join existing chat room
         await chatService.joinChatRoom(roomId, {
-          oderId: currentUser!.id,
+          passengerId: currentUser!.id,
           name: currentUser!.name || '乘客',
           role: 'passenger',
           phone: currentUser!.phone || '',
@@ -384,7 +384,7 @@ export default function PassengerHome() {
               </p>
             ) : (
               myChats.map(room => {
-                const other = room.participants?.find((p: any) => p.oderId !== currentUser?.id)
+                const other = room.participants?.find((p: any) => p.passengerId !== currentUser?.id)
                 return (
                   <div 
                     key={room.id} 

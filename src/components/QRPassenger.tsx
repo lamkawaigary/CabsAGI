@@ -28,7 +28,7 @@ export default function QRPassenger({ tripId, passengerId, passengerName }: QRPa
       setTrip(tripData)
       
       // Find passenger in the trip
-      const passenger = tripData?.passengers?.find((p: any) => p.oderId === passengerId)
+      const passenger = tripData?.passengers?.find((p: any) => p.passengerId === passengerId)
       
       if (passenger?.qrCode) {
         setQrCode(passenger.qrCode)
@@ -119,7 +119,7 @@ export default function QRPassenger({ tripId, passengerId, passengerName }: QRPa
       
       <div style={styles.footer}>
         狀態：
-        {trip?.passengers?.find((p: any) => p.oderId === passengerId)?.onboarded 
+        {trip?.passengers?.find((p: any) => p.passengerId === passengerId)?.onboarded 
           ? <span style={styles.onboarded}> 🚗 已上車</span>
           : <span style={styles.pending}> ⏳ 等待上車</span>
         }

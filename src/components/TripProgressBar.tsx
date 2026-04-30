@@ -42,10 +42,10 @@ export default function TripProgressBar({
   }
 
   // 獲取乘客個人進度
-  const getPassengerProgress = (oderId: string): number => {
-    const isPending = trip.pendingPassengers?.some(p => p.oderId === oderId)
-    const passenger = trip.passengers?.find(p => p.oderId === oderId)
-    const isNoShow = trip.noShowPassengers?.some(n => n.oderId === oderId)
+  const getPassengerProgress = (passengerId: string): number => {
+    const isPending = trip.pendingPassengers?.some(p => p.passengerId === passengerId)
+    const passenger = trip.passengers?.find(p => p.passengerId === passengerId)
+    const isNoShow = trip.noShowPassengers?.some(n => n.passengerId === passengerId)
     
     if (isPending) return 10                                    // 等待批准
     if (isNoShow) return 5                                      // 未到
@@ -115,9 +115,9 @@ export default function TripProgressBar({
         <div style={styles.passengerList}>
           <div style={styles.passengerTitle}>乘客狀態：</div>
           {trip.passengers.map((p, idx) => {
-            const isNoShow = trip.noShowPassengers?.some(n => n.oderId === p.oderId)
+            const isNoShow = trip.noShowPassengers?.some(n => n.passengerId === p.passengerId)
             return (
-              <div key={p.oderId || idx} style={styles.passengerItem}>
+              <div key={p.passengerId || idx} style={styles.passengerItem}>
                 <span style={styles.passengerIcon}>
                   {isNoShow ? '❌' : p.onboarded ? '🚗' : '⏳'}
                 </span>
@@ -134,7 +134,7 @@ export default function TripProgressBar({
                   <button
                     onClick={async () => {
                       try {
-                        await tripService.markPassengerOnboarded(trip.id, p.oderId)
+                        await tripService.markPassengerOnboarded(trip.id, p.passengerId)
                         onStatusChange?.()
                       } catch (e: any) {
                         alert(e.message)
@@ -149,7 +149,7 @@ export default function TripProgressBar({
                   <button
                     onClick={async () => {
                       try {
-                        await tripService.markPassengerNoShow(trip.id, p.oderId)
+                        await tripService.markPassengerNoShow(trip.id, p.passengerId)
                         onStatusChange?.()
                       } catch (e: any) {
                         alert(e.message)

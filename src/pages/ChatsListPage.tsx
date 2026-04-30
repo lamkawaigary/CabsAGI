@@ -33,7 +33,7 @@ export default function ChatsListPage() {
   }
 
   const getOtherParticipant = (room: any) => {
-    return room.participants?.find((p: any) => p.oderId !== currentUser?.id)
+    return room.participants?.find((p: any) => p.passengerId !== currentUser?.id)
   }
 
   const formatTime = (iso?: string) => {
@@ -90,12 +90,12 @@ export default function ChatsListPage() {
                 onClick={() => navigate(`/chat/${room.id}`)}
               >
                 <div style={styles.avatar}>
-                  {other?.name?.charAt(0) || (other?.oderId ? '用' : '?')}
+                  {other?.name?.charAt(0) || (other?.passengerId ? '用' : '?')}
                 </div>
                 <div style={styles.chatContent}>
                   <div style={styles.chatHeader}>
                     <div style={styles.chatName}>
-                      {other?.name || (other?.oderId ? `用戶${other.oderId.slice(0, 5)}` : '未知')}
+                      {other?.name || (other?.passengerId ? `用戶${other.passengerId.slice(0, 5)}` : '未知')}
                     </div>
                     <div style={styles.chatTime}>{formatTime(room.updatedAt)}</div>
                   </div>

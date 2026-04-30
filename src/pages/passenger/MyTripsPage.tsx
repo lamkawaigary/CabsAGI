@@ -45,18 +45,18 @@ export default function MyTripsPage() {
 
   // 獲取乘客在行程中的狀態
   const getPassengerStatus = (trip: Trip): 'pending' | 'approved' | 'confirmed' | 'onboarded' | 'rejected' | 'no_show' | 'left' => {
-    const oderId = currentUser?.id
+    const passengerId = currentUser?.id
     
-    if (trip.rejectedPassengers?.includes(oderId || '')) return 'rejected'
-    if (trip.noShowPassengers?.some(n => n.oderId === oderId)) return 'no_show'
-    if (trip.leftPassengers?.some(l => l.oderId === oderId)) return 'left'
-    if (trip.passengers?.some(p => p.oderId === oderId)) {
-      const passenger = trip.passengers?.find(p => p.oderId === oderId)
+    if (trip.rejectedPassengers?.includes(passengerId || '')) return 'rejected'
+    if (trip.noShowPassengers?.some(n => n.passengerId === passengerId)) return 'no_show'
+    if (trip.leftPassengers?.some(l => l.passengerId === passengerId)) return 'left'
+    if (trip.passengers?.some(p => p.passengerId === passengerId)) {
+      const passenger = trip.passengers?.find(p => p.passengerId === passengerId)
       if (passenger?.onboarded) return 'onboarded'
-      if (trip.confirmedByPassengers?.includes(oderId || '')) return 'confirmed'
+      if (trip.confirmedByPassengers?.includes(passengerId || '')) return 'confirmed'
       return 'approved'
     }
-    if (trip.pendingPassengers?.some(p => p.oderId === oderId)) return 'pending'
+    if (trip.pendingPassengers?.some(p => p.passengerId === passengerId)) return 'pending'
     
     return 'pending'
   }

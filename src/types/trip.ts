@@ -44,7 +44,7 @@ export interface Trip {
   
   // 乘客名單 (已批准的聊天參與者)
   passengers: {
-    oderId: string
+    passengerId: string
     name: string
     phone: string
     confirmed: boolean       // 是否已確認共乘
@@ -55,25 +55,25 @@ export interface Trip {
   
   // 待批准的乘客（pending approval）
   pendingPassengers: {
-    oderId: string
+    passengerId: string
     name: string
     phone: string
     joinedAt: string  // 加入時間
   }[]
   
   // 已拒絕的乘客（拒絕後不再顯示）
-  rejectedPassengers: string[]  // oderId 列表
+  rejectedPassengers: string[]  // passengerId 列表
   
   // 已離開的乘客（乘客主動離開）
   leftPassengers: {
-    oderId: string
+    passengerId: string
     leftAt: string
     reason?: string
   }[]
   
   // 司機標記的未到乘客
   noShowPassengers: {
-    oderId: string
+    passengerId: string
     markedAt: string
     markedBy: string
   }[]
@@ -133,7 +133,7 @@ export interface PassengerRequest {
   
   // 其他想加入的乘客
   joinedPassengers: {
-    oderId: string
+    passengerId: string
     name: string
     phone: string
     confirmed: boolean
@@ -158,7 +158,7 @@ export interface ChatRoom {
   
   // 參與者
   participants: {
-    oderId: string
+    passengerId: string
     name: string
     role: 'driver' | 'passenger'
     phone: string

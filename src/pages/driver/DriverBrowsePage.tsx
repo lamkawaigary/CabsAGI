@@ -53,7 +53,7 @@ export default function DriverBrowsePage() {
 
       // Add driver to the chat room
       await chatService.joinChatRoom(roomId, {
-        oderId: currentUser.id,
+        passengerId: currentUser.id,
         name: currentUser.name || '司機',
         role: 'driver',
         phone: currentUser.phone || '',

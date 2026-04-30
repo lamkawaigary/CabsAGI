@@ -55,9 +55,9 @@ export default function DriverTripsPage() {
   }
 
   // 處理批准乘客
-  const handleApprove = async (tripId: string, oderId: string) => {
+  const handleApprove = async (tripId: string, passengerId: string) => {
     try {
-      await tripService.approvePassenger(tripId, oderId)
+      await tripService.approvePassenger(tripId, passengerId)
       loadUserTrips()
       alert('已批准乘客')
     } catch (error: any) {
@@ -66,10 +66,10 @@ export default function DriverTripsPage() {
   }
 
   // 處理拒絕乘客
-  const handleReject = async (tripId: string, oderId: string) => {
+  const handleReject = async (tripId: string, passengerId: string) => {
     if (!confirm('確定要拒絕這位乘客嗎？')) return
     try {
-      await tripService.rejectPassenger(tripId, oderId)
+      await tripService.rejectPassenger(tripId, passengerId)
       loadUserTrips()
       alert('已拒絕乘客')
     } catch (error: any) {
@@ -196,18 +196,18 @@ export default function DriverTripsPage() {
                   <div style={styles.pendingSection}>
                     <div style={styles.pendingTitle}>⏳ 待批准乘客：</div>
                     {trip.pendingPassengers.map(p => (
-                      <div key={p.oderId} style={styles.pendingItem}>
+                      <div key={p.passengerId} style={styles.pendingItem}>
                         <span style={styles.pendingName}>{p.name}</span>
                         <div style={styles.pendingActions}>
                           <button 
                             style={{...styles.smallBtn, background: '#4caf50'}}
-                            onClick={() => handleApprove(trip.id, p.oderId)}
+                            onClick={() => handleApprove(trip.id, p.passengerId)}
                           >
                             批准
                           </button>
                           <button 
                             style={{...styles.smallBtn, background: '#f44336'}}
-                            onClick={() => handleReject(trip.id, p.oderId)}
+                            onClick={() => handleReject(trip.id, p.passengerId)}
                           >
                             拒絕
                           </button>
@@ -222,7 +222,7 @@ export default function DriverTripsPage() {
                   <div style={styles.passengersSection}>
                     <div style={styles.passengersTitle}>✅ 已批准乘客：</div>
                     {trip.passengers.map(p => (
-                      <div key={p.oderId} style={styles.passengerItem}>
+                      <div key={p.passengerId} style={styles.passengerItem}>
                         <span style={styles.passengerName}>{p.name}</span>
                         <span style={styles.passengerStatus}>
                           {p.onboarded ? '🔵 已上車' : p.confirmed ? '✅ 已確認' : '⏳ 待出發'}

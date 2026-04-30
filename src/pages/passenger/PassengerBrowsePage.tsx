@@ -58,14 +58,14 @@ export default function PassengerBrowsePage() {
       
       // Add passenger to pending list (not directly to chat)
       await tripService.requestJoin(trip.id, {
-        oderId: currentUser.id,
+        passengerId: currentUser.id,
         name: currentUser.name || '乘客',
         phone: currentUser.phone || '',
       })
       
       // Add passenger to chat room so they can communicate while waiting
       await chatService.joinChatRoom(roomId, {
-        oderId: currentUser.id,
+        passengerId: currentUser.id,
         name: currentUser.name || '乘客',
         role: 'passenger',
         phone: currentUser.phone || '',

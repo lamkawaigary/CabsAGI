@@ -139,7 +139,7 @@ export default function DriverDashboard() {
       
       // Add driver as participant
       await chatService.joinChatRoom(roomId, {
-        oderId: currentUser!.id,
+        passengerId: currentUser!.id,
         name: currentUser!.name || '司機',
         role: 'driver',
         phone: currentUser!.phone || '',
@@ -287,17 +287,17 @@ export default function DriverDashboard() {
                         ⏳ 待批准乘客：
                       </p>
                       {trip.pendingPassengers.map(p => (
-                        <div key={p.oderId} style={styles.participant}>
+                        <div key={p.passengerId} style={styles.participant}>
                           <span>{p.name}</span>
                           <div style={{ display: 'flex', gap: 4 }}>
                             <button 
-                              onClick={() => tripService.approvePassenger(trip.id, p.oderId)}
+                              onClick={() => tripService.approvePassenger(trip.id, p.passengerId)}
                               style={{...styles.smallBtn, background: '#4caf50'}}
                             >
                               ✅ 批准
                             </button>
                             <button 
-                              onClick={() => tripService.rejectPassenger(trip.id, p.oderId)}
+                              onClick={() => tripService.rejectPassenger(trip.id, p.passengerId)}
                               style={{...styles.smallBtn, background: '#f44336'}}
                             >
                               ❌ 拒絕
@@ -313,7 +313,7 @@ export default function DriverDashboard() {
                     <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #eee' }}>
                       <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>👥 已批准乘客：</p>
                       {trip.passengers.map(p => (
-                        <div key={p.oderId} style={styles.participant}>
+                        <div key={p.passengerId} style={styles.participant}>
                           <span>{p.name}</span>
                           <span style={{ fontSize: 12, color: p.confirmed ? '#4caf50' : '#666' }}>
                             {p.confirmed ? '✅ 已確認乘車' : '⏳ 待乘車確認'}
@@ -375,7 +375,7 @@ export default function DriverDashboard() {
               </p>
             ) : (
               myChats.map(room => {
-                const other = room.participants?.find((p: any) => p.oderId !== currentUser?.id)
+                const other = room.participants?.find((p: any) => p.passengerId !== currentUser?.id)
                 return (
                   <div 
                     key={room.id} 

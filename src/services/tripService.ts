@@ -109,8 +109,8 @@ export const tripService = {
       const trips: Trip[] = []
       allDocs.forEach(doc => {
         const data = doc.data()
-        const isPassenger = data.passengers?.some((p: any) => p.oderId === passengerId)
-        const isPending = data.pendingPassengers?.some((p: any) => p.oderId === passengerId)
+        const isPassenger = data.passengers?.some((p: any) => p.passengerId === passengerId)
+        const isPending = data.pendingPassengers?.some((p: any) => p.passengerId === passengerId)
         
         if (isPassenger || isPending) {
           trips.push({ id: doc.id, ...data } as Trip)
@@ -155,12 +155,12 @@ export const tripService = {
    * 乘客申請加入行程 (加入待批准名單)
    */
   async requestJoin(tripId: string, passenger: {
-    oderId: string
+    passengerId: string
     name: string
     phone: string
   }): Promise<void> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
-    const userRef = doc(db, 'users', passenger.oderId)
+    const userRef = doc(db, 'users', passenger.passengerId)
     
     // Add to trip's pendingPassengers
     await updateDoc(tripRef, {
@@ -183,20 +183,20 @@ export const tripService = {
   /**
    * 司機批准乘客加入
    */
-  async approvePassenger(tripId: string, oderId: string): Promise<void> {
+  async approvePassenger(tripId: string, passengerId: string): Promise<void> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
     // Get the pending passenger data
     const trip = await this.getById(tripId)
     if (!trip) throw new Error('Trip not found')
     
-    const pending = trip.pendingPassengers?.find(p => p.oderId === oderId)
+    const pending = trip.pendingPassengers?.find(p => p.passengerId === passengerId)
     if (!pending) throw new Error('Passenger not found in pending list')
     
     // Move from pending to passengers, decrease availableSeats
     await updateDoc(tripRef, {
-      pendingPassengers: trip.pendingPassengers?.filter(p => p.oderId !== oderId) || [],
+      pendingPassengers: trip.pendingPassengers?.filter(p => p.passengerId !== passengerId) || [],
       passengers: arrayUnion({
-        oderId: pending.oderId,
+        passengerId: pending.passengerId,
         name: pending.name,
         phone: pending.phone,
         confirmed: false,
@@ -210,14 +210,14 @@ export const tripService = {
   /**
    * 司機拒絕乘客加入
    */
-  async rejectPassenger(tripId: string, oderId: string): Promise<void> {
+  async rejectPassenger(tripId: string, passengerId: string): Promise<void> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
     const trip = await this.getById(tripId)
     if (!trip) throw new Error('Trip not found')
     
     await updateDoc(tripRef, {
-      pendingPassengers: trip.pendingPassengers?.filter(p => p.oderId !== oderId) || [],
-      rejectedPassengers: arrayUnion(oderId),
+      pendingPassengers: trip.pendingPassengers?.filter(p => p.passengerId !== passengerId) || [],
+      rejectedPassengers: arrayUnion(passengerId),
       updatedAt: new Date().toISOString(),
     })
   },
@@ -225,10 +225,10 @@ export const tripService = {
   /**
    * 確認共乘
    */
-  async confirm(tripId: string, oderId: string): Promise<void> {
+  async confirm(tripId: string, passengerId: string): Promise<void> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
     await updateDoc(tripRef, {
-      confirmedByPassengers: arrayUnion(oderId),
+      confirmedByPassengers: arrayUnion(passengerId),
       updatedAt: new Date().toISOString(),
     })
   },
@@ -244,7 +244,7 @@ export const tripService = {
   /**
    * 乘客主動離開行程（行程開始前）
    */
-  async passengerLeave(tripId: string, oderId: string): Promise<void> {
+  async passengerLeave(tripId: string, passengerId: string): Promise<void> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
     const trip = await this.getById(tripId)
     if (!trip) throw new Error('Trip not found')
@@ -255,14 +255,14 @@ export const tripService = {
     }
     
     // Remove from passengers list
-    const updatedPassengers = trip.passengers?.filter(p => p.oderId !== oderId) || []
+    const updatedPassengers = trip.passengers?.filter(p => p.passengerId !== passengerId) || []
     
     await updateDoc(tripRef, {
       passengers: updatedPassengers,
       availableSeats: (trip.availableSeats || trip.totalSeats) + 1,
       // Add to leftPassengers record for history
       leftPassengers: arrayUnion({
-        oderId,
+        passengerId,
         leftAt: new Date().toISOString(),
         reason: 'passenger_left'
       }),
@@ -273,7 +273,7 @@ export const tripService = {
   /**
    * 司機標記乘客未到
    */
-  async markPassengerNoShow(tripId: string, oderId: string): Promise<void> {
+  async markPassengerNoShow(tripId: string, passengerId: string): Promise<void> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
     const trip = await this.getById(tripId)
     if (!trip) throw new Error('Trip not found')
@@ -285,13 +285,13 @@ export const tripService = {
     
     // Update passenger's onboarded status to false
     const updatedPassengers = trip.passengers?.map(p => 
-      p.oderId === oderId ? { ...p, onboarded: false } : p
+      p.passengerId === passengerId ? { ...p, onboarded: false } : p
     ) || []
     
     await updateDoc(tripRef, {
       passengers: updatedPassengers,
       noShowPassengers: arrayUnion({
-        oderId,
+        passengerId,
         markedAt: new Date().toISOString(),
         markedBy: trip.driverId
       }),
@@ -302,7 +302,7 @@ export const tripService = {
   /**
    * 司機標記乘客已上車
    */
-  async markPassengerOnboarded(tripId: string, oderId: string): Promise<void> {
+  async markPassengerOnboarded(tripId: string, passengerId: string): Promise<void> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
     const trip = await this.getById(tripId)
     if (!trip) throw new Error('Trip not found')
@@ -314,7 +314,7 @@ export const tripService = {
     
     // Update passenger's onboarded status to true
     const updatedPassengers = trip.passengers?.map(p => 
-      p.oderId === oderId ? { ...p, onboarded: true } : p
+      p.passengerId === passengerId ? { ...p, onboarded: true } : p
     ) || []
     
     await updateDoc(tripRef, {
@@ -326,7 +326,7 @@ export const tripService = {
   /**
    * 生成乘客 QR 驗證碼
    */
-  async generateQRCode(tripId: string, oderId: string, oderName: string): Promise<string> {
+  async generateQRCode(tripId: string, passengerId: string, oderName: string): Promise<string> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
     const trip = await this.getById(tripId)
     if (!trip) throw new Error('Trip not found')
@@ -338,7 +338,7 @@ export const tripService = {
     
     // Update passenger's qrCode
     const updatedPassengers = trip.passengers?.map(p => {
-      if (p.oderId !== oderId) return p
+      if (p.passengerId !== passengerId) return p
       return {
         ...p,
         qrCode: code,
@@ -534,7 +534,7 @@ export const requestService = {
    * 其他乘客加入
    */
   async joinRequest(requestId: string, passenger: {
-    oderId: string
+    passengerId: string
     name: string
     phone: string
   }): Promise<void> {

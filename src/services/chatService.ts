@@ -41,7 +41,7 @@ export const chatService = {
       roomType: 'trip' as const,
       roomTypeId: trip.tripId,
       participants: [{
-        oderId: trip.driverId,
+        passengerId: trip.driverId,
         name: trip.driverName,
         role: 'driver' as const,
         phone: trip.driverPhone
@@ -77,7 +77,7 @@ export const chatService = {
       roomType: 'request' as const,
       roomTypeId: request.requestId,
       participants: [{
-        oderId: request.passengerId,
+        passengerId: request.passengerId,
         name: request.passengerName,
         role: 'passenger' as const,
         phone: request.passengerPhone
@@ -101,7 +101,7 @@ export const chatService = {
    * 加入聊天室
    */
   async joinChatRoom(roomId: string, participant: {
-    oderId: string
+    passengerId: string
     name: string
     role: 'driver' | 'passenger'
     phone: string
@@ -109,7 +109,7 @@ export const chatService = {
     const roomRef = doc(db, CHAT_ROOMS_COLLECTION, roomId)
     await updateDoc(roomRef, {
       participants: arrayUnion(participant),
-      participantIds: arrayUnion(participant.oderId), // For easy querying
+      participantIds: arrayUnion(participant.passengerId), // For easy querying
       updatedAt: new Date().toISOString(),
     })
   },
@@ -118,12 +118,12 @@ export const chatService = {
    * 獲取用戶的聊天室列表
    */
   subscribeToUserRooms(
-    oderId: string,
+    passengerId: string,
     callback: (rooms: ChatRoom[]) => void
   ): () => void {
     const q = query(
       collection(db, CHAT_ROOMS_COLLECTION),
-      where('participantIds', 'array-contains', oderId)
+      where('participantIds', 'array-contains', passengerId)
     )
     
     return onSnapshot(q, (snapshot) => {
@@ -141,11 +141,11 @@ export const chatService = {
   /**
    * 獲取用戶的所有聊天室（非訂閱）
    */
-  async getUserRooms(oderId: string): Promise<ChatRoom[]> {
+  async getUserRooms(passengerId: string): Promise<ChatRoom[]> {
     try {
       const q = query(
         collection(db, CHAT_ROOMS_COLLECTION),
-        where('participantIds', 'array-contains', oderId)
+        where('participantIds', 'array-contains', passengerId)
       )
       const snapshot = await getDocs(q)
       return snapshot.docs.map(doc => ({
@@ -218,10 +218,10 @@ export const chatService = {
   /**
    * 確認共乘
    */
-  async confirmRide(roomId: string, oderId: string): Promise<void> {
+  async confirmRide(roomId: string, passengerId: string): Promise<void> {
     const roomRef = doc(db, CHAT_ROOMS_COLLECTION, roomId)
     await updateDoc(roomRef, {
-      confirmedBy: arrayUnion(oderId),
+      confirmedBy: arrayUnion(passengerId),
       updatedAt: new Date().toISOString(),
     })
   },
@@ -370,10 +370,10 @@ export const messageService = {
   /**
    * 標記已讀
    */
-  async markAsRead(messageId: string, oderId: string): Promise<void> {
+  async markAsRead(messageId: string, passengerId: string): Promise<void> {
     const docRef = doc(db, MESSAGES_COLLECTION, messageId)
     await updateDoc(docRef, {
-      readBy: arrayUnion(oderId)
+      readBy: arrayUnion(passengerId)
     })
   },
 

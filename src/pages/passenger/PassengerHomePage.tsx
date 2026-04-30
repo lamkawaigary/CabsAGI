@@ -46,16 +46,16 @@ export default function PassengerHomePage() {
   }
 
   const getPassengerStatus = (trip: any) => {
-    const oderId = currentUser?.id
-    if (trip.pendingPassengers?.some((p: any) => p.oderId === oderId)) {
+    const passengerId = currentUser?.id
+    if (trip.pendingPassengers?.some((p: any) => p.passengerId === passengerId)) {
       return { label: '⏳ 待批准', color: '#ff9800', bg: '#fff3e0' }
     }
-    if (trip.passengers?.some((p: any) => p.oderId === oderId)) {
-      const passenger = trip.passengers?.find((p: any) => p.oderId === oderId)
+    if (trip.passengers?.some((p: any) => p.passengerId === passengerId)) {
+      const passenger = trip.passengers?.find((p: any) => p.passengerId === passengerId)
       if (passenger?.onboarded) {
         return { label: '🔵 已上車', color: '#2196f3', bg: '#e3f2fd' }
       }
-      if (trip.confirmedByPassengers?.includes(oderId)) {
+      if (trip.confirmedByPassengers?.includes(passengerId)) {
         return { label: '🟡 已確認', color: '#4caf50', bg: '#e8f5e9' }
       }
       return { label: '🟢 已批准', color: '#4caf50', bg: '#e8f5e9' }

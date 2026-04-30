@@ -542,7 +542,7 @@ export default function ChatPage() {
                 <button
                   style={styles.qrGuidanceBtn}
                   onClick={() => {
-                    setShowQRModal(true)
+                    setShowQuoteModal(true)
                   }}
                 >
                   🎫 查看上車令牌
@@ -565,7 +565,7 @@ export default function ChatPage() {
                 <button
                   style={styles.qrGuidanceBtn}
                   onClick={() => {
-                    setShowQRModal(true)
+                    setShowQuoteModal(true)
                   }}
                 >
                   📷 掃描乘客上車

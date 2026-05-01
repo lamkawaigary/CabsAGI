@@ -84,7 +84,6 @@ export default function ChatPage() {
         } catch (e) {
           console.warn('Failed to load trip info:', e)
         }
-        <>
       }
       
       // Load messages using simple query
@@ -108,7 +107,7 @@ export default function ChatPage() {
       // Check if trip is completed and user hasn't rated yet
       if (tripInfo && (tripInfo.status === 'COMPLETED' || tripInfo.status === 'IN_PROGRESS')) {
         const otherParticipant = roomData.participants?.find(
-          (p: any) => p.passengerId !== currentUser?.id
+          (p: any) => p.oderId !== currentUser?.id
         )
         if (otherParticipant && tripInfo.status === 'COMPLETED') {
           // Check if current user has already rated
@@ -119,7 +118,6 @@ export default function ChatPage() {
             setShowRatingModal(true)
           }
         }
-        <>
       }
     } catch (err: any) {
       console.error('Error loading chat:', err)
@@ -273,7 +271,7 @@ export default function ChatPage() {
       // Create or update the quote (one quote per user)
       await priceQuoteService.createOrUpdate({
         roomId,
-        passengerId: currentUser.id,
+        oderId: currentUser.id,
         oderName: currentUser.name || '用戶',
         oderRole: currentUser.role as 'driver' | 'passenger',
         type,
@@ -381,7 +379,7 @@ export default function ChatPage() {
 
   const getOtherName = () => {
     if (!room || !currentUser) return '未知'
-    const other = room.participants?.find((p: any) => p.passengerId !== currentUser.id)
+    const other = room.participants?.find((p: any) => p.oderId !== currentUser.id)
     return other?.name || '未知'
   }
 
@@ -456,7 +454,7 @@ export default function ChatPage() {
             <div>💺 {tripInfo.availableSeats || tripInfo.totalSeats} 剩餘 / {tripInfo.totalSeats} 總位</div>
             <div>👤 司機: {tripInfo.driverName}</div>
           </div>
-          {currentUser.role === 'passenger' && tripInfo.passengers?.some((p: any) => p.passengerId === currentUser.id) && (
+          {currentUser.role === 'passenger' && tripInfo.passengers?.some((p: any) => p.oderId === currentUser.id) && (
             <div style={styles.tripStatusActions}>
               {tripInfo.status === 'IN_PROGRESS' && (
                 <button 
@@ -507,7 +505,6 @@ export default function ChatPage() {
 
       {/* Confirmed Banner */}
       {hasConfirmedQuote && (
-        <>
         <div style={styles.priceConfirmedBanner}>
           <div style={styles.confirmedPrice}>
             💰 價格已確認：HK$ {confirmedQuote.pricePerSeat}/位
@@ -545,7 +542,7 @@ export default function ChatPage() {
                 <button
                   style={styles.qrGuidanceBtn}
                   onClick={() => {
-                    setShowQuoteModal(true)
+                    setShowQRModal(true)
                   }}
                 >
                   🎫 查看上車令牌
@@ -568,7 +565,7 @@ export default function ChatPage() {
                 <button
                   style={styles.qrGuidanceBtn}
                   onClick={() => {
-                    setShowQuoteModal(true)
+                    setShowQRModal(true)
                   }}
                 >
                   📷 掃描乘客上車
@@ -577,7 +574,6 @@ export default function ChatPage() {
             )}
           </div>
         </div>
-        <>
       )}
       
       {/* Both Confirmed Banner (if no price quote) */}
@@ -603,7 +599,7 @@ export default function ChatPage() {
           {quoteExpanded && (
             <div style={styles.quoteContent}>
               {quotes.filter(q => q.status === 'pending').slice(0, 2).map(quote => {
-                const isMyQuote = quote.passengerId === currentUser?.id
+                const isMyQuote = quote.oderId === currentUser?.id
                 return (
                   <div key={quote.id} style={styles.quoteCardCompact}>
                     <div style={styles.quoteCardTop}>
@@ -886,7 +882,7 @@ export default function ChatPage() {
           roomId={roomId || ''}
           userId={currentUser?.id || ''}
           userName={currentUser?.name || ''}
-          otherUserId={ratingTarget.passengerId}
+          otherUserId={ratingTarget.oderId}
           otherUserName={ratingTarget.name}
           userRole={currentUser?.role as 'driver' | 'passenger'}
         />

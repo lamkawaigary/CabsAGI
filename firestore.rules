@@ -17,20 +17,27 @@ service cloud.firestore {
       allow write: if isAuthenticated() && uid() == userId;
     }
     
-    // ========== TRIPS ==========
+    // ========== LISTINGS (Carousell Model) ==========
+    // Simple: OPEN → SOLD/CANCELLED
     
-    match /trips/{tripId} {
+    match /listings/{listingId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.driverId == uid();
-      allow update, delete: if isAuthenticated() && resource.data.driverId == uid();
-    }
-    
-    // ========== PASSENGER REQUESTS ==========
-    
-    match /passengerRequests/{requestId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.passengerId == uid();
-      allow update, delete: if isAuthenticated() && resource.data.passengerId == uid();
+      
+      // Anyone can create a listing (driver offer or passenger request)
+      allow create: if isAuthenticated() && request.resource.data.initiatorId == uid();
+      
+      // Update allowed if:
+      // - initiator can update their listing
+      // - anyone can add to interested parties (for tracking)
+      // - buyer can mark as sold (when agreement reached)
+      allow update: if isAuthenticated() && (
+        resource.data.initiatorId == uid() ||
+        request.resource.data.buyerId == uid() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['interestedParties', 'updatedAt'])
+      );
+      
+      // Only initiator can delete, and only if still OPEN
+      allow delete: if isAuthenticated() && resource.data.initiatorId == uid() && resource.data.status == 'OPEN';
     }
     
     // ========== CHAT ROOMS ==========
@@ -50,7 +57,20 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     
-    // ========== PRICE QUOTES ==========
+    // ========== LEGACY COLLECTIONS (Keep for migration) ==========
+    
+    match /trips/{tripId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.driverId == uid();
+      allow update: if isAuthenticated() && (resource.data.driverId == uid() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingPassengers', 'updatedAt']));
+      allow delete: if isAuthenticated() && resource.data.driverId == uid();
+    }
+    
+    match /passengerRequests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.passengerId == uid();
+      allow update, delete: if isAuthenticated() && resource.data.passengerId == uid();
+    }
     
     match /priceQuotes/{quoteId} {
       allow read: if isAuthenticated();

@@ -1,29 +1,30 @@
-// Cabs Carpool - Driver Browse Page (Passenger Requests) v1.1
-// 司機瀏覽乘客需求
+// Cabs Carpool - Driver Browse Page v3.0 (Carousell Model)
+// Browse passenger requests (where driver can offer rides)
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { requestService } from '../../services/tripService'
-import { chatService } from '../../services/chatService'
 import { useAuth } from '../../context/AuthContext'
+import { listingService, type Listing } from '../../services/listingService'
 import BottomNav from '../../components/BottomNav'
 
 export default function DriverBrowsePage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const [requests, setRequests] = useState<any[]>([])
+  const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
-  const [creatingRoom, setCreatingRoom] = useState<string | null>(null)
 
   useEffect(() => {
-    loadData()
+    loadListings()
   }, [])
 
-  const loadData = async () => {
+  const loadListings = async () => {
     try {
       setLoading(true)
-      const allRequests = await requestService.getPublicRequests()
-      setRequests(allRequests)
+      const all = await listingService.getOpenListings()
+      // Filter: show only passenger requests (where driver is the responder)
+      const passengerRequests = all.filter(l => l.type === 'passenger_request')
+      // Filter out my own
+      setListings(passengerRequests.filter(l => l.initiatorId !== currentUser?.id))
     } catch (error) {
       console.error('Error loading:', error)
     } finally {
@@ -31,98 +32,65 @@ export default function DriverBrowsePage() {
     }
   }
 
-  const handleContact = async (request: any) => {
-    if (!currentUser) {
-      navigate('/profile')
-      return
-    }
-
-    try {
-      setCreatingRoom(request.id)
-      
-      // Create a chat room for this request
-      const roomId = await chatService.createRequestChatRoom({
-        requestId: request.id,
-        passengerId: request.passengerId,
-        passengerName: request.passengerName || '乘客',
-        passengerPhone: request.passengerPhone || '',
-        pickup: request.pickup?.placeName || request.pickup || '',
-        dropoff: request.dropoff?.placeName || request.dropoff || '',
-        departureDate: request.departureDate || '',
-      })
-
-      // Add driver to the chat room
-      await chatService.joinChatRoom(roomId, {
-        passengerId: currentUser.id,
-        name: currentUser.name || '司機',
-        role: 'driver',
-        phone: currentUser.phone || '',
-      })
-
-      // Navigate to the chat room
-      navigate(`/chat/${roomId}`)
-    } catch (error) {
-      console.error('Error creating chat room:', error)
-      alert('創建聊天室失敗')
-    } finally {
-      setCreatingRoom(null)
-    }
+  const formatTime = (iso: string) => {
+    const d = new Date(iso)
+    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`
   }
-
-  const getPickup = (item: any) => item.pickup?.placeName || item.pickup || '未知'
-  const getDropoff = (item: any) => item.dropoff?.placeName || item.dropoff || '未知'
 
   return (
     <div style={styles.container}>
       {/* Header */}
       <header style={styles.header}>
         <button style={styles.backBtn} onClick={() => navigate('/driver-home')}>←</button>
-        <div style={styles.title}>📋 乘客需求</div>
-        <div style={{width: 40}} />
+        <div style={styles.title}>🔍 瀏覽乘客需求</div>
+        <button style={styles.refreshBtn} onClick={loadListings}>↻</button>
       </header>
 
       {/* Content */}
       <div style={styles.content}>
         {loading ? (
           <div style={styles.empty}>載入中...</div>
-        ) : requests.length === 0 ? (
+        ) : listings.length === 0 ? (
           <div style={styles.empty}>
-            <div style={styles.emptyIcon}>📋</div>
+            <div style={styles.emptyIcon}>👤</div>
             <div>暫時沒有乘客需求</div>
-            <div style={styles.emptySubtext}>成為第一位回應需求的司機！</div>
+            <div style={styles.emptySubtext}>乘客發布需求後會在這裡顯示</div>
           </div>
         ) : (
-          requests.map(req => (
-            <div key={req.id} style={styles.card}>
-              <div style={styles.cardRoute}>
-                📍 {getPickup(req)} → {getDropoff(req)}
+          listings.map(listing => (
+            <div 
+              key={listing.id} 
+              style={styles.card}
+              onClick={() => navigate(`/listing/${listing.id}`)}
+            >
+              <div style={styles.cardHeader}>
+                <span style={styles.badgePassenger}>👤 乘客需求</span>
+                <span style={styles.postTime}>{formatTime(listing.createdAt)}</span>
               </div>
+
+              <div style={styles.route}>
+                📍 {listing.route.pickup?.placeName} → {listing.route.dropoff?.placeName}
+              </div>
+
               <div style={styles.cardInfo}>
-                <span style={styles.badgeOpen}>🟢 開放中</span>
-                <span>{req.departureDate || '時間待定'}</span>
-                <span>{req.passengerName || '乘客'}</span>
+                <span>🕐 {formatTime(listing.departureTime)}</span>
+                <span>👥 {listing.passengerCount}位</span>
+                <span>{listing.vehicleType === '7seater' ? '🚐 七人車' : '🚙 轎車'}</span>
+                {listing.isCarpool && <span>🔄 可共乘</span>}
               </div>
-              <div style={styles.cardBottom}>
-                <span style={styles.seats}>👥 {req.passengerCount || 1}位</span>
-              </div>
-              {req.notes && (
-                <div style={styles.notesBox}>
-                  📝 {req.notes}
-                </div>
+
+              {listing.notes && (
+                <div style={styles.notes}>📝 {listing.notes}</div>
               )}
-              <button 
-                style={styles.contactBtn} 
-                onClick={() => handleContact(req)}
-                disabled={creatingRoom === req.id}
-              >
-                {creatingRoom === req.id ? '創建中...' : '💬 聯絡乘客'}
-              </button>
+
+              <div style={styles.contactBtn}>
+                💬 查看並聯繫乘客
+              </div>
             </div>
           ))
         )}
       </div>
 
-      {/* Bottom Navigation */}
       <BottomNav />
     </div>
   )
@@ -148,137 +116,91 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     color: '#e07b4c',
     cursor: 'pointer',
+    padding: '4px 8px',
   },
   title: {
-    fontSize: 17,
-    fontWeight: 600,
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#4a3728',
+  },
+  refreshBtn: {
+    fontSize: 20,
+    background: 'none',
+    border: 'none',
+    color: '#e07b4c',
+    cursor: 'pointer',
+    padding: '4px 8px',
   },
   content: {
-    padding: 16,
-  },
-  card: {
-    background: '#fff',
-    border: '2px solid #f0e0d6',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  cardRoute: {
-    fontSize: 16,
-    fontWeight: 600,
-    color: '#4a3728',
-    marginBottom: 12,
-  },
-  cardInfo: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    gap: 8,
-    fontSize: 13,
-    color: '#8b7355',
-    marginBottom: 12,
-  },
-  badgeOpen: {
-    background: '#e8f5e8',
-    color: '#e07b4c',
-    padding: '4px 10px',
-    borderRadius: 12,
-    fontSize: 12,
-  },
-  cardBottom: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  seats: {
-    fontSize: 13,
-    color: '#8b7355',
-  },
-  vehicleBadge: {
-    background: '#e3f2fd',
-    color: '#1976d2',
-    padding: '2px 8px',
-    borderRadius: 10,
-    fontSize: 12,
-  },
-  typeBadge: {
-    background: '#f3e5f5',
-    color: '#7b1fa2',
-    padding: '2px 8px',
-    borderRadius: 10,
-    fontSize: 12,
-  },
-  notesBox: {
-    background: '#fff9f5',
-    border: '1px solid #f0e0d6',
-    borderRadius: 8,
-    padding: '10px 12px',
-    fontSize: 13,
-    color: '#4a3728',
-    marginBottom: 12,
-  },
-  contactBtn: {
-    width: '100%',
-    padding: 14,
-    background: 'linear-gradient(135deg, #e07b4c, #c4623a)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 12,
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: 'pointer',
+    padding: '18px',
   },
   empty: {
     textAlign: 'center' as const,
-    padding: 40,
+    padding: '60px 20px',
     color: '#8b7355',
   },
   emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+    fontSize: '48px',
+    marginBottom: '16px',
   },
   emptySubtext: {
-    fontSize: 13,
-    marginTop: 8,
-    color: '#8b7355',
+    fontSize: '14px',
+    marginTop: '8px',
   },
-  bottomNav: {
-    position: 'fixed' as const,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    display: 'flex',
+  card: {
     background: '#fff',
-    padding: '10px 0',
-    borderTop: '2px solid #f0e0d6',
-    zIndex: 100,
-  },
-  navItem: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    gap: 4,
-    padding: '6px 2px',
-    background: 'none',
-    border: 'none',
-    fontSize: 12,
-    color: '#8b7355',
+    borderRadius: '12px',
+    padding: '16px',
+    marginBottom: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
     cursor: 'pointer',
   },
-  navItemActive: {
-    flex: 1,
+  cardHeader: {
     display: 'flex',
-    flexDirection: 'column' as const,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 4,
-    padding: '6px 2px',
-    background: 'none',
-    border: 'none',
-    fontSize: 12,
+    marginBottom: '10px',
+  },
+  badgePassenger: {
+    background: '#fff3e0',
+    padding: '4px 10px',
+    borderRadius: '12px',
     color: '#e07b4c',
-    fontWeight: 600,
-    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 'bold',
+  },
+  postTime: {
+    fontSize: '12px',
+    color: '#8b7355',
+  },
+  route: {
+    fontSize: '16px',
+    fontWeight: 'bold',
+    color: '#4a3728',
+    marginBottom: '10px',
+  },
+  cardInfo: {
+    display: 'flex',
+    gap: '10px',
+    fontSize: '13px',
+    color: '#8b7355',
+    flexWrap: 'wrap' as const,
+  },
+  notes: {
+    marginTop: '10px',
+    padding: '8px 12px',
+    background: '#f5f5f5',
+    borderRadius: '8px',
+    fontSize: '13px',
+    color: '#666',
+  },
+  contactBtn: {
+    marginTop: '12px',
+    padding: '10px',
+    background: '#e07b4c',
+    color: '#fff',
+    borderRadius: '8px',
+    textAlign: 'center' as const,
+    fontWeight: 'bold',
   },
 }

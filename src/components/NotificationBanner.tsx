@@ -76,7 +76,7 @@ export default function NotificationBanner({ currentUser }: NotificationBannerPr
           const quotes = await priceQuoteService.getRoomQuotes(room.id)
           const newQuotes = quotes.filter(q => 
             q.createdAt > lastCheckedRef.current &&
-            q.passengerId !== currentUser.id // Don't notify for own quotes
+            q.oderId !== currentUser.id // Don't notify for own quotes
           )
           
           for (const quote of newQuotes) {

@@ -1,0 +1,97 @@
+import { useLocation, useNavigate } from 'react-router-dom'
+import { colors } from '../styles/designSystem'
+
+export default function BottomNav() {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const isActive = (path: string) => location.pathname === path
+
+  const tabs = [
+    { path: '/passenger-home', icon: 'explore', label: '探索' },
+    { path: '/passenger-browse', icon: 'directions_car', label: '行程' },
+    { path: '/create-request', icon: 'add_box', label: '發佈' },
+    { path: '/chats', icon: 'chat_bubble', label: '收件箱' },
+    { path: '/profile', icon: 'account_circle', label: '個人資料' },
+  ]
+
+  return (
+    <nav style={navStyle}>
+      {tabs.map(tab => {
+        const active = isActive(tab.path)
+        return (
+          <button key={tab.path} onClick={() => navigate(tab.path)} style={active ? tabActiveStyle : tabStyle}>
+            <span style={getIconStyle(active)}>{tab.icon}</span>
+            <span style={labelStyle}>{tab.label}</span>
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
+const navStyle: React.CSSProperties = {
+  position: 'fixed',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  paddingBottom: 'env(safe-area-inset-bottom, 0)',
+  background: 'rgba(255,255,255,0.95)',
+  backdropFilter: 'blur(12px)',
+  borderTop: '1px solid #d8c3ad',
+  display: 'flex',
+  justifyContent: 'space-around',
+  alignItems: 'center',
+  zIndex: 50,
+  borderRadius: '2rem 2rem 0 0',
+  paddingTop: 8,
+  paddingBottom: 24,
+  boxShadow: '0 -8px 30px rgba(29,78,216,0.06)',
+}
+
+const tabStyle: React.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '8px 4px',
+  borderRadius: '1rem',
+  transition: 'all 0.15s',
+}
+
+const tabActiveStyle: React.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  background: '#fef3c7',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '8px 4px',
+  borderRadius: '1rem',
+  transition: 'all 0.15s',
+}
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: '0.05em',
+  color: '#5f5f59',
+  marginTop: 2,
+}
+
+const getIconStyle = (active: boolean): React.CSSProperties => ({
+  fontFamily: "'Material Symbols Outlined'",
+  fontSize: 24,
+  color: active ? '#f59e0b' : '#5f5f59',
+  fontVariationSettings: active
+    ? "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24"
+    : "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24",
+})

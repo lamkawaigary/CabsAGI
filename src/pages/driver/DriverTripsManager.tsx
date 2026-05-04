@@ -341,7 +341,7 @@ export default function DriverTripsManager() {
                               style={styles.approveBtn}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                tripService.acceptPassenger(trip.id, p.passengerId)
+                                tripService.approvePassenger(trip.id, p.passengerId)
                                 loadTrips()
                               }}
                             >

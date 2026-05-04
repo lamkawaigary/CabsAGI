@@ -27,6 +27,7 @@ const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
 const ChatsListPage = lazy(() => import('./pages/ChatsListPage'))
 const CreateTripPage = lazy(() => import('./pages/CreateTripPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
+const ListingDetailPage = lazy(() => import('./pages/ListingDetailPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const NotificationBanner = lazy(() => import('./components/NotificationBanner'))
 const BottomNav = lazy(() => import('./components/BottomNav'))
@@ -124,6 +125,7 @@ function AppShell() {
           {/* Shared routes */}
           <Route path="/chats" element={<ChatsListPage />} />
           <Route path="/chat/:roomId" element={<ChatPage />} />
+          <Route path="/listing/:listingId" element={<ListingDetailPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           

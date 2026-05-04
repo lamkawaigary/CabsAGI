@@ -1,8 +1,9 @@
-// Cabs Carpool - Trip Progress Bar Component
-// 行程進度條 - 複雜進度模式顯示
+// Cabs Carpool - Trip Progress Bar Component v2.0
+// Improved UI with Design System
 
 import type { Trip, TripStatus } from '../types/trip'
 import { tripService } from '../services/tripService'
+import { colors, radius } from '../styles/designSystem'
 
 interface TripProgressBarProps {
   trip: Trip
@@ -18,56 +19,52 @@ export default function TripProgressBar({
   onStatusChange 
 }: TripProgressBarProps) {
   
-  // 計算行程進度百分比
   const getTripProgress = (): number => {
     switch (trip.status) {
       case 'OPEN': {
-        // 招募中：根據乘客報名進度
         const approved = trip.passengers?.length || 0
         const total = trip.totalSeats || 1
         const ratio = approved / total
-        return Math.min(20 + ratio * 20, 40)  // 20-40%
+        return Math.min(20 + ratio * 20, 40)
       }
-      case 'CONFIRMED': return 50  // 已確認
+      case 'CONFIRMED': return 50
       case 'IN_PROGRESS': {
-        // 行程中：根據上車人數
         const onboarded = trip.passengers?.filter(p => p.onboarded)?.length || 0
         const total = trip.passengers?.length || 1
         const ratio = onboarded / total
-        return 50 + ratio * 40  // 50-90%
+        return 50 + ratio * 40
       }
       case 'COMPLETED': return 100
       default: return 0
     }
   }
 
-  // 獲取乘客個人進度
   const getPassengerProgress = (passengerId: string): number => {
     const isPending = trip.pendingPassengers?.some(p => p.passengerId === passengerId)
     const passenger = trip.passengers?.find(p => p.passengerId === passengerId)
     const isNoShow = trip.noShowPassengers?.some(n => n.passengerId === passengerId)
     
-    if (isPending) return 10                                    // 等待批准
-    if (isNoShow) return 5                                      // 未到
+    if (isPending) return 10
+    if (isNoShow) return 5
     if (!passenger) return 0
     
     if (trip.status === 'COMPLETED') return 100
-    if (trip.status === 'IN_PROGRESS' && passenger.onboarded) return 80  // 已上車
-    if (trip.status === 'IN_PROGRESS') return 60                // 行程中
-    if (trip.status === 'CONFIRMED') return 40                   // 已批准，等出發
-    if (trip.status === 'OPEN') return 30                  // 已批准，招募中
+    if (trip.status === 'IN_PROGRESS' && passenger.onboarded) return 80
+    if (trip.status === 'IN_PROGRESS') return 60
+    if (trip.status === 'CONFIRMED') return 40
+    if (trip.status === 'OPEN') return 30
     
     return 0
   }
 
   const getStatusConfig = (status: TripStatus) => {
     const configs: Record<TripStatus, { label: string; color: string; bg: string }> = {
-      'OPEN': { label: '🟢 招募中', color: '#4caf50', bg: '#e8f5e9' },
-      'CONFIRMED': { label: '🟡 已確認', color: '#ff9800', bg: '#fff3e0' },
-      'IN_PROGRESS': { label: '🔵 行程中', color: '#2196f3', bg: '#e3f2fd' },
+      'OPEN': { label: '🟢 招募中', color: colors.success, bg: colors.successBg },
+      'CONFIRMED': { label: '🟡 已確認', color: colors.warning, bg: colors.warningBg },
+      'IN_PROGRESS': { label: '🔵 行程中', color: colors.info, bg: colors.infoBg },
       'COMPLETED': { label: '✅ 已完成', color: '#9e9e9e', bg: '#f5f5f5' },
-      'CANCELLED': { label: '❌ 已取消', color: '#f44336', bg: '#ffebee' },
-      'EXPIRED': { label: '⏰ 已過期', color: '#ff9800', bg: '#fff3e0' },
+      'CANCELLED': { label: '❌ 已取消', color: colors.error, bg: colors.errorBg },
+      'EXPIRED': { label: '⏰ 已過期', color: colors.warning, bg: colors.warningBg },
     }
     return configs[status] || configs['OPEN']
   }
@@ -78,12 +75,15 @@ export default function TripProgressBar({
     ? getPassengerProgress(currentUserId) 
     : null
 
-  // 刪除未使用的 getPassengerStatusIcon 函數，保持代碼整潔
   return (
     <div style={styles.container}>
-      {/* 狀態標題 */}
+      {/* Status Header */}
       <div style={styles.statusHeader}>
-        <span style={{...styles.statusBadge, background: statusConfig.bg, color: statusConfig.color}}>
+        <span style={{
+          ...styles.statusBadge,
+          background: statusConfig.bg,
+          color: statusConfig.color
+        }}>
           {statusConfig.label}
         </span>
         {trip.status === 'OPEN' && (
@@ -98,7 +98,7 @@ export default function TripProgressBar({
         )}
       </div>
 
-      {/* 主進度條 */}
+      {/* Progress Bar */}
       <div style={styles.progressContainer}>
         <div style={styles.progressBg}>
           <div style={{
@@ -110,7 +110,7 @@ export default function TripProgressBar({
         <span style={styles.progressLabel}>{progress}%</span>
       </div>
 
-      {/* 乘客列表（司機看到） */}
+      {/* Passenger List (Driver View) */}
       {currentUserRole === 'driver' && trip.passengers && trip.passengers.length > 0 && (
         <div style={styles.passengerList}>
           <div style={styles.passengerTitle}>乘客狀態：</div>
@@ -123,7 +123,7 @@ export default function TripProgressBar({
                 </span>
                 <span style={{
                   ...styles.passengerName,
-                  color: isNoShow ? '#999' : p.onboarded ? '#4caf50' : '#666'
+                  color: isNoShow ? '#999' : p.onboarded ? colors.success : colors.textSecondary
                 }}>
                   {p.name}
                 </span>
@@ -166,7 +166,7 @@ export default function TripProgressBar({
         </div>
       )}
 
-      {/* 乘客個人進度（乘客看到） */}
+      {/* Passenger Personal Progress (Passenger View) */}
       {currentUserRole === 'passenger' && passengerProgress !== null && (
         <div style={styles.myProgress}>
           <div style={styles.myProgressLabel}>你的進度：</div>
@@ -185,11 +185,11 @@ export default function TripProgressBar({
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    background: '#fff',
-    borderRadius: 12,
+    background: colors.white,
+    borderRadius: radius.md,
     padding: 16,
     marginBottom: 16,
-    border: '2px solid #f0e0d6',
+    border: `2px solid ${colors.border}`,
   },
   statusHeader: {
     display: 'flex',
@@ -199,13 +199,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   statusBadge: {
     padding: '4px 12px',
-    borderRadius: 20,
+    borderRadius: radius.full,
     fontSize: 13,
     fontWeight: 600,
   },
   recruitInfo: {
     fontSize: 13,
-    color: '#8b7355',
+    color: colors.textSecondary,
   },
   progressContainer: {
     display: 'flex',
@@ -216,30 +216,30 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     height: 12,
     background: '#f0f0f0',
-    borderRadius: 6,
+    borderRadius: radius.sm,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: radius.sm,
     transition: 'width 0.3s ease',
   },
   progressLabel: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#4a3728',
+    color: colors.textPrimary,
     minWidth: 40,
     textAlign: 'right' as const,
   },
   passengerList: {
     marginTop: 16,
     paddingTop: 12,
-    borderTop: '1px solid #f0e0d6',
+    borderTop: `1px solid ${colors.border}`,
   },
   passengerTitle: {
     fontSize: 12,
     fontWeight: 600,
-    color: '#8b7355',
+    color: colors.textSecondary,
     marginBottom: 8,
   },
   passengerItem: {
@@ -257,50 +257,50 @@ const styles: Record<string, React.CSSProperties> = {
   },
   passengerStatus: {
     fontSize: 12,
-    color: '#999',
+    color: colors.textMuted,
   },
   onboardBtn: {
     padding: '4px 8px',
-    background: '#4caf50',
-    color: '#fff',
+    background: colors.success,
+    color: colors.white,
     border: 'none',
-    borderRadius: 6,
+    borderRadius: radius.sm,
     fontSize: 12,
     cursor: 'pointer',
   },
   noShowBtn: {
     padding: '4px 8px',
-    background: '#f44336',
-    color: '#fff',
+    background: colors.error,
+    color: colors.white,
     border: 'none',
-    borderRadius: 6,
+    borderRadius: radius.sm,
     fontSize: 12,
     cursor: 'pointer',
   },
   myProgress: {
     marginTop: 12,
     paddingTop: 12,
-    borderTop: '1px solid #f0e0d6',
+    borderTop: `1px solid ${colors.border}`,
   },
   myProgressLabel: {
     fontSize: 12,
-    color: '#8b7355',
+    color: colors.textSecondary,
     marginBottom: 6,
   },
   myProgressBar: {
     height: 8,
     background: '#f0f0f0',
-    borderRadius: 4,
+    borderRadius: radius.sm,
     overflow: 'hidden',
   },
   myProgressFill: {
     height: '100%',
-    background: '#e07b4c',
-    borderRadius: 4,
+    background: colors.primary,
+    borderRadius: radius.sm,
   },
   myProgressText: {
     fontSize: 12,
-    color: '#e07b4c',
+    color: colors.primary,
     fontWeight: 600,
     marginTop: 4,
   },

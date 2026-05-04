@@ -24,7 +24,7 @@ const INIT_DOC_ID = '__init__'
 export interface PriceQuote {
   id: string
   roomId: string           // 聊天室 ID
-  passengerId: string           // 報價者 ID
+  oderId: string           // 報價者 ID (統一用 oderId)
   oderName: string         // 報價者名稱
   oderRole: 'driver' | 'passenger'
   type: 'offer' | 'counter'  // 報價 / 還價
@@ -49,7 +49,7 @@ export const priceQuoteService = {
    */
   async createOrUpdate(data: {
     roomId: string
-    passengerId: string
+    oderId: string
     oderName: string
     oderRole: 'driver' | 'passenger'
     type: 'offer' | 'counter'
@@ -60,7 +60,7 @@ export const priceQuoteService = {
     tripId?: string | null  // Set when quote is converted to trip
   }): Promise<string> {
     // Find existing pending quote from this user
-    const existing = await this.getMyPendingQuote(data.roomId, data.passengerId)
+    const existing = await this.getMyPendingQuote(data.roomId, data.oderId)
     
     if (existing) {
       // Update existing quote
@@ -79,7 +79,7 @@ export const priceQuoteService = {
       // Create new quote
       const quote = {
         roomId: data.roomId,
-        passengerId: data.passengerId,
+        oderId: data.oderId,
         oderName: data.oderName,
         oderRole: data.oderRole,
         type: data.type,
@@ -102,12 +102,12 @@ export const priceQuoteService = {
   /**
    * 獲取用戶的 pending 報價
    */
-  async getMyPendingQuote(roomId: string, passengerId: string): Promise<PriceQuote | null> {
+  async getMyPendingQuote(roomId: string, oderId: string): Promise<PriceQuote | null> {
     try {
       const q = query(
         collection(db, PRICE_QUOTES_COLLECTION),
         where('roomId', '==', roomId),
-        where('passengerId', '==', passengerId),
+        where('oderId', '==', oderId),
         where('status', '==', 'pending')
       )
       

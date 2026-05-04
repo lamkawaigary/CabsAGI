@@ -1,10 +1,10 @@
-// Cabs Carpool - Create Request Page v1.1
-// 乘客發布乘車需求 + 常用地點
+// Cabs Carpool - Create Request Page v2.0
+// Updated to use unified listingService
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { requestService } from '../../services/tripService'
+import { listingService } from '../../services/listingService'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../../firebaseConfig'
 
@@ -67,15 +67,16 @@ export default function CreateRequestPage() {
 
     try {
       setLoading(true)
-      const departureDate = `${date} ${time}`
+      const departureTime = new Date(`${date}T${time}`).toISOString()
       
-      await requestService.create({
-        passengerId: currentUser.id,
-        passengerName: currentUser.name || '乘客',
-        passengerPhone: currentUser.phone || '',
+      await listingService.create({
+        type: 'passenger_request',  // This is a passenger requesting a ride
+        initiatorId: currentUser.id,
+        initiatorName: currentUser.name || '乘客',
+        initiatorPhone: currentUser.phone || '',
         pickup: { placeName: pickup, latitude: 0, longitude: 0 },
         dropoff: { placeName: dropoff, latitude: 0, longitude: 0 },
-        departureDate,
+        departureTime,
         passengerCount: passengers,
         vehicleType,
         isCarpool,
@@ -83,7 +84,7 @@ export default function CreateRequestPage() {
       })
 
       alert('需求發布成功！')
-      navigate('/my-requests')
+      navigate('/passenger-home')
     } catch (error) {
       console.error('Error creating request:', error)
       alert('發布失敗，請重試')

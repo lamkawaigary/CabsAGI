@@ -1,6 +1,5 @@
-// Cabs Carpool - Passenger Home (Simplified Chat-Centric)
-// Version: 3.0
-// 核心理念：瀏覽行程或提出需求，都是聊天話題的起點
+// Cabs Carpool - Passenger Home v4.0
+// Improved UI with Design System
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -9,6 +8,10 @@ import { tripService, requestService } from '../services/tripService'
 import QRPassenger from '../components/QRPassenger'
 import { chatService } from '../services/chatService'
 import type { Trip, PassengerRequest } from '../types/trip'
+import { colors, radius } from '../styles/designSystem'
+import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
+import Badge from '../components/ui/Badge'
 
 // ============ ICONS ============
 const Icon = {
@@ -16,8 +19,8 @@ const Icon = {
   Chat: () => <span style={{ fontSize: 18 }}>💬</span>,
   Location: () => <span style={{ fontSize: 18 }}>📍</span>,
   User: () => <span style={{ fontSize: 18 }}>👤</span>,
-  Check: () => <span style={{ fontSize: 18 }}>✅</span>,
-  Close: () => <span style={{ fontSize: 18 }}>✖️</span>,
+  Search: () => <span style={{ fontSize: 18 }}>🔍</span>,
+  Clock: () => <span style={{ fontSize: 18 }}>🕐</span>,
 }
 
 // ============ MAIN COMPONENT ============
@@ -32,13 +35,11 @@ export default function PassengerHome() {
   const [myRequests, setMyRequests] = useState<PassengerRequest[]>([])
   const [myChats, setMyChats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [showQRModal, setShowQRModal] = useState(false)
   const [selectedTripForQR, setSelectedTripForQR] = useState<any>(null)
   
   // Create Request Modal
   const [showCreate, setShowCreate] = useState(false)
-  const [creating, setCreating] = useState(false)
   const [newRequest, setNewRequest] = useState({
     pickup: '',
     dropoff: '',
@@ -50,7 +51,6 @@ export default function PassengerHome() {
   useEffect(() => {
     if (!currentUser?.id) return
     
-    // Subscribe to user's chat rooms
     const unsubChats = chatService.subscribeToUserRooms(currentUser!.id, (rooms) => {
       setMyChats(rooms)
     })
@@ -64,7 +64,6 @@ export default function PassengerHome() {
 
   const loadData = async () => {
     try {
-      setError(null)
       setLoading(true)
       const [allTrips, allRequests] = await Promise.all([
         tripService.getPublicTrips(),
@@ -79,7 +78,6 @@ export default function PassengerHome() {
       }
     } catch (error) {
       console.error('Error loading data:', error)
-      setError('載入失敗，請檢查網絡連接')
     } finally {
       setLoading(false)
     }
@@ -92,9 +90,6 @@ export default function PassengerHome() {
     }
     
     try {
-      setCreating(true)
-      
-      // Create request
       const requestId = await requestService.create({
         passengerId: currentUser!.id,
         passengerName: currentUser!.name || '乘客',
@@ -106,7 +101,6 @@ export default function PassengerHome() {
         notes: newRequest.notes,
       })
       
-      // Create chat room for this request
       await chatService.createRequestChatRoom({
         requestId,
         passengerId: currentUser!.id,
@@ -120,26 +114,22 @@ export default function PassengerHome() {
       setShowCreate(false)
       setNewRequest({ pickup: '', dropoff: '', date: '', passengers: 1, notes: '' })
       loadData()
-      setActiveTab('my') // Switch to 'my' tab to show the new request
+      setActiveTab('my')
       alert('需求已發布！等司機聯絡你。')
     } catch (error) {
       console.error('Error:', error)
       alert('發布失敗，請重試')
-    } finally {
-      setCreating(false)
     }
   }
 
   const handleJoinTrip = async (trip: Trip) => {
     try {
-      // Add passenger to trip
       await tripService.requestJoin(trip.id, {
         passengerId: currentUser!.id,
         name: currentUser!.name || '乘客',
         phone: currentUser!.phone || '',
       })
       
-      // Get or create chat room
       let roomId = await chatService.getTripRoom(trip.id)
       if (!roomId) {
         roomId = await chatService.createTripChatRoom({
@@ -152,7 +142,6 @@ export default function PassengerHome() {
           departureTime: trip.departureTime,
         })
       } else {
-        // Join existing chat room
         await chatService.joinChatRoom(roomId, {
           passengerId: currentUser!.id,
           name: currentUser!.name || '乘客',
@@ -161,7 +150,6 @@ export default function PassengerHome() {
         })
       }
       
-      // Navigate to chat
       navigate(`/chat/${roomId}`)
     } catch (error) {
       console.error('Error:', error)
@@ -175,25 +163,27 @@ export default function PassengerHome() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff9f5' }}>
+    <div style={{ minHeight: '100vh', background: colors.background }}>
       {/* Header */}
-      <div style={{
-        background: '#e07b4c',
-        color: 'white',
-        padding: '16px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 18 }}>🚗 Cabs Carpool</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.8 }}>
-            {currentUser?.name ? `👤 ${currentUser.name}` : '乘客'}
-          </p>
+      <div style={styles.header}>
+        <div style={styles.headerContent}>
+          <div>
+            <h1 style={styles.headerTitle}>🚗 Cabs Carpool</h1>
+            <p style={styles.headerSubtitle}>
+              {currentUser?.name ? `👤 ${currentUser.name}` : '乘客'}
+            </p>
+          </div>
+          <button onClick={() => navigate('/profile')} style={styles.profileBtn}>
+            👤
+          </button>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => navigate('/profile')} style={{background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 8, padding: '8px 12px', color: 'white', fontSize: 16, cursor: 'pointer'}}>👤</button>
-        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div style={styles.quickActions}>
+        <Button fullWidth onClick={() => setShowCreate(true)}>
+          <Icon.Plus /> 提出路線需求
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -202,7 +192,6 @@ export default function PassengerHome() {
           { key: 'trips', label: '📍 瀏覽行程' },
           { key: 'requests', label: '💬 乘客需求' },
           { key: 'my', label: '📋 我的需求' },
-          { key: 'chats', label: '💬 我的聊天' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -218,45 +207,57 @@ export default function PassengerHome() {
       </div>
 
       {/* Content */}
-      <div style={{ padding: 16 }}>
+      <div style={styles.content}>
         {/* Browse Trips */}
         {activeTab === 'trips' && (
           <div>
-            {/* Request Button */}
-            <button onClick={() => setShowCreate(true)} style={styles.requestBtn}>
-              <Icon.Plus /> 提出路線需求
-            </button>
-
-            {loading ? <p style={styles.center}>載入中...</p> :
-             trips.length === 0 ? (
-              <p style={styles.center}>
-                暫時沒有行程<br/>
-                <small>可以提出需求，等司機聯絡你</small>
-              </p>
+            {loading ? (
+              <Card><p style={styles.center}>載入中...</p></Card>
+            ) : trips.length === 0 ? (
+              <Card>
+                <p style={styles.center}>
+                  暫時沒有行程<br/>
+                  <small style={{ color: colors.textSecondary }}>
+                    可以提出需求，等司機聯絡你
+                  </small>
+                </p>
+              </Card>
             ) : (
               trips.map(trip => (
-                <div key={trip.id} style={styles.card}>
+                <Card key={trip.id} style={{ marginBottom: 12 }}>
                   <div style={styles.cardHeader}>
-                    <span><Icon.User /> {trip.driverName}</span>
+                    <span style={styles.driverInfo}>
+                      👤 {trip.driverName}
+                    </span>
                     <span style={styles.time}>{formatDate(trip.departureTime)}</span>
                   </div>
-                  <div style={styles.route}>
-                    <Icon.Location /> {trip.route.pickup.placeName}
-                    <br/>↓<br/>
-                    {trip.route.dropoff.placeName}
-                  </div>
-                  <div style={styles.info}>
-                    <span><Icon.User /> {trip.passengers.length}/{trip.totalSeats} 座位</span>
-                  </div>
-                  {trip.notes && <p style={styles.notes}>📝 {trip.notes}</p>}
                   
-                  <button
+                  <div style={styles.route}>
+                    <div style={styles.routePoint}>
+                      <span style={{...styles.routeDot, color: colors.success}}>●</span>
+                      <span style={styles.placeName}>{trip.route.pickup.placeName}</span>
+                    </div>
+                    <div style={styles.routeLine}>↓</div>
+                    <div style={styles.routePoint}>
+                      <span style={{...styles.routeDot, color: colors.primary}}>●</span>
+                      <span style={styles.placeName}>{trip.route.dropoff.placeName}</span>
+                    </div>
+                  </div>
+                  
+                  <div style={styles.tripInfo}>
+                    <span>💺 {trip.passengers.length}/{trip.totalSeats} 座位</span>
+                    {trip.notes && <span>📝</span>}
+                  </div>
+                  
+                  <Button 
+                    fullWidth 
+                    variant="secondary"
                     onClick={() => handleJoinTrip(trip)}
-                    style={styles.chatBtn}
+                    style={{ marginTop: 12 }}
                   >
                     <Icon.Chat /> 加入並聊天
-                  </button>
-                </div>
+                  </Button>
+                </Card>
               ))
             )}
           </div>
@@ -267,26 +268,35 @@ export default function PassengerHome() {
           <div>
             <p style={styles.sectionTitle}>其他乘客的需求</p>
             
-            {error ? (
-              <p style={{...styles.center, color: '#c62828'}}>{error}</p>
-            ) : loading ? <p style={styles.center}>載入中...</p> :
-             requests.length === 0 ? (
-              <p style={styles.center}>暫時沒有需求</p>
+            {loading ? (
+              <Card><p style={styles.center}>載入中...</p></Card>
+            ) : requests.length === 0 ? (
+              <Card><p style={styles.center}>暫時沒有需求</p></Card>
             ) : (
               requests.map(req => (
-                <div key={req.id} style={styles.card}>
+                <Card key={req.id} style={{ marginBottom: 12 }}>
                   <div style={styles.cardHeader}>
-                    <span><Icon.User /> {req.passengerName} | {req.passengerCount}位</span>
+                    <span>👤 {req.passengerName} | {req.passengerCount}位</span>
                     <span style={styles.time}>{req.departureDate}</span>
                   </div>
+                  
                   <div style={styles.route}>
-                    <Icon.Location /> {req.pickup.placeName}
-                    <br/>↓<br/>
-                    {req.dropoff.placeName}
+                    <div style={styles.routePoint}>
+                      <span style={{...styles.routeDot, color: colors.success}}>●</span>
+                      <span style={styles.placeName}>{req.pickup.placeName}</span>
+                    </div>
+                    <div style={styles.routeLine}>↓</div>
+                    <div style={styles.routePoint}>
+                      <span style={{...styles.routeDot, color: colors.primary}}>●</span>
+                      <span style={styles.placeName}>{req.dropoff.placeName}</span>
+                    </div>
                   </div>
+                  
                   {req.notes && <p style={styles.notes}>📝 {req.notes}</p>}
                   
-                  <button
+                  <Button 
+                    fullWidth 
+                    variant="outline"
                     onClick={async () => {
                       try {
                         const roomId = await chatService.createRequestChatRoom({
@@ -304,11 +314,11 @@ export default function PassengerHome() {
                         alert('無法開啟聊天室，請重試')
                       }
                     }}
-                    style={styles.chatBtn}
+                    style={{ marginTop: 12 }}
                   >
                     <Icon.Chat /> 聯絡乘客
-                  </button>
-                </div>
+                  </Button>
+                </Card>
               ))
             )}
           </div>
@@ -317,100 +327,51 @@ export default function PassengerHome() {
         {/* My Requests */}
         {activeTab === 'my' && (
           <div>
-            <button onClick={() => setShowCreate(true)} style={styles.requestBtn}>
+            <Button fullWidth variant="secondary" onClick={() => setShowCreate(true)} style={{ marginBottom: 16 }}>
               <Icon.Plus /> 提出新需求
-            </button>
+            </Button>
             
-            {loading ? <p style={styles.center}>載入中...</p> :
-             myRequests.length === 0 ? (
-              <p style={styles.center}>
-                暫時沒有需求記錄<br/>
-                <small>提出需求後，司機可以直接聯絡你</small>
-              </p>
+            {loading ? (
+              <Card><p style={styles.center}>載入中...</p></Card>
+            ) : myRequests.length === 0 ? (
+              <Card>
+                <p style={styles.center}>
+                  暫時沒有需求記錄<br/>
+                  <small style={{ color: colors.textSecondary }}>
+                    提出需求後，司機可以直接聯絡你
+                  </small>
+                </p>
+              </Card>
             ) : (
               myRequests.map(req => (
-                <div key={req.id} style={styles.card}>
+                <Card key={req.id} style={{ marginBottom: 12 }}>
                   <div style={styles.cardHeader}>
-                    <span style={req.status === 'OPEN' ? styles.badgeOpen : styles.badgeClosed}>
+                    <Badge variant={req.status === 'OPEN' ? 'success' : 'error'}>
                       {req.status === 'OPEN' ? '🟢 開放中' : req.status === 'CONFIRMED' ? '✅ 已確認' : '❌ 已取消'}
-                    </span>
+                    </Badge>
                     <span style={styles.time}>{req.departureDate}</span>
                   </div>
-                  <div style={styles.route}>
-                    <Icon.Location /> {req.pickup.placeName}
-                    <br/>↓<br/>
-                    {req.dropoff.placeName}
-                  </div>
-                  <div style={styles.info}>
-                    <span><Icon.User /> {req.passengerCount} 位 | 已有 {req.interestedDrivers.length} 位司機有興趣</span>
-                  </div>
-                  {req.notes && <p style={styles.notes}>📝 {req.notes}</p>}
                   
-                  <button
-                    onClick={async () => {
-                      try {
-                        const roomId = await chatService.createRequestChatRoom({
-                          requestId: req.id,
-                          passengerId: req.passengerId,
-                          passengerName: req.passengerName,
-                          passengerPhone: req.passengerPhone,
-                          pickup: req.pickup.placeName,
-                          dropoff: req.dropoff.placeName,
-                          departureDate: req.departureDate,
-                        })
-                        navigate(`/chat/${roomId}`)
-                      } catch (error) {
-                        console.error('Error:', error)
-                        alert('無法開啟聊天室，請重試')
-                      }
-                    }}
-                    style={styles.chatBtn}
-                  >
-                    <Icon.Chat /> 進入聊天室
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === 'chats' && (
-          <div>
-            {loading ? <p style={styles.center}>載入中...</p> :
-             myChats.length === 0 ? (
-              <p style={styles.center}>
-                暫時沒有聊天記錄<br/>
-                <small>瀏覽行程或提出需求，司機會聯絡你！</small>
-              </p>
-            ) : (
-              myChats.map(room => {
-                const other = room.participants?.find((p: any) => p.passengerId !== currentUser?.id)
-                return (
-                  <div 
-                    key={room.id} 
-                    style={styles.card}
-                    onClick={() => navigate(`/chat/${room.id}`)}
-                  >
-                    <div style={styles.cardHeader}>
-                      <span>{room.roomType === 'trip' ? '🚗 行程' : '📝 需求'}</span>
-                      <span style={room.status === 'active' ? styles.badgeOpen : styles.badgeClosed}>
-                        {room.status === 'active' ? '🟢 進行中' : '❌ 已關閉'}
-                      </span>
+                  <div style={styles.route}>
+                    <div style={styles.routePoint}>
+                      <span style={{...styles.routeDot, color: colors.success}}>●</span>
+                      <span style={styles.placeName}>{req.pickup.placeName}</span>
                     </div>
-                    <div style={styles.route}>
-                      <Icon.Location /> {room.topicPickup}
-                      <br/>↓<br/>
-                      {room.topicDropoff}
+                    <div style={styles.routeLine}>↓</div>
+                    <div style={styles.routePoint}>
+                      <span style={{...styles.routeDot, color: colors.primary}}>●</span>
+                      <span style={styles.placeName}>{req.dropoff.placeName}</span>
                     </div>
-                    <div style={styles.info}>
-                      <span><Icon.User /> {other?.name || '未知'} | {other?.role === 'driver' ? '司機' : '乘客'}</span>
-                    </div>
-                    <p style={styles.lastMsg}>
-                      💬 點擊進入聊天室
-                    </p>
                   </div>
-                )
-              })
+                  
+                  <div style={styles.tripInfo}>
+                    <span>👤 {req.passengerCount}位乘客</span>
+                    {req.interestedDrivers?.length > 0 && (
+                      <span>有 {req.interestedDrivers.length} 位司機感興趣</span>
+                    )}
+                  </div>
+                </Card>
+              ))
             )}
           </div>
         )}
@@ -418,75 +379,87 @@ export default function PassengerHome() {
 
       {/* Create Request Modal */}
       {showCreate && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
+        <div style={styles.modalOverlay} onClick={() => setShowCreate(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <h2 style={{ margin: 0 }}>提出路線需求</h2>
-              <button onClick={() => setShowCreate(false)} style={styles.closeBtn}><Icon.Close /></button>
+              <h2 style={styles.modalTitle}>提出路線需求</h2>
+              <button onClick={() => setShowCreate(false)} style={styles.closeBtn}>✕</button>
             </div>
             
             <div style={styles.form}>
-              <label>上車地點 *</label>
-              <input
-                type="text"
-                placeholder="例：香港國際機場"
-                value={newRequest.pickup}
-                onChange={e => setNewRequest({...newRequest, pickup: e.target.value})}
-                style={styles.input}
-              />
+              <div style={styles.field}>
+                <label style={styles.label}>上車地點 📍</label>
+                <input
+                  style={styles.input}
+                  placeholder="例如：香港國際機場"
+                  value={newRequest.pickup}
+                  onChange={e => setNewRequest({...newRequest, pickup: e.target.value})}
+                />
+              </div>
               
-              <label>目的地點 *</label>
-              <input
-                type="text"
-                placeholder="例：深圳灣口岸"
-                value={newRequest.dropoff}
-                onChange={e => setNewRequest({...newRequest, dropoff: e.target.value})}
-                style={styles.input}
-              />
+              <div style={styles.field}>
+                <label style={styles.label}>目的地 📍</label>
+                <input
+                  style={styles.input}
+                  placeholder="例如：深圳灣口岸"
+                  value={newRequest.dropoff}
+                  onChange={e => setNewRequest({...newRequest, dropoff: e.target.value})}
+                />
+              </div>
               
-              <label>出發日期 *</label>
-              <input
-                type="date"
-                value={newRequest.date}
-                onChange={e => setNewRequest({...newRequest, date: e.target.value})}
-                style={styles.input}
-              />
+              <div style={styles.field}>
+                <label style={styles.label}>出發日期 📅</label>
+                <input
+                  style={styles.input}
+                  type="date"
+                  value={newRequest.date}
+                  onChange={e => setNewRequest({...newRequest, date: e.target.value})}
+                />
+              </div>
               
-              <label>人數</label>
-              <select
-                value={newRequest.passengers}
-                onChange={e => setNewRequest({...newRequest, passengers: parseInt(e.target.value)})}
-                style={styles.input}
-              >
-                {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{n} 位</option>)}
-              </select>
+              <div style={styles.field}>
+                <label style={styles.label}>乘客數 👥</label>
+                <div style={styles.seatSelector}>
+                  {[1, 2, 3, 4, 5, 6, 7].map(n => (
+                    <button
+                      key={n}
+                      style={{
+                        ...styles.seatBtn,
+                        ...(newRequest.passengers === n ? styles.seatBtnActive : {})
+                      }}
+                      onClick={() => setNewRequest({...newRequest, passengers: n})}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
               
-              <label>備註</label>
-              <textarea
-                placeholder="行李、寵物、特殊需求..."
-                value={newRequest.notes}
-                onChange={e => setNewRequest({...newRequest, notes: e.target.value})}
-                style={{...styles.input, minHeight: 60}}
-              />
+              <div style={styles.field}>
+                <label style={styles.label}>備註 📝（可選）</label>
+                <textarea
+                  style={styles.textarea}
+                  placeholder="任何特別要求或備註..."
+                  value={newRequest.notes}
+                  onChange={e => setNewRequest({...newRequest, notes: e.target.value})}
+                />
+              </div>
               
-              <button
-                onClick={handleCreateRequest}
-                disabled={creating}
-                style={styles.submitBtn}
-              >
-                {creating ? '發布中...' : '✅ 發布需求'}
-              </button>
+              <Button fullWidth onClick={handleCreateRequest}>
+                🚗 發布需求
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* QR Code Modal for Trips */}
+      {/* QR Code Modal */}
       {showQRModal && selectedTripForQR && (
         <div style={styles.modalOverlay} onClick={() => setShowQRModal(false)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <div style={{display:'flex',justifyContent:'flex-end'}}>
-              <button onClick={() => setShowQRModal(false)} style={{background:'none',border:'none',fontSize:18,cursor:'pointer'}}>✕</button>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>上車二維碼</h2>
+              <button onClick={() => setShowQRModal(false)} style={styles.closeBtn}>✕</button>
             </div>
             <QRPassenger 
               tripId={selectedTripForQR.id}
@@ -502,120 +475,120 @@ export default function PassengerHome() {
 
 // ============ STYLES ============
 const styles: Record<string, React.CSSProperties> = {
+  header: {
+    background: colors.white,
+    padding: '16px',
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  headerContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  headerSubtitle: {
+    margin: '4px 0 0',
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  profileBtn: {
+    padding: '8px 12px',
+    background: colors.primaryLight,
+    border: 'none',
+    borderRadius: radius.sm,
+    fontSize: 16,
+    cursor: 'pointer',
+  },
+  quickActions: {
+    padding: 16,
+    background: colors.white,
+  },
   tabs: {
     display: 'flex',
-    background: 'white',
-    borderBottom: '1px solid #f0e0d6',
+    background: colors.white,
+    borderBottom: `1px solid ${colors.border}`,
   },
   tab: {
     flex: 1,
     padding: '14px 0',
     border: 'none',
     background: 'transparent',
-    color: '#8b7355',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: 500,
     cursor: 'pointer',
   },
   tabActive: {
-    background: '#e07b4c',
-    color: 'white',
+    background: colors.primary,
+    color: colors.white,
+  },
+  content: {
+    padding: 16,
   },
   center: {
     textAlign: 'center',
     padding: 40,
-    color: '#8b7355',
+    color: colors.textSecondary,
   },
   sectionTitle: {
     fontSize: 13,
     fontWeight: 600,
-    color: '#8b7355',
+    color: colors.textSecondary,
     margin: '0 0 12px 0',
-  },
-  requestBtn: {
-    width: '100%',
-    padding: 14,
-    background: '#e07b4c',
-    color: 'white',
-    border: 'none',
-    borderRadius: 12,
-    fontSize: 15,
-    fontWeight: 600,
-    cursor: 'pointer',
-    marginBottom: 16,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  card: {
-    background: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
   },
   cardHeader: {
     display: 'flex',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  driverInfo: {
     fontSize: 13,
-  },
-  badgeOpen: {
-    padding: '2px 8px',
-    background: '#e8f5e8',
-    color: '#5a9a5a',
-    borderRadius: 10,
-    fontSize: 12,
-  },
-  badgeClosed: {
-    padding: '2px 8px',
-    background: '#ffebee',
-    color: '#c62828',
-    borderRadius: 10,
-    fontSize: 12,
+    color: colors.textSecondary,
   },
   time: {
-    color: '#8b7355',
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   route: {
-    display: 'flex',
-    gap: 8,
-    fontSize: 14,
     marginBottom: 12,
   },
-  info: {
+  routePoint: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  routeDot: {
+    fontSize: 10,
+  },
+  placeName: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: colors.textPrimary,
+  },
+  routeLine: {
+    paddingLeft: 4,
+    color: colors.textLight,
+    fontSize: 14,
+  },
+  tripInfo: {
+    display: 'flex',
+    gap: 12,
     fontSize: 13,
-    color: '#8b7355',
+    color: colors.textSecondary,
   },
   notes: {
     fontSize: 13,
-    color: '#4a3728',
-    background: '#fff',
+    color: colors.textSecondary,
+    background: colors.background,
     padding: '8px 12px',
-    borderRadius: 6,
+    borderRadius: radius.sm,
     marginTop: 8,
-  },
-  lastMsg: {
-    fontSize: 13,
-    color: '#e07b4c',
-    marginTop: 8,
-  },
-  chatBtn: {
-    width: '100%',
-    padding: 12,
-    background: '#e07b4c',
-    color: 'white',
-    border: 'none',
-    borderRadius: 8,
-    fontSize: 14,
-    fontWeight: 500,
-    cursor: 'pointer',
-    marginTop: 12,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
   },
   modalOverlay: {
     position: 'fixed',
@@ -626,11 +599,11 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 1000,
   },
   modal: {
-    background: 'white',
+    background: colors.white,
     width: '100%',
     maxHeight: '90vh',
     overflow: 'auto',
-    borderRadius: '16px 16px 0 0',
+    borderRadius: `${radius.lg} ${radius.lg} 0 0`,
     padding: 20,
   },
   modalHeader: {
@@ -639,34 +612,68 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     marginBottom: 20,
   },
+  modalTitle: {
+    margin: 0,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
   closeBtn: {
     background: 'none',
     border: 'none',
     fontSize: 24,
     cursor: 'pointer',
+    color: colors.textSecondary,
   },
   form: {
     display: 'grid',
-    gap: 12,
+    gap: 16,
+  },
+  field: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: colors.textSecondary,
   },
   input: {
     width: '100%',
     padding: 12,
-    border: '1px solid #f0e0d6',
-    borderRadius: 8,
+    border: `1px solid ${colors.border}`,
+    borderRadius: radius.sm,
     fontSize: 15,
-    boxSizing: 'border-box',
+    boxSizing: 'border-box' as const,
   },
-  submitBtn: {
-    width: '100%',
-    padding: 14,
-    background: '#e07b4c',
-    color: 'white',
-    border: 'none',
-    borderRadius: 8,
+  seatSelector: {
+    display: 'flex',
+    gap: 8,
+  },
+  seatBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    border: `2px solid ${colors.primary}`,
+    background: colors.white,
+    color: colors.primary,
     fontSize: 16,
-    fontWeight: 600,
+    fontWeight: 'bold',
     cursor: 'pointer',
-    marginTop: 8,
+  },
+  seatBtnActive: {
+    background: colors.primary,
+    color: colors.white,
+  },
+  textarea: {
+    width: '100%',
+    padding: 12,
+    border: `1px solid ${colors.border}`,
+    borderRadius: radius.sm,
+    fontSize: 15,
+    resize: 'vertical' as const,
+    fontFamily: 'inherit',
+    boxSizing: 'border-box' as const,
   },
 }

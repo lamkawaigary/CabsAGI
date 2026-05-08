@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { requestService } from '../../services/tripService'
+import { listingService } from '../../services/listingService'
 import { chatService } from '../../services/chatService'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../../firebaseConfig'
@@ -245,6 +246,21 @@ export default function CreateRequestPage() {
         notes,
         tags,
         vehicleType,
+      })
+      
+      // Also create a listing so drivers can find it
+      await listingService.create({
+        type: 'passenger_request',
+        initiatorId: currentUser.id,
+        initiatorName: currentUser.name || '乘客',
+        initiatorPhone: currentUser.phone || '',
+        pickup: { placeName: pickup, latitude: 0, longitude: 0 },
+        dropoff: { placeName: dropoff, latitude: 0, longitude: 0 },
+        departureTime: departureDate,
+        passengerCount: passengers,
+        vehicleType: vehicleType || 'sedan',
+        isCarpool: true,
+        notes,
       })
       
       // Create chat room

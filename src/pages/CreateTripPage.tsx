@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { tripService } from '../services/tripService'
+import { listingService } from '../services/listingService'
 import { chatService } from '../services/chatService'
 import { colors, radius } from '../styles/designSystem'
 
@@ -225,6 +226,21 @@ export default function CreateTripPage() {
         notes,
         tags,
         vehicleType,
+      })
+      
+      // Also create a listing so passengers can find it
+      await listingService.create({
+        type: 'driver_offer',
+        initiatorId: currentUser.id,
+        initiatorName: currentUser.name || '司機',
+        initiatorPhone: currentUser.phone || '',
+        pickup: { placeName: pickup, latitude: 0, longitude: 0 },
+        dropoff: { placeName: dropoff, latitude: 0, longitude: 0 },
+        departureTime,
+        passengerCount: seats,
+        vehicleType: vehicleType || 'sedan',
+        isCarpool: true,
+        notes,
       })
       
       // Create chat room

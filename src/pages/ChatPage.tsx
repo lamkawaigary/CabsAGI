@@ -110,6 +110,12 @@ export default function ChatPage() {
         }
       }
       
+      // Check for price update system messages in trip rooms
+      if (roomData.roomType === 'trip' && tripInfo?.pricePerSeat) {
+        // This would be handled by a snapshot listener in production
+        // For now, we display trip price from tripInfo
+      }
+      
       // Load messages using simple query
       const msgs = await getRoomMessages(roomId)
       setMessages(msgs)
@@ -415,6 +421,10 @@ export default function ChatPage() {
   const isHost = room?.hostId === currentUser?.id
   const bothConfirmed = room?.confirmedBy?.length === 2
   const hasConfirmedQuote = !!confirmedQuote
+  
+  // Check if this is a trip (fixed price) or request (negotiable)
+  const isTripRoom = room?.roomType === 'trip'
+  const isRequestRoom = room?.roomType === 'request'
 
   if (loading) {
     return (
@@ -527,6 +537,11 @@ export default function ChatPage() {
           <div style={styles.tripStatusInfo}>
             <div>💺 {tripInfo.availableSeats || tripInfo.totalSeats} 剩餘 / {tripInfo.totalSeats} 總位</div>
             <div>👤 司機: {tripInfo.driverName}</div>
+            {isTripRoom && tripInfo.pricePerSeat && (
+              <div style={{...styles.tripPrice, marginTop: 6}}>
+                💰 價格：HK$ {tripInfo.pricePerSeat}/位
+              </div>
+            )}
           </div>
           {/* Pending Passenger Status */}
           {currentUser.role === 'passenger' && tripInfo.pendingPassengers?.some((p: any) => p.passengerId === currentUser.id) && (
@@ -610,7 +625,7 @@ export default function ChatPage() {
       )}
 
       {/* Price Quote Section - Collapsible */}
-      {quotes.length > 0 && !hasConfirmedQuote && (
+      {quotes.length > 0 && !hasConfirmedQuote && isRequestRoom && (
         <div style={styles.quoteSection}>
           {/* Header */}
           <div 
@@ -879,6 +894,7 @@ export default function ChatPage() {
           style={styles.quoteBtn}
           onClick={() => setShowQuoteModal(true)}
           title="報價"
+          disabled={isTripRoom}  // Disable for fixed price trips
         >
           💰
         </button>
@@ -1066,7 +1082,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: '#8b7355',
     display: 'flex',
-    gap: 16,
+    flexDirection: 'column',
+    gap: 4,
+  },
+  tripPrice: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#f59e0b',
+    background: '#fef3c7',
+    padding: '4px 8px',
+    borderRadius: 6,
+    display: 'inline-block',
   },
   tripStatusActions: {
     display: 'flex',

@@ -23,6 +23,9 @@ const Icon = {
   Clock: () => <span style={{ fontSize: 18 }}>🕐</span>,
 }
 
+// ============ TAGS ============
+const TAGS = ['演唱會', '迪士尼', '機場', '口岸', '商務', '婚禮', '體育賽事', '其他']
+
 // ============ MAIN COMPONENT ============
 export default function PassengerHome() {
   const navigate = useNavigate()
@@ -46,6 +49,7 @@ export default function PassengerHome() {
     date: '',
     passengers: 1,
     notes: '',
+    tags: [] as string[],
   })
 
   useEffect(() => {
@@ -99,6 +103,7 @@ export default function PassengerHome() {
         departureDate: newRequest.date,
         passengerCount: newRequest.passengers,
         notes: newRequest.notes,
+        tags: newRequest.tags,
       })
       
       await chatService.createRequestChatRoom({
@@ -112,7 +117,7 @@ export default function PassengerHome() {
       })
       
       setShowCreate(false)
-      setNewRequest({ pickup: '', dropoff: '', date: '', passengers: 1, notes: '' })
+      setNewRequest({ pickup: '', dropoff: '', date: '', passengers: 1, notes: '', tags: [] })
       loadData()
       setActiveTab('my')
       alert('需求已發布！等司機聯絡你。')
@@ -423,6 +428,7 @@ export default function PassengerHome() {
                   {[1, 2, 3, 4, 5, 6, 7].map(n => (
                     <button
                       key={n}
+                      type="button"
                       style={{
                         ...styles.seatBtn,
                         ...(newRequest.passengers === n ? styles.seatBtnActive : {})
@@ -443,6 +449,40 @@ export default function PassengerHome() {
                   value={newRequest.notes}
                   onChange={e => setNewRequest({...newRequest, notes: e.target.value})}
                 />
+              </div>
+              
+              <div style={styles.field}>
+                <label style={styles.label}>標籤 🏷️（可選）</label>
+                <div style={styles.tagGrid}>
+                  {TAGS.map(tag => {
+                    const isSelected = newRequest.tags.includes(tag)
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        style={{
+                          ...styles.tagBtn,
+                          ...(isSelected ? styles.tagBtnActive : {})
+                        }}
+                        onClick={() => {
+                          if (isSelected) {
+                            setNewRequest({
+                              ...newRequest,
+                              tags: newRequest.tags.filter(t => t !== tag)
+                            })
+                          } else {
+                            setNewRequest({
+                              ...newRequest,
+                              tags: [...newRequest.tags, tag]
+                            })
+                          }
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
               
               <Button fullWidth onClick={handleCreateRequest}>
@@ -675,5 +715,25 @@ const styles: Record<string, React.CSSProperties> = {
     resize: 'vertical' as const,
     fontFamily: 'inherit',
     boxSizing: 'border-box' as const,
+  },
+  tagGrid: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: 8,
+  },
+  tagBtn: {
+    padding: '8px 14px',
+    borderRadius: radius.full,
+    border: `2px solid ${colors.border}`,
+    background: colors.white,
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  tagBtnActive: {
+    border: `2px solid ${colors.primary}`,
+    background: colors.primary,
+    color: colors.white,
   },
 }

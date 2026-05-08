@@ -1,16 +1,31 @@
-// Cabs Carpool - Passenger Requests Page v1.0
-// 乘客管理自己的需求
+// Cabs Carpool - Passenger Requests Page v7.0
+// Material Symbols Design with Design System
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { requestService } from '../../services/tripService'
+import { chatService } from '../../services/chatService'
 import { useAuth } from '../../context/AuthContext'
 import BottomNav from '../../components/BottomNav'
+import type { PassengerRequest } from '../../types/trip'
+import { colors, radius, shadows, spacing } from '../../styles/designSystem'
+
+// Material Symbol Icon Component
+const Icon = ({ name, filled = false, style = {} }: { name: string; filled?: boolean; style?: React.CSSProperties }) => (
+  <span style={{
+    fontFamily: "'Material Symbols Outlined'",
+    fontVariationSettings: filled ? "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" : "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24",
+    fontSize: 20,
+    ...style
+  }}>
+    {name}
+  </span>
+)
 
 export default function PassengerRequestsPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const [requests, setRequests] = useState<any[]>([])
+  const [requests, setRequests] = useState<PassengerRequest[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,254 +48,424 @@ export default function PassengerRequestsPage() {
     }
   }
 
-  const handleChat = () => {
-    if (!currentUser) {
-      navigate('/profile')
-      return
-    }
-    navigate('/chats')
+  const getPickup = (req: PassengerRequest): string => req.pickup?.placeName || '未知'
+  const getDropoff = (req: PassengerRequest): string => req.dropoff?.placeName || '未知'
+
+  const renderRequest = (req: PassengerRequest) => {
+    const isOpen = req.status === 'OPEN'
+
+    return (
+      <div key={req.id} style={styles.card}>
+        {/* Decorative corner */}
+        <div style={styles.cardDecor} />
+
+        {/* Header Row */}
+        <div style={styles.cardHeader}>
+          <div style={{ ...styles.statusChip, ...(isOpen ? styles.statusChipOpen : styles.statusChipClosed) }}>
+            <Icon
+              name={isOpen ? 'check_circle' : 'cancel'}
+              style={{ fontSize: 14, color: isOpen ? '#15803d' : '#6b7280' }}
+            />
+            <span style={{ color: isOpen ? '#15803d' : '#6b7280' }}>
+              {isOpen ? '開放中' : '已關閉'}
+            </span>
+          </div>
+          <span style={styles.time}>{req.departureDate || '時間待定'}</span>
+        </div>
+
+        {/* Route */}
+        <div style={styles.routeSection}>
+          <div style={styles.routeDots}>
+            <div style={styles.routeDot} />
+            <div style={styles.routeLine} />
+            <div style={styles.routeDotEnd} />
+          </div>
+          <div style={styles.routePlaces}>
+            <div>
+              <div style={styles.placeName}>{getPickup(req)}</div>
+              <div style={styles.placeTime}>上車</div>
+            </div>
+            <div style={{ marginTop: 24 }}>
+              <div style={styles.placeName}>{getDropoff(req)}</div>
+              <div style={styles.placeTime}>目的地</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Info Row */}
+        <div style={styles.infoRow}>
+          <div style={styles.infoItem}>
+            <Icon name="group" style={{ fontSize: 16, color: colors.tertiary }} />
+            <span>{req.passengerCount || 1} 位乘客</span>
+          </div>
+          <div style={styles.infoItem}>
+            <Icon name="directions_car" style={{ fontSize: 16, color: colors.tertiary }} />
+            <span>{req.interestedDrivers?.length || 0} 位司機感興趣</span>
+          </div>
+        </div>
+
+        {/* Notes */}
+        {req.notes && (
+          <div style={styles.notes}>
+            <Icon name="notes" style={{ fontSize: 16, color: colors.tertiary }} />
+            <span>{req.notes}</span>
+          </div>
+        )}
+
+        {/* Tags */}
+        {req.tags && req.tags.length > 0 && (
+          <div style={styles.tags}>
+            {req.tags.map(tag => (
+              <span key={tag} style={styles.tag}>{tag}</span>
+            ))}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={styles.actions}>
+          <button
+            style={styles.editBtn}
+            onClick={() => navigate(`/edit-request/${req.id}`)}
+          >
+            <Icon name="edit" style={{ fontSize: 16 }} />
+            編輯
+          </button>
+          <button
+            style={styles.chatBtn}
+            onClick={async () => {
+              try {
+                const roomId = await chatService.createRequestChatRoom({
+                  requestId: req.id,
+                  passengerId: req.passengerId,
+                  passengerName: req.passengerName,
+                  passengerPhone: req.passengerPhone,
+                  pickup: getPickup(req),
+                  dropoff: getDropoff(req),
+                  departureDate: req.departureDate,
+                })
+                navigate(`/chat/${roomId}`)
+              } catch (error) {
+                console.error('Error:', error)
+                alert('無法開啟聊天室')
+              }
+            }}
+          >
+            <Icon name="chat" style={{ fontSize: 16 }} />
+            聊天
+          </button>
+        </div>
+      </div>
+    )
   }
 
-  const handleEdit = (req: any) => {
-    // Navigate to edit page with request ID
-    // For now, we'll use a simple prompt to edit notes
-    const newNotes = prompt('修改備註：', req.notes || '')
-    if (newNotes !== null) {
-      // Update via requestService.update if available
-      // For now, just reload
-      loadUserRequests()
-    }
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loading}>
+          <Icon name="progress_activity" style={{ fontSize: 32, color: colors.tertiary }} />
+          <p>載入中...</p>
+        </div>
+        <BottomNav />
+      </div>
+    )
   }
-
-  const getPickup = (req: any) => req.pickup?.placeName || req.pickup || '未知'
-  const getDropoff = (req: any) => req.dropoff?.placeName || req.dropoff || '未知'
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <header style={styles.header}>
-        <button style={styles.backBtn} onClick={() => navigate('/passenger-home')}>←</button>
-        <div style={styles.title}>📋 我的需求</div>
-        <button style={styles.addBtn} onClick={() => navigate('/create-request')}>+</button>
+      {/* Top App Bar */}
+      <header style={styles.appBar}>
+        <button style={styles.backBtn} onClick={() => navigate('/passenger-home')}>
+          <Icon name="arrow_back" style={{ color: colors.primary }} />
+        </button>
+        <h1 style={styles.title}>我的需求</h1>
+        <button style={styles.addBtn} onClick={() => navigate('/create-request')}>
+          <Icon name="add" style={{ fontSize: 20, color: colors.white }} />
+        </button>
       </header>
 
       {/* Content */}
-      <div style={styles.content}>
-        {loading ? (
-          <div style={styles.empty}>載入中...</div>
-        ) : requests.length === 0 ? (
+      <main style={styles.main}>
+        {requests.length === 0 ? (
           <div style={styles.empty}>
-            <div style={styles.emptyIcon}>📋</div>
-            <div>暫時沒有需求</div>
-            <div style={styles.emptySubtext}>發布你的第一個乘車需求吧！</div>
-            <button 
+            <Icon name="assignment" style={{ fontSize: 48, color: colors.tertiary }} />
+            <p>暫時沒有需求</p>
+            <p style={styles.emptySubtext}>發布你的第一個乘車需求吧！</p>
+            <button
               style={styles.createBtn}
               onClick={() => navigate('/create-request')}
             >
-              + 發布需求
+              <Icon name="add" style={{ fontSize: 18 }} />
+              發布需求
             </button>
           </div>
         ) : (
-          requests.map(req => (
-            <div key={req.id} style={styles.tripCard}>
-              <div style={styles.tripHeader}>
-                <div style={styles.tripRoute}>
-                  📍 {getPickup(req)} → {getDropoff(req)}
-                </div>
-                <span style={req.status === 'OPEN' ? styles.badgeOpen : styles.badgeDone}>
-                  {req.status === 'OPEN' ? '🟢 開放中' : '✓ 已關閉'}
-                </span>
-              </div>
-              <div style={styles.tripDetails}>
-                <div>🕐 <strong>{req.departureDate || '時間待定'}</strong></div>
-                <div>👥 {req.passengerCount || 1} 位</div>
-                <div>感興趣的司機：{req.interestedDrivers?.length || 0} 位</div>
-                {req.notes && <div>📝 {req.notes}</div>}
-              </div>
-              <div style={styles.tripActions}>
-                <button style={styles.editBtn} onClick={() => handleEdit(req)}>
-                  ✏️ 編輯
-                </button>
-                <button style={styles.chatBtn} onClick={handleChat}>
-                  💬 聊天
-                </button>
-              </div>
-            </div>
-          ))
+          <div style={styles.cardList}>
+            {requests.map(renderRequest)}
+          </div>
         )}
-      </div>
+      </main>
 
       <BottomNav />
     </div>
   )
 }
 
+// ============ STYLES ============
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: '#fff9f5',
-    paddingBottom: 80,
+    background: colors.background,
+    paddingBottom: 140,
   },
-  header: {
+  appBar: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    padding: '0 20px',
+    height: 64,
+    background: 'rgba(255,251,249,0.9)',
+    backdropFilter: 'blur(12px)',
+    borderBottom: `1px solid ${colors.outlineVariant}`,
     display: 'flex',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '14px 18px',
-    background: '#fff',
-    borderBottom: '2px solid #f0e0d6',
+    alignItems: 'center',
   },
   backBtn: {
-    fontSize: 22,
+    padding: 8,
     background: 'none',
     border: 'none',
-    color: '#e07b4c',
     cursor: 'pointer',
+    borderRadius: '50%',
   },
   title: {
     fontSize: 17,
     fontWeight: 600,
-    color: '#4a3728',
+    color: colors.textPrimary,
   },
   addBtn: {
     width: 36,
     height: 36,
     borderRadius: '50%',
-    background: '#e07b4c',
-    color: '#fff',
+    background: colors.primary,
     border: 'none',
-    fontSize: 20,
     cursor: 'pointer',
-  },
-  content: {
-    padding: 16,
-  },
-  tripCard: {
-    background: '#fff',
-    border: '2px solid #f0e0d6',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  tripHeader: {
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tripRoute: {
-    fontSize: 16,
-    fontWeight: 600,
-    color: '#4a3728',
-    flex: 1,
+  main: {
+    paddingTop: 80,
+    paddingLeft: spacing.container,
+    paddingRight: spacing.container,
   },
-  badgeOpen: {
-    background: '#e8f5e8',
-    color: '#e07b4c',
-    padding: '4px 10px',
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  badgeDone: {
-    background: '#eceff1',
-    color: '#546e7a',
-    padding: '4px 10px',
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  tripDetails: {
-    fontSize: 13,
-    color: '#8b7355',
-    lineHeight: 1.8,
-    marginBottom: 12,
-  },
-  tripActions: {
+  loading: {
+    textAlign: 'center' as const,
+    padding: 60,
+    color: colors.textSecondary,
     display: 'flex',
-    gap: 8,
-  },
-  chatBtn: {
-    flex: 1,
-    padding: '10px 16px',
-    background: '#e07b4c',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 10,
-    fontSize: 13,
-    fontWeight: 500,
-    cursor: 'pointer',
-  },
-  editBtn: {
-    padding: '10px 16px',
-    background: '#f5f5f5',
-    color: '#666',
-    border: 'none',
-    borderRadius: 10,
-    fontSize: 13,
-    fontWeight: 500,
-    cursor: 'pointer',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: 12,
   },
   empty: {
     textAlign: 'center' as const,
-    padding: 40,
-    color: '#8b7355',
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+    padding: '60px 20px',
+    color: colors.textSecondary,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: 8,
   },
   emptySubtext: {
-    fontSize: 13,
-    marginTop: 8,
-    marginBottom: 20,
-    color: '#8b7355',
+    fontSize: 14,
+    color: colors.tertiary,
+    marginTop: 4,
   },
   createBtn: {
+    marginTop: 16,
     padding: '12px 24px',
-    background: 'linear-gradient(135deg, #e07b4c, #c4623a)',
-    color: '#fff',
+    background: `linear-gradient(to right, ${colors.primary}, ${colors.primaryDark})`,
+    color: colors.white,
     border: 'none',
-    borderRadius: 12,
+    borderRadius: radius.xl,
     fontSize: 14,
     fontWeight: 600,
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    boxShadow: shadows.fab,
   },
-  bottomNav: {
-    position: 'fixed' as const,
-    bottom: 0,
-    left: 0,
+  cardList: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  card: {
+    background: colors.surfaceContainerLowest,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    position: 'relative' as const,
+    overflow: 'hidden' as const,
+    boxShadow: shadows.card,
+  },
+  cardDecor: {
+    position: 'absolute' as const,
+    top: 0,
     right: 0,
-    display: 'flex',
-    background: '#fff',
-    padding: '10px 0',
-    borderTop: '2px solid #f0e0d6',
-    zIndex: 100,
+    width: 96,
+    height: 96,
+    background: `${colors.primary}15`,
+    borderRadius: '0 0 0 96px',
   },
-  navItem: {
-    flex: 1,
+  cardHeader: {
     display: 'flex',
-    flexDirection: 'column' as const,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 4,
-    padding: '6px 2px',
-    background: 'none',
-    border: 'none',
-    fontSize: 12,
-    color: '#8b7355',
-    cursor: 'pointer',
+    marginBottom: spacing.lg,
   },
-  navItemActive: {
-    flex: 1,
+  statusChip: {
     display: 'flex',
-    flexDirection: 'column' as const,
     alignItems: 'center',
-    gap: 4,
-    padding: '6px 2px',
-    background: 'none',
-    border: 'none',
-    fontSize: 12,
-    color: '#e07b4c',
+    gap: 6,
+    padding: '6px 12px',
+    borderRadius: radius.full,
+    background: colors.surfaceContainer,
+    fontSize: 13,
     fontWeight: 600,
+  },
+  statusChipOpen: {
+    background: colors.successBg,
+  },
+  statusChipClosed: {
+    background: colors.surfaceContainer,
+  },
+  time: {
+    fontSize: 13,
+    color: colors.tertiary,
+  },
+  routeSection: {
+    display: 'flex',
+    gap: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  routeDots: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+  },
+  routeDot: {
+    width: 12,
+    height: 12,
+    borderRadius: '50%',
+    border: `2px solid ${colors.secondary}`,
+    background: colors.surfaceContainerLowest,
+    zIndex: 10,
+  },
+  routeLine: {
+    width: 2,
+    height: 40,
+    background: colors.surfaceContainerHigh,
+    marginTop: -2,
+    marginBottom: -2,
+  },
+  routeDotEnd: {
+    width: 12,
+    height: 12,
+    borderRadius: '50%',
+    background: colors.secondary,
+    zIndex: 10,
+  },
+  routePlaces: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: spacing.xxl,
+  },
+  placeName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: colors.textPrimary,
+  },
+  placeTime: {
+    fontSize: 12,
+    color: colors.tertiary,
+    marginTop: 2,
+  },
+  infoRow: {
+    display: 'flex',
+    gap: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  infoItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  notes: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 8,
+    fontSize: 13,
+    color: colors.textSecondary,
+    background: colors.surfaceContainerLow,
+    padding: '10px 12px',
+    borderRadius: radius.sm,
+    marginBottom: spacing.md,
+  },
+  tags: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  tag: {
+    padding: '4px 10px',
+    background: colors.primaryLight,
+    color: colors.primaryDark,
+    borderRadius: radius.full,
+    fontSize: 12,
+    fontWeight: 500,
+  },
+  actions: {
+    display: 'flex',
+    gap: spacing.sm,
+    paddingTop: spacing.lg,
+    borderTop: `1px solid ${colors.surfaceContainerHigh}`,
+  },
+  editBtn: {
+    flex: 1,
+    padding: '10px 12px',
+    background: colors.surfaceContainer,
+    color: colors.textSecondary,
+    border: 'none',
+    borderRadius: radius.sm,
+    fontSize: 13,
+    fontWeight: 500,
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  chatBtn: {
+    flex: 1,
+    padding: '10px 12px',
+    background: colors.secondary,
+    color: colors.white,
+    border: 'none',
+    borderRadius: radius.sm,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
 }

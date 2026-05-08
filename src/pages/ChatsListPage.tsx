@@ -1,10 +1,21 @@
-// Cabs Carpool - Chats List Page
-// 用戶的聊天室列表
+// Cabs Carpool - Chats List Page v2.0
+// Redesigned to match PassengerHome design style
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { chatService } from '../services/chatService'
+import { colors, radius } from '../styles/designSystem'
+import BottomNav from '../components/BottomNav'
+
+const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties }) => (
+  <span style={{
+    fontFamily: "'Material Symbols Outlined'",
+    fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24",
+    fontSize: 20,
+    ...style
+  }}>{name}</span>
+)
 
 export default function ChatsListPage() {
   const navigate = useNavigate()
@@ -14,8 +25,6 @@ export default function ChatsListPage() {
 
   useEffect(() => {
     if (!currentUser?.id) return
-
-    loadRooms()
 
     // Subscribe to user's rooms
     const unsub = chatService.subscribeToUserRooms(currentUser.id, (userRooms) => {
@@ -27,10 +36,6 @@ export default function ChatsListPage() {
 
     return () => unsub()
   }, [currentUser?.id])
-
-  const loadRooms = async () => {
-    // Initial load handled by subscription
-  }
 
   const getOtherParticipant = (room: any) => {
     return room.participants?.find((p: any) => p.passengerId !== currentUser?.id)
@@ -54,28 +59,39 @@ export default function ChatsListPage() {
   return (
     <div style={styles.container}>
       {/* Header */}
-      <header style={styles.header}>
-        <button style={styles.backBtn} onClick={() => navigate(isDriver ? '/driver-home' : '/passenger-home')}>←</button>
-        <div style={styles.title}>💬 我的聊天室</div>
-        <div style={{width: 40}} />
-      </header>
+      <div style={styles.header}>
+        <div style={styles.headerContent}>
+          <div>
+            <h1 style={styles.headerTitle}>💬 聊天室</h1>
+            <p style={styles.headerSubtitle}>
+              {currentUser?.name ? `${currentUser.name}` : '用戶'}
+            </p>
+          </div>
+          <button onClick={() => navigate('/profile')} style={styles.profileBtn}>
+            👤
+          </button>
+        </div>
+      </div>
 
       {/* Chat List */}
       <div style={styles.list}>
         {loading ? (
-          <div style={styles.empty}>載入中...</div>
+          <div style={styles.empty}>
+            <Icon name="progress_activity" style={{ fontSize: 48, color: colors.tertiary }} />
+            <p>載入中...</p>
+          </div>
         ) : rooms.length === 0 ? (
           <div style={styles.empty}>
-            <div style={styles.emptyIcon}>💬</div>
-            <div>暫時沒有聊天室</div>
-            <div style={styles.emptySubtext}>
+            <Icon name="chat_bubble" style={{ fontSize: 48, color: colors.tertiary }} />
+            <p>暫時沒有聊天室</p>
+            <p style={{ fontSize: 14, color: colors.textSecondary, marginTop: 8 }}>
               {isDriver 
                 ? '瀏覽乘客需求並聯絡他們吧！' 
                 : '瀏覽司機行程並加入聊天吧！'}
-            </div>
+            </p>
             <button 
               style={styles.browseBtn}
-              onClick={() => navigate(isDriver ? '/passenger-requests' : '/browse-trips')}
+              onClick={() => navigate(isDriver ? '/browse-requests' : '/browse-trips')}
             >
               {isDriver ? '📋 查看乘客需求' : '🚗 查看司機行程'}
             </button>
@@ -89,9 +105,17 @@ export default function ChatsListPage() {
                 style={styles.chatItem}
                 onClick={() => navigate(`/chat/${room.id}`)}
               >
-                <div style={styles.avatar}>
-                  {other?.name?.charAt(0) || (other?.passengerId ? '用' : '?')}
+                <div style={styles.avatarWrapper}>
+                  <img
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(other?.name || 'U')}&background=dee8ff&color=1d4ed8&size=64`}
+                    alt={other?.name || 'User'}
+                    style={styles.avatar}
+                  />
+                  <span style={styles.roomTypeIcon}>
+                    {room.roomType === 'trip' ? '🚗' : '📋'}
+                  </span>
                 </div>
+                
                 <div style={styles.chatContent}>
                   <div style={styles.chatHeader}>
                     <div style={styles.chatName}>
@@ -99,12 +123,12 @@ export default function ChatsListPage() {
                     </div>
                     <div style={styles.chatTime}>{formatTime(room.updatedAt)}</div>
                   </div>
-                  <div style={styles.chatPreview}>
-                    <span style={styles.routeTag}>
-                      {room.roomType === 'trip' ? '🚗' : '📋'}
-                    </span>
+                  
+                  <div style={styles.routePreview}>
+                    <span style={styles.routeDot}>●</span>
                     {room.topicPickup} → {room.topicDropoff}
                   </div>
+                  
                   {room.lastMessage && (
                     <div style={styles.lastMessage}>
                       {room.lastMessage.length > 30 
@@ -112,15 +136,22 @@ export default function ChatsListPage() {
                         : room.lastMessage}
                     </div>
                   )}
+                  
                   {room.confirmedBy?.length === 2 && (
-                    <div style={styles.confirmedBadge}>✅ 已確認</div>
+                    <div style={styles.confirmedBadge}>✅ 已確認共乘</div>
                   )}
+                </div>
+                
+                <div style={styles.chevron}>
+                  <Icon name="chevron_right" style={{ fontSize: 20, color: colors.textLight }} />
                 </div>
               </div>
             )
           })
         )}
       </div>
+
+      <BottomNav />
     </div>
   )
 }
@@ -128,52 +159,66 @@ export default function ChatsListPage() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: '#fff9f5',
+    background: colors.background,
+    paddingBottom: 100,
   },
   header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '14px 18px',
-    background: '#fff',
-    borderBottom: '2px solid #f0e0d6',
+    background: colors.white,
+    padding: '16px',
+    borderBottom: `1px solid ${colors.border}`,
   },
-  backBtn: {
-    fontSize: 22,
-    background: 'none',
+  headerContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  headerSubtitle: {
+    margin: '4px 0 0',
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  profileBtn: {
+    padding: '8px 12px',
+    background: colors.primaryLight,
     border: 'none',
-    color: '#e07b4c',
+    borderRadius: radius.sm,
+    fontSize: 16,
     cursor: 'pointer',
   },
-  title: {
-    fontSize: 17,
-    fontWeight: 600,
-    color: '#4a3728',
-  },
   list: {
-    padding: 8,
+    padding: 16,
   },
   chatItem: {
     display: 'flex',
-    background: '#fff',
-    border: '2px solid #f0e0d6',
-    borderRadius: 16,
+    alignItems: 'center',
+    background: colors.white,
+    borderRadius: radius.md,
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 12,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     cursor: 'pointer',
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginRight: 12,
   },
   avatar: {
     width: 50,
     height: 50,
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #e07b4c, #c4623a)',
-    color: '#fff',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 20,
-    fontWeight: 600,
-    marginRight: 12,
+    border: '2px solid #dee8ff',
+  },
+  roomTypeIcon: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    fontSize: 12,
   },
   chatContent: {
     flex: 1,
@@ -182,62 +227,65 @@ const styles: Record<string, React.CSSProperties> = {
   chatHeader: {
     display: 'flex',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
   chatName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 600,
-    color: '#4a3728',
+    color: colors.textPrimary,
   },
   chatTime: {
     fontSize: 12,
-    color: '#8b7355',
+    color: colors.textLight,
   },
-  chatPreview: {
+  routePreview: {
     fontSize: 13,
-    color: '#8b7355',
+    color: colors.textSecondary,
     display: 'flex',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
-  routeTag: {
-    fontSize: 12,
+  routeDot: {
+    fontSize: 8,
+    color: colors.primary,
   },
   lastMessage: {
     fontSize: 12,
-    color: '#8b7355',
+    color: colors.textLight,
     marginTop: 4,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
   },
   confirmedBadge: {
     display: 'inline-block',
     fontSize: 11,
-    color: '#5a9a5a',
-    background: '#e8f5e8',
+    color: colors.success,
+    background: colors.successBg,
     padding: '2px 8px',
-    borderRadius: 10,
-    marginTop: 4,
+    borderRadius: radius.full,
+    marginTop: 6,
+  },
+  chevron: {
+    marginLeft: 8,
   },
   empty: {
-    textAlign: 'center',
-    padding: 40,
-    color: '#8b7355',
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptySubtext: {
-    fontSize: 13,
-    marginTop: 8,
-    marginBottom: 20,
-    color: '#8b7355',
+    textAlign: 'center' as const,
+    padding: 60,
+    color: colors.textSecondary,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
   },
   browseBtn: {
+    marginTop: 16,
     padding: '12px 24px',
-    background: 'linear-gradient(135deg, #e07b4c, #c4623a)',
-    color: '#fff',
+    background: colors.primary,
+    color: colors.white,
     border: 'none',
-    borderRadius: 12,
+    borderRadius: radius.md,
     fontSize: 14,
     fontWeight: 600,
     cursor: 'pointer',

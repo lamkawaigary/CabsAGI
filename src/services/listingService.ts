@@ -105,17 +105,16 @@ export const listingService = {
    * Get all OPEN listings (for browsing)
    */
   async getOpenListings(): Promise<Listing[]> {
-    const q = query(
-      collection(db, LISTINGS_COLLECTION),
-      where('status', '==', 'OPEN'),
-      orderBy('createdAt', 'desc')
-    )
-    
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Listing[]
+    try {
+      const snapshot = await getDocs(collection(db, LISTINGS_COLLECTION))
+      return snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Listing))
+        .filter(l => l.status === 'OPEN')
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+    } catch (e) {
+      console.error('Error getting listings:', e)
+      return []
+    }
   },
 
   /**

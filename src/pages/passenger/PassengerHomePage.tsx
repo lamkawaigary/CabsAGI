@@ -4,7 +4,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { listingService, type Listing } from '../../services/listingService'
+import { tripService } from '../../services/tripService'
+import { type Trip } from '../../types/trip'
 import BottomNav from '../../components/BottomNav'
 import { colors, radius, shadows, spacing } from '../../styles/designSystem'
 
@@ -25,21 +26,22 @@ const Icon = ({ name, filled = false, style = {} }: { name: string; filled?: boo
 export default function PassengerHomePage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const [listings, setListings] = useState<Listing[]>([])
+  const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
   const [activeCategory, setActiveCategory] = useState('全部')
   const [searchQuery, setSearchQuery] = useState('')
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
-    loadListings()
+    loadTrips()
   }, [])
 
-  const loadListings = async () => {
+  const loadTrips = async () => {
     try {
       setLoading(true)
-      const all = await listingService.getOpenListings()
-      const driverOffers = all.filter(l => l.type === 'driver_offer' && l.status === 'OPEN')
-      setListings(driverOffers.filter(l => l.initiatorId !== currentUser?.id))
+      const publicTrips = await tripService.getPublicTrips()
+      // Filter: driver offers (exclude own trips)
+      setTrips(publicTrips.filter(t => t.driverId !== currentUser?.id))
     } catch (error) {
       console.error('Error loading:', error)
     } finally {
@@ -52,9 +54,9 @@ export default function PassengerHomePage() {
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`
   }
 
-  const getRouteCode = (listing: Listing) => {
-    const pickup = listing.route.pickup?.placeName || ''
-    const dropoff = listing.route.dropoff?.placeName || ''
+  const getRouteCode = (trip: Trip) => {
+    const pickup = trip.route.pickup?.placeName || ''
+    const dropoff = trip.route.dropoff?.placeName || ''
     
     if (pickup.toLowerCase().includes('airport') || pickup.includes('機場')) {
       if (dropoff.includes('深圳') || dropoff.includes('SZX')) return 'HKG → SZX'
@@ -63,14 +65,14 @@ export default function PassengerHomePage() {
     return '... → ...'
   }
 
-  const getDriverRating = (listing: Listing) => {
-    const hash = listing.initiatorId.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
+  const getDriverRating = (trip: Trip) => {
+    const hash = trip.driverId.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
     return (4.5 + (hash % 5) / 10).toFixed(1)
   }
 
-  const filteredListings = listings.filter(listing => {
+  const filteredTrips = trips.filter(trip => {
     if (activeCategory === '全部') return true
-    const places = `${listing.route.pickup?.placeName} ${listing.route.dropoff?.placeName}`.toLowerCase()
+    const places = `${trip.route.pickup?.placeName} ${trip.route.dropoff?.placeName}`.toLowerCase()
     switch (activeCategory) {
       case '機場': return places.includes('airport') || places.includes('機場')
       case '口岸': return places.includes('口岸')
@@ -79,16 +81,16 @@ export default function PassengerHomePage() {
     }
   })
 
-  const renderListing = (listing: Listing) => {
-    const rating = getDriverRating(listing)
-    const isUrgent = new Date(listing.departureTime).getTime() - Date.now() < 2 * 60 * 60 * 1000
-    const availableSeats = 7 - (listing.passengerCount || 0)
+  const renderTrip = (trip: Trip) => {
+    const rating = getDriverRating(trip)
+    const isUrgent = new Date(trip.departureTime).getTime() - Date.now() < 2 * 60 * 60 * 1000
+    const availableSeats = 7 - (trip.passengers?.length || 0 || 0)
 
     return (
       <div 
-        key={listing.id} 
+        key={trip.id} 
         style={styles.card}
-        onClick={() => navigate(`/listing/${listing.id}`)}
+        onClick={() => navigate(`/listing/${trip.id}`)}
       >
         {/* Decorative corner */}
         <div style={styles.cardDecor} />
@@ -96,7 +98,7 @@ export default function PassengerHomePage() {
         {/* Header Row */}
         <div style={styles.cardHeader}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={styles.routeCode}>{getRouteCode(listing)}</span>
+            <span style={styles.routeCode}>{getRouteCode(trip)}</span>
             {isUrgent && (
               <span style={styles.urgentTag}>
                 <Icon name="local_fire_department" style={{ fontSize: 14 }} />
@@ -105,7 +107,7 @@ export default function PassengerHomePage() {
             )}
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={styles.price}>HK$ {listing.price || 150}</div>
+            <div style={styles.price}>HK$ {trip.pricePerSeat || 150}</div>
             <div style={styles.priceUnit}>每位</div>
           </div>
         </div>
@@ -119,11 +121,11 @@ export default function PassengerHomePage() {
           </div>
           <div style={styles.routePlaces}>
             <div>
-              <div style={styles.placeName}>{listing.route.pickup?.placeName}</div>
-              <div style={styles.placeTime}>今天 {formatTime(listing.departureTime)}</div>
+              <div style={styles.placeName}>{trip.route.pickup?.placeName}</div>
+              <div style={styles.placeTime}>今天 {formatTime(trip.departureTime)}</div>
             </div>
             <div style={{ marginTop: 24 }}>
-              <div style={styles.placeName}>{listing.route.dropoff?.placeName}</div>
+              <div style={styles.placeName}>{trip.route.dropoff?.placeName}</div>
               <div style={styles.placeTime}>預計 15:45 抵達</div>
             </div>
           </div>
@@ -133,18 +135,18 @@ export default function PassengerHomePage() {
         <div style={styles.cardFooter}>
           <div style={styles.driverInfo}>
             <img 
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(listing.initiatorName)}&background=dee8ff&color=1d4ed8`}
-              alt={listing.initiatorName}
+              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(trip.driverName)}&background=dee8ff&color=1d4ed8`}
+              alt={trip.driverName}
               style={styles.driverAvatar}
             />
             <div>
               <div style={styles.driverName}>
-                {listing.initiatorName}
+                {trip.driverName}
                 <Icon name="verified" style={{ fontSize: 14, color: colors.primary, marginLeft: 4 }} />
               </div>
               <div style={styles.driverMeta}>
                 <Icon name="star" style={{ fontSize: 14, color: '#f59e0b' }} />
-                {rating} ({listing.passengerCount || 0}+ 趟)
+                {rating} ({trip.passengers?.length || 0 || 0}+ 趟)
               </div>
             </div>
           </div>
@@ -156,7 +158,7 @@ export default function PassengerHomePage() {
                   name="airline_seat_recline_normal" 
                   style={{
                     fontSize: 18,
-                    color: i <= (listing.passengerCount || 0) ? colors.tertiary : colors.surfaceContainerHigh
+                    color: i <= (trip.passengers?.length || 0 || 0) ? colors.tertiary : colors.surfaceContainerHigh
                   }} 
                 />
               ))}
@@ -172,17 +174,60 @@ export default function PassengerHomePage() {
     <div style={styles.container}>
       {/* Top App Bar */}
       <header style={styles.appBar}>
-        <button style={styles.menuBtn}>
+        <button style={styles.menuBtn} onClick={() => setDrawerOpen(true)}>
           <Icon name="menu" style={{ color: colors.primary }} />
         </button>
         <h1 style={styles.logo}>OpenCabs</h1>
-        <div style={styles.avatar}>
-          <img 
+        <div style={styles.avatar} onClick={() => navigate('/profile')}>
+          <img
             src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'U')}&background=ffddb8&color=855300`}
-            alt="User" 
+            alt="User"
           />
         </div>
       </header>
+
+      {/* Side Drawer */}
+      {drawerOpen && (
+        <>
+          <div style={styles.drawerOverlay} onClick={() => setDrawerOpen(false)} />
+          <div style={styles.drawer}>
+            <div style={styles.drawerHeader}>
+              <h2 style={styles.drawerLogo}>OpenCabs</h2>
+              <button style={styles.drawerClose} onClick={() => setDrawerOpen(false)}>
+                <Icon name="close" style={{ fontSize: 24 }} />
+              </button>
+            </div>
+            <nav style={styles.drawerNav}>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/passenger-home') }}>
+                <Icon name="home" style={{ fontSize: 20 }} />
+                <span>首頁</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/browse-trips') }}>
+                <Icon name="search" style={{ fontSize: 20 }} />
+                <span>瀏覽行程</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/my-requests') }}>
+                <Icon name="assignment" style={{ fontSize: 20 }} />
+                <span>我的需求</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/my-trips') }}>
+                <Icon name="directions_car" style={{ fontSize: 20 }} />
+                <span>我的行程</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/favorite-places') }}>
+                <Icon name="star" style={{ fontSize: 20 }} />
+                <span>我的收藏</span>
+              </button>
+            </nav>
+            <div style={styles.drawerFooter}>
+              <button style={styles.drawerLogout} onClick={() => { setDrawerOpen(false); navigate('/profile') }}>
+                <Icon name="logout" style={{ fontSize: 20 }} />
+                <span>登出</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       <main style={styles.main}>
         {/* Search Section */}
@@ -238,7 +283,7 @@ export default function PassengerHomePage() {
               <Icon name="progress_activity" style={{ fontSize: 32, color: colors.tertiary }} />
               <p>載入中...</p>
             </div>
-          ) : filteredListings.length === 0 ? (
+          ) : filteredTrips.length === 0 ? (
             <div style={styles.empty}>
               <Icon name="directions_car" style={{ fontSize: 48, color: colors.tertiary }} />
               <p>暫時沒有行程</p>
@@ -246,17 +291,11 @@ export default function PassengerHomePage() {
             </div>
           ) : (
             <div style={styles.cardList}>
-              {filteredListings.map(renderListing)}
+              {filteredTrips.map(renderTrip)}
             </div>
           )}
         </section>
       </main>
-
-      {/* FAB */}
-      <button style={styles.fab} onClick={() => navigate('/create-request')}>
-        <Icon name="add" style={{ fontSize: 24 }} />
-        <span style={styles.fabText}>發佈需求</span>
-      </button>
 
       <BottomNav />
     </div>
@@ -596,5 +635,85 @@ const styles: Record<string, React.CSSProperties> = {
   fabText: {
     fontSize: 14,
     fontWeight: 600,
+  },
+  drawerOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.5)',
+    zIndex: 100,
+  },
+  drawer: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 280,
+    background: colors.surfaceContainerLowest,
+    zIndex: 101,
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
+  },
+  drawerHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 20px',
+    borderBottom: `1px solid ${colors.surfaceContainerHigh}`,
+  },
+  drawerLogo: {
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: 20,
+    fontWeight: 800,
+    color: colors.primary,
+    fontStyle: 'italic',
+  },
+  drawerClose: {
+    padding: 8,
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    borderRadius: '50%',
+  },
+  drawerNav: {
+    flex: 1,
+    padding: '16px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  drawerItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    padding: '14px 16px',
+    background: 'none',
+    border: 'none',
+    borderRadius: radius.md,
+    fontSize: 15,
+    fontWeight: 500,
+    color: colors.textPrimary,
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+    width: '100%',
+  },
+  drawerFooter: {
+    padding: '16px 12px',
+    borderTop: `1px solid ${colors.surfaceContainerHigh}`,
+  },
+  drawerLogout: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    padding: '14px 16px',
+    background: 'none',
+    border: 'none',
+    borderRadius: radius.md,
+    fontSize: 15,
+    fontWeight: 500,
+    color: colors.error,
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+    width: '100%',
   },
 }

@@ -1,12 +1,22 @@
-// Cabs Carpool - Profile Page
-// Version: 3.1
-// 用戶可以設置暱稱和驗證電話
+// Cabs Carpool - Profile Page v2.0
+// Redesigned to match PassengerHome design style
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
+import { colors, radius } from '../styles/designSystem'
+import BottomNav from '../components/BottomNav'
+
+const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties }) => (
+  <span style={{
+    fontFamily: "'Material Symbols Outlined'",
+    fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24",
+    fontSize: 20,
+    ...style
+  }}>{name}</span>
+)
 
 export default function ProfilePage() {
   const navigate = useNavigate()
@@ -98,7 +108,6 @@ export default function ProfilePage() {
         setVerifySuccess(true)
         setOtpError('')
         setShowPhoneForm(false)
-        // No reload needed - AuthContext already updated the user state
       } else {
         setOtpError(result.message)
       }
@@ -118,57 +127,65 @@ export default function ProfilePage() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <button style={styles.backBtn} onClick={() => navigate(-1)}>←</button>
-        <h1 style={styles.title}>個人資料</h1>
-        <div style={{ width: 40 }} />
+        <div style={styles.headerContent}>
+          <div>
+            <h1 style={styles.headerTitle}>👤 個人資料</h1>
+            <p style={styles.headerSubtitle}>
+              {currentUser?.role === 'driver' ? '🚗 司機' : currentUser?.role === 'admin' ? '⚙️ 管理員' : '👤 乘客'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Success Banner */}
       {verifySuccess && (
-        <div style={{...styles.successBanner}}>
+        <div style={styles.successBanner}>
           ✅ 電話驗證成功！正在更新...
         </div>
       )}
 
       {/* Content */}
       <div style={styles.content}>
-        {/* Avatar */}
-        <div style={styles.avatar}>
-          {name ? name.charAt(0).toUpperCase() : '?'}
+        {/* Avatar Card */}
+        <div style={styles.card}>
+          <div style={styles.avatar}>
+            {name ? name.charAt(0).toUpperCase() : '?'}
+          </div>
+          <p style={styles.avatarHint}>這是你的頭像首字母</p>
         </div>
 
         {/* Nickname Form */}
-        <div style={styles.form}>
-          <label style={styles.label}>暱稱 *</label>
-          <input
-            type="text"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="輸入暱稱"
-            style={styles.input}
-            maxLength={20}
-          />
-          <p style={styles.hint}>暱稱會在對話中顯示，讓對方知道你在說什麼</p>
-
-          <button
-            onClick={handleSaveNickname}
-            disabled={saving || !name.trim()}
-            style={{
-              ...styles.saveBtn,
-              background: saving ? '#ccc' : saved ? '#e07b4c' : '#e07b4c',
-            }}
-          >
-            {saving ? '儲存中...' : saved ? '✓ 已儲存' : '儲存'}
-          </button>
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>🌟 暱稱</h3>
+          <p style={styles.cardHint}>暱稱會在對話中顯示</p>
+          
+          <div style={styles.inputRow}>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="輸入暱稱"
+              style={styles.input}
+              maxLength={20}
+            />
+            <button
+              onClick={handleSaveNickname}
+              disabled={saving || !name.trim()}
+              style={{
+                ...styles.saveBtn,
+                background: saved ? colors.success : colors.primary,
+              }}
+            >
+              {saving ? '...' : saved ? '✓' : '儲存'}
+            </button>
+          </div>
         </div>
 
         {/* Phone Verification */}
         {showPhoneForm ? (
-          <div style={styles.form}>
-            <h3 style={styles.sectionTitle}>📱 電話驗證</h3>
-            <p style={styles.sectionHint}>
-              驗證電話後，司机和乘客可以通過電話聯絡你
-            </p>
+          <div style={styles.card}>
+            <h3 style={styles.cardTitle}>📱 電話驗證</h3>
+            <p style={styles.cardHint}>驗證電話後，司機和乘客可以通過電話聯絡你</p>
             
             <label style={styles.label}>電話號碼</label>
             <div style={styles.phoneRow}>
@@ -190,66 +207,71 @@ export default function ProfilePage() {
               <button
                 onClick={handleSendOtp}
                 disabled={sendingOtp || phone.length < 8}
-                style={styles.sendBtn}
+                style={styles.primaryBtn}
               >
                 {sendingOtp ? '發送中...' : '發送驗證碼'}
               </button>
             ) : (
               <>
                 <label style={styles.label}>驗證碼</label>
-                <input
-                  type="text"
-                  value={otp}
-                  onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="輸入6位驗證碼"
-                  style={styles.input}
-                  maxLength={6}
-                />
-                <div style={styles.otpButtons}>
+                <div style={styles.inputRow}>
+                  <input
+                    type="text"
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="6位驗證碼"
+                    style={styles.input}
+                    maxLength={6}
+                  />
                   <button
                     onClick={handleVerifyOtp}
                     disabled={verifying || otp.length < 6}
-                    style={styles.verifyBtn}
+                    style={styles.saveBtn}
                   >
-                    {verifying ? '驗證中...' : '驗證'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOtpSent(false)
-                      setOtp('')
-                      setOtpError('')
-                    }}
-                    style={styles.resendBtn}
-                  >
-                    重新輸入
+                    {verifying ? '...' : '驗證'}
                   </button>
                 </div>
+                <button
+                  onClick={() => {
+                    setOtpSent(false)
+                    setOtp('')
+                    setOtpError('')
+                  }}
+                  style={styles.textBtn}
+                >
+                  重新輸入電話號碼
+                </button>
               </>
             )}
             
             <div id="recaptcha-container" />
           </div>
         ) : (
-          <div style={styles.infoCard}>
-            <h3 style={styles.infoTitle}>📱 電話驗證</h3>
+          <div style={styles.card}>
+            <h3 style={styles.cardTitle}>📱 電話驗證</h3>
+            
             <div style={styles.infoRow}>
               <span style={styles.infoLabel}>電話</span>
-              <span style={styles.infoValue}>
+              <span style={{
+                ...styles.infoValue,
+                color: currentUser?.phone ? colors.success : colors.textLight
+              }}>
                 {currentUser?.phone ? `✓ ${currentUser.phone}` : '未設定'}
               </span>
             </div>
+            
             <button
               onClick={() => setShowPhoneForm(true)}
-              style={styles.editBtn}
+              style={styles.outlineBtn}
             >
               修改電話
             </button>
           </div>
         )}
 
-        {/* User Info */}
-        <div style={styles.infoCard}>
-          <h3 style={styles.infoTitle}>帳戶資料</h3>
+        {/* Account Info */}
+        <div style={styles.card}>
+          <h3 style={styles.cardTitle}>📋 帳戶資料</h3>
           
           <div style={styles.infoRow}>
             <span style={styles.infoLabel}>電郵</span>
@@ -257,19 +279,21 @@ export default function ProfilePage() {
           </div>
           
           <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>角色</span>
-            <span style={styles.infoValue}>
-              {currentUser?.role === 'driver' ? '🚗 司機' : 
-               currentUser?.role === 'admin' ? '⚙️ 管理員' : '👤 乘客'}
+            <span style={styles.infoLabel}>用戶ID</span>
+            <span style={styles.infoValueMono}>
+              {currentUser?.id?.slice(0, 12)}...
             </span>
           </div>
         </div>
 
         {/* Logout */}
         <button onClick={handleLogout} style={styles.logoutBtn}>
+          <Icon name="logout" style={{ fontSize: 18 }} />
           登出
         </button>
       </div>
+
+      <BottomNav />
     </div>
   )
 }
@@ -277,86 +301,98 @@ export default function ProfilePage() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: '#fff9f5',
+    background: colors.background,
+    paddingBottom: 100,
   },
   header: {
+    background: colors.white,
+    padding: '16px',
+    borderBottom: `1px solid ${colors.border}`,
+  },
+  headerContent: {
     display: 'flex',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '14px 18px',
-    background: '#fff',
-    borderBottom: '2px solid #f0e0d6',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+  headerSubtitle: {
+    margin: '4px 0 0',
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   successBanner: {
-    background: '#e8f5e8',
-    color: '#e07b4c',
+    background: colors.successBg,
+    color: colors.success,
     padding: '12px 16px',
     textAlign: 'center',
     fontWeight: 600,
     fontSize: 14,
   },
-  backBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#e07b4c',
-    fontSize: 24,
-    cursor: 'pointer',
-  },
-  title: {
-    margin: 0,
-    fontSize: 17,
-    fontWeight: 600,
-    color: '#4a3728',
-  },
   content: {
-    padding: 20,
+    padding: 16,
     display: 'grid',
-    gap: 20,
+    gap: 16,
+  },
+  card: {
+    background: colors.white,
+    borderRadius: radius.md,
+    padding: 20,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+  },
+  cardTitle: {
+    margin: '0 0 4px 0',
+    fontSize: 16,
+    fontWeight: 600,
+    color: colors.textPrimary,
+  },
+  cardHint: {
+    margin: '0 0 16px 0',
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #e07b4c, #c4623a)',
-    color: '#fff',
+    background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})`,
+    color: colors.white,
     display: 'grid',
     placeItems: 'center',
     fontSize: 32,
     fontWeight: 600,
-    margin: '0 auto',
+    margin: '0 auto 8px',
   },
-  form: {
-    background: '#fff',
-    border: '2px solid #f0e0d6',
-    borderRadius: 16,
-    padding: 20,
+  avatarHint: {
+    textAlign: 'center' as const,
+    fontSize: 12,
+    color: colors.textLight,
+    margin: 0,
   },
-  sectionTitle: {
-    margin: '0 0 8px',
-    fontSize: 16,
-    fontWeight: 600,
-    color: '#4a3728',
-  },
-  sectionHint: {
-    fontSize: 13,
-    color: '#8b7355',
-    margin: '0 0 16px',
+  inputRow: {
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
   },
   label: {
     display: 'block',
     fontSize: 13,
     fontWeight: 500,
     marginBottom: 8,
-    color: '#8b7355',
+    color: colors.textSecondary,
   },
   input: {
-    width: '100%',
+    flex: 1,
     padding: '12px 16px',
-    border: '2px solid #f0e0d6',
-    borderRadius: 12,
+    border: `1px solid ${colors.border}`,
+    borderRadius: radius.sm,
     fontSize: 16,
-    boxSizing: 'border-box' as any,
-    color: '#4a3728',
+    boxSizing: 'border-box' as const,
+    color: colors.textPrimary,
   },
   phoneRow: {
     display: 'flex',
@@ -366,117 +402,91 @@ const styles: Record<string, React.CSSProperties> = {
   },
   phonePrefix: {
     padding: '12px 8px',
-    background: '#f0e0d6',
-    borderRadius: 12,
+    background: colors.background,
+    borderRadius: radius.sm,
     fontSize: 16,
-    color: '#8b7355',
-  },
-  hint: {
-    fontSize: 12,
-    color: '#8b7355',
-    margin: '8px 0 16px',
+    color: colors.textSecondary,
   },
   errorText: {
     fontSize: 13,
-    color: '#c62828',
+    color: colors.error,
     margin: '8px 0',
   },
-  saveBtn: {
+  primaryBtn: {
     width: '100%',
     padding: '14px',
-    color: '#fff',
+    background: colors.primary,
+    color: colors.white,
     border: 'none',
-    borderRadius: 12,
-    fontSize: 16,
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'background 0.2s',
-    background: '#e07b4c',
-  },
-  sendBtn: {
-    width: '100%',
-    padding: '14px',
-    background: '#e07b4c',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 12,
-    fontSize: 16,
-    fontWeight: 600,
-    cursor: 'pointer',
-    marginTop: 8,
-  },
-  otpButtons: {
-    display: 'flex',
-    gap: 12,
-    marginTop: 12,
-  },
-  verifyBtn: {
-    flex: 1,
-    padding: '14px',
-    background: '#e07b4c',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 12,
-    fontSize: 16,
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  resendBtn: {
-    padding: '14px 16px',
-    background: '#fff',
-    color: '#8b7355',
-    border: '2px solid #f0e0d6',
-    borderRadius: 12,
-    fontSize: 14,
-    cursor: 'pointer',
-  },
-  infoCard: {
-    background: '#fff',
-    border: '2px solid #f0e0d6',
-    borderRadius: 16,
-    padding: 20,
-  },
-  infoTitle: {
-    margin: '0 0 16px',
+    borderRadius: radius.md,
     fontSize: 15,
     fontWeight: 600,
-    color: '#4a3728',
+    cursor: 'pointer',
+  },
+  saveBtn: {
+    padding: '12px 20px',
+    background: colors.primary,
+    color: colors.white,
+    border: 'none',
+    borderRadius: radius.sm,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+  },
+  textBtn: {
+    background: 'none',
+    border: 'none',
+    color: colors.textSecondary,
+    fontSize: 13,
+    cursor: 'pointer',
+    marginTop: 12,
+    textDecoration: 'underline',
   },
   infoRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '10px 0',
-    borderBottom: '1px solid #f0e0d6',
+    padding: '12px 0',
+    borderBottom: `1px solid ${colors.border}`,
   },
   infoLabel: {
     fontSize: 14,
-    color: '#8b7355',
+    color: colors.textSecondary,
   },
   infoValue: {
     fontSize: 14,
     fontWeight: 500,
-    color: '#4a3728',
+    color: colors.textPrimary,
   },
-  editBtn: {
+  infoValueMono: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: colors.textLight,
+  },
+  outlineBtn: {
     width: '100%',
-    padding: '10px',
-    background: '#fff9f5',
-    color: '#e07b4c',
-    border: '2px solid #e07b4c',
-    borderRadius: 12,
+    padding: '12px',
+    background: colors.white,
+    color: colors.primary,
+    border: `2px solid ${colors.primary}`,
+    borderRadius: radius.md,
     fontSize: 14,
-    fontWeight: 500,
+    fontWeight: 600,
     cursor: 'pointer',
     marginTop: 12,
   },
   logoutBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     width: '100%',
     padding: '14px',
-    background: '#fff',
-    color: '#c62828',
-    border: '2px solid #c62828',
-    borderRadius: 12,
-    fontSize: 16,
+    background: colors.white,
+    color: colors.error,
+    border: `1px solid ${colors.error}`,
+    borderRadius: radius.md,
+    fontSize: 15,
     fontWeight: 500,
     cursor: 'pointer',
   },

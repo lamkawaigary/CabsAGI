@@ -74,7 +74,7 @@ export default function EditTripPage() {
       })
 
       alert('行程已更新！')
-      navigate('/my-trips')
+      navigate('/driver-trips')
     } catch (error) {
       console.error('Error updating trip:', error)
       alert('更新失敗，請重試')
@@ -95,7 +95,7 @@ export default function EditTripPage() {
     <div style={styles.container}>
       {/* Header */}
       <header style={styles.header}>
-        <button style={styles.backBtn} onClick={() => navigate('/my-trips')}>←</button>
+        <button style={styles.backBtn} onClick={() => navigate('/driver-trips')}>←</button>
         <div style={styles.title}>✏️ 編輯行程</div>
         <div style={{width: 40}} />
       </header>

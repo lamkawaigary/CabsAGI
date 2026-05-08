@@ -1,158 +1,184 @@
-// Cabs Carpool - Passenger Browse Page v3.0
-// Material Symbols Design
+// Cabs Carpool - Passenger Browse Page v5.0
+// New card design matching reference screenshot
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { listingService, type Listing } from '../../services/listingService'
+import { tripService } from '../../services/tripService'
+import { chatService } from '../../services/chatService'
+import { colors, radius } from '../../styles/designSystem'
 import BottomNav from '../../components/BottomNav'
 
-const CATEGORIES = ['全部', '演唱會', '迪士尼', '機場', '口岸', '商務']
+const CATEGORIES = ['全部', '演唱會', '迪士尼', '機場', '口岸', '商務', '婚禮', '體育賽事']
 
-const Icon = ({ name, filled = false, style = {} }: { name: string; filled?: boolean; style?: React.CSSProperties }) => (
+const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties }) => (
   <span style={{
     fontFamily: "'Material Symbols Outlined'",
-    fontVariationSettings: filled ? "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" : "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24",
+    fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24",
     fontSize: 20,
     ...style
-  }}>
-    {name}
-  </span>
+  }}>{name}</span>
 )
 
 export default function PassengerBrowsePage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const [listings, setListings] = useState<Listing[]>([])
+  const [trips, setTrips] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeCategory, setActiveCategory] = useState('全部')
 
   useEffect(() => {
-    loadListings()
+    loadTrips()
   }, [])
 
-  const loadListings = async () => {
+  const loadTrips = async () => {
     try {
       setLoading(true)
-      const all = await listingService.getOpenListings()
-      const driverOffers = all.filter(l => l.type === 'driver_offer' && l.status === 'OPEN')
-      setListings(driverOffers.filter(l => l.initiatorId !== currentUser?.id))
+      const publicTrips = await tripService.getPublicTrips()
+      const filteredTrips = publicTrips.filter(t => t.driverId !== currentUser?.id)
+      setTrips(filteredTrips || [])
     } catch (error) {
-      console.error('Error loading:', error)
+      console.error('Error loading trips:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const formatTime = (iso: string) => {
+  const formatTripTime = (iso: string) => {
     const d = new Date(iso)
-    return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`
+    const now = new Date()
+    const isToday = d.toDateString() === now.toDateString()
+    const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+    return isToday ? timeStr : `${d.getMonth() + 1}/${d.getDate()} ${timeStr}`
   }
 
-  const getRouteCode = (listing: Listing) => {
-    const pickup = listing.route.pickup?.placeName || ''
-    const dropoff = listing.route.dropoff?.placeName || ''
-    
-    if (pickup.toLowerCase().includes('airport') || pickup.includes('機場')) {
-      if (dropoff.includes('深圳') || dropoff.includes('SZX')) return 'HKG → SZX'
-      if (dropoff.includes('廣州') || dropoff.includes('CAN')) return 'HKG → CAN'
-    }
-    return '... → ...'
-  }
-
-  const getDriverRating = (listing: Listing) => {
-    const hash = listing.initiatorId.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
+  const getDriverRating = (trip: any) => {
+    const hash = (trip.driverId || '').split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0)
     return (4.5 + (hash % 5) / 10).toFixed(1)
   }
 
-  const filteredListings = listings.filter(listing => {
+  const filteredTrips = trips.filter(trip => {
     if (activeCategory === '全部') return true
-    const places = `${listing.route.pickup?.placeName} ${listing.route.dropoff?.placeName}`.toLowerCase()
+    const tripTags = trip.tags || []
+    const places = `${trip.route?.pickup?.placeName || ''} ${trip.route?.dropoff?.placeName || ''}`.toLowerCase()
+
+    if (tripTags.includes(activeCategory)) return true
+
     switch (activeCategory) {
-      case '機場': return places.includes('airport') || places.includes('機場')
-      case '口岸': return places.includes('口岸')
-      case '商務': return places.includes('中環')
-      default: return true
+      case '機場':
+        return places.includes('airport') || places.includes('機場') || places.includes('國際機場')
+      case '口岸':
+        return places.includes('口岸') || places.includes('深圳灣') || places.includes('羅湖') || places.includes('落馬洲')
+      case '商務':
+        return places.includes('中環') || places.includes('灣仔') || places.includes('金鐘') || places.includes('商務')
+      case '演唱會':
+        return tripTags.includes('演唱會') || places.includes('演唱會') || places.includes('會展')
+      case '迪士尼':
+        return tripTags.includes('迪士尼') || places.includes('迪士尼') || places.includes('Disney')
+      case '婚禮':
+        return tripTags.includes('婚禮') || places.includes('婚禮') || places.includes('酒店')
+      case '體育賽事':
+        return tripTags.includes('體育賽事') || places.includes('足球') || places.includes('籃球') || places.includes('賽馬')
+      default:
+        return true
     }
   })
 
-  const renderListing = (listing: Listing) => {
-    const rating = getDriverRating(listing)
-    const isUrgent = new Date(listing.departureTime).getTime() - Date.now() < 2 * 60 * 60 * 1000
-    const availableSeats = 7 - (listing.passengerCount || 0)
+  const handleJoinTrip = async (trip: any) => {
+    try {
+      await tripService.requestJoin(trip.id, {
+        passengerId: currentUser!.id,
+        name: currentUser!.name || '乘客',
+        phone: currentUser!.phone || '',
+      })
+
+      let roomId = await chatService.getTripRoom(trip.id)
+      
+      if (!roomId) {
+        roomId = await chatService.createTripChatRoom({
+          tripId: trip.id,
+          driverId: trip.driverId,
+          driverName: trip.driverName,
+          driverPhone: trip.driverPhone,
+          pickup: trip.route?.pickup?.placeName || trip.pickup?.placeName || '',
+          dropoff: trip.route?.dropoff?.placeName || trip.dropoff?.placeName || '',
+          departureTime: trip.departureTime,
+        })
+      } else {
+        await chatService.joinChatRoom(roomId, {
+          passengerId: currentUser!.id,
+          name: currentUser!.name || '乘客',
+          role: 'passenger',
+          phone: currentUser!.phone || '',
+        })
+      }
+
+      navigate(`/chat/${roomId}`)
+    } catch (error: any) {
+      console.error('Error joining trip:', error)
+      alert('無法加入，請重試: ' + (error?.message || '未知錯誤'))
+    }
+  }
+
+  const renderTripCard = (trip: any) => {
+    const rating = getDriverRating(trip)
+    const availableSeats = trip.availableSeats !== undefined 
+      ? trip.availableSeats 
+      : (trip.totalSeats || 7) - (trip.passengers?.length || 0)
+
+    const pickup = trip.route?.pickup?.placeName || trip.pickup?.placeName || '上車地點'
+    const dropoff = trip.route?.dropoff?.placeName || trip.dropoff?.placeName || '目的地'
 
     return (
-      <div key={listing.id} style={styles.card} onClick={() => navigate(`/listing/${listing.id}`)}>
-        <div style={styles.cardDecor} />
-        
-        <div style={styles.cardHeader}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={styles.routeCode}>{getRouteCode(listing)}</span>
-            {isUrgent && (
-              <span style={styles.urgentTag}>
-                <Icon name="local_fire_department" style={{ fontSize: 14 }} />
-                極速成團
-              </span>
-            )}
+      <div key={trip.id} style={cardStyles.card}>
+        {/* Category Tags */}
+        {trip.tags && trip.tags.length > 0 && (
+          <div style={cardStyles.tagRow}>
+            {trip.tags.slice(0, 2).map((tag: string) => (
+              <span key={tag} style={cardStyles.tag}>{tag}</span>
+            ))}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={styles.price}>HK$ {listing.price || 150}</div>
-            <div style={styles.priceUnit}>每位</div>
+        )}
+
+        {/* Driver Info */}
+        <div style={cardStyles.driverRow}>
+          <img 
+            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(trip.driverName || 'D')}&background=dee8ff&color=1d4ed8`}
+            alt={trip.driverName}
+            style={cardStyles.avatar}
+          />
+          <div style={cardStyles.driverInfo}>
+            <span style={cardStyles.driverName}>{trip.driverName}</span>
+            <span style={cardStyles.driverMeta}>⭐ {rating}</span>
           </div>
         </div>
 
-        <div style={styles.routeSection}>
-          <div style={styles.routeDots}>
-            <div style={styles.routeDot} />
-            <div style={styles.routeLine} />
-            <div style={styles.routeDotEnd} />
-          </div>
-          <div style={styles.routePlaces}>
-            <div>
-              <div style={styles.placeName}>{listing.route.pickup?.placeName}</div>
-              <div style={styles.placeTime}>今天 {formatTime(listing.departureTime)}</div>
-            </div>
-            <div style={{ marginTop: 24 }}>
-              <div style={styles.placeName}>{listing.route.dropoff?.placeName}</div>
-              <div style={styles.placeTime}>預計 15:45 抵達</div>
-            </div>
-          </div>
+        {/* Route */}
+        <div style={cardStyles.routeRow}>
+          <div style={cardStyles.routeStart}>{pickup}</div>
+          <div style={cardStyles.routeArrow}>→</div>
+          <div style={cardStyles.routeEnd}>{dropoff}</div>
         </div>
 
-        <div style={styles.cardFooter}>
-          <div style={styles.driverInfo}>
-            <img 
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(listing.initiatorName)}&background=dee8ff&color=1d4ed8`}
-              alt={listing.initiatorName}
-              style={styles.driverAvatar}
-            />
-            <div>
-              <div style={styles.driverName}>
-                {listing.initiatorName}
-                <Icon name="verified" style={{ fontSize: 14, color: '#f59e0b', marginLeft: 4 }} />
-              </div>
-              <div style={styles.driverMeta}>
-                <Icon name="star" style={{ fontSize: 14, color: '#f59e0b' }} />
-                {rating} ({listing.passengerCount || 0}+ 趟)
-              </div>
-            </div>
-          </div>
-          <div style={styles.seatInfo}>
-            <div style={styles.seatIcons}>
-              {[1,2,3,4].map(i => (
-                <Icon 
-                  key={i} 
-                  name="airline_seat_recline_normal" 
-                  style={{
-                    fontSize: 18,
-                    color: i <= (listing.passengerCount || 0) ? '#5f5f59' : '#dee8ff'
-                  }} 
-                />
-              ))}
-            </div>
-            <span style={styles.seatBadge}>剩 {availableSeats} 座</span>
-          </div>
+        {/* Time and Seats */}
+        <div style={cardStyles.infoRow}>
+          <span style={cardStyles.time}>
+            <Icon name="schedule" style={{ fontSize: 14 }} />
+            {formatTripTime(trip.departureTime)}
+          </span>
+          <span style={cardStyles.seats}>
+            <Icon name="airline_seat_recline_normal" style={{ fontSize: 14 }} />
+            剩 {availableSeats} 位
+          </span>
         </div>
+
+        {/* Join Button */}
+        <button 
+          style={cardStyles.joinBtn}
+          onClick={() => handleJoinTrip(trip)}
+        >
+          加入
+        </button>
       </div>
     )
   }
@@ -160,14 +186,14 @@ export default function PassengerBrowsePage() {
   return (
     <div style={styles.container}>
       <header style={styles.appBar}>
-        <button style={styles.menuBtn} onClick={() => navigate(-1)}>
+        <button style={styles.menuBtn} onClick={() => navigate('/passenger-home')}>
           <Icon name="arrow_back" style={{ color: '#f59e0b' }} />
         </button>
-        <h1 style={styles.title}>探索行程</h1>
+        <h1 style={styles.title}>🔍 瀏覽行程</h1>
         <div style={styles.avatar}>
-          <img 
+          <img
             src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'U')}&background=ffddb8&color=855300`}
-            alt="User" 
+            alt="User"
           />
         </div>
       </header>
@@ -194,7 +220,7 @@ export default function PassengerBrowsePage() {
               <Icon name="progress_activity" style={{ fontSize: 32, color: '#5f5f59' }} />
               <p>載入中...</p>
             </div>
-          ) : filteredListings.length === 0 ? (
+          ) : filteredTrips.length === 0 ? (
             <div style={styles.empty}>
               <Icon name="directions_car" style={{ fontSize: 48, color: '#5f5f59' }} />
               <p>暫時沒有行程</p>
@@ -202,7 +228,7 @@ export default function PassengerBrowsePage() {
             </div>
           ) : (
             <div style={styles.cardList}>
-              {filteredListings.map(renderListing)}
+              {filteredTrips.map(renderTripCard)}
             </div>
           )}
         </section>
@@ -239,33 +265,117 @@ const styles: Record<string, React.CSSProperties> = {
   loading: { textAlign: 'center' as const, padding: 60, color: '#534434', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 },
   empty: { textAlign: 'center' as const, padding: '60px 20px', color: '#534434', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
   cardList: { display: 'flex', flexDirection: 'column', gap: 16 },
+}
+
+const cardStyles: Record<string, React.CSSProperties> = {
   card: {
-    background: '#ffffff', borderRadius: 16, padding: 16, position: 'relative', overflow: 'hidden',
-    boxShadow: '0 4px 20px rgba(29,78,216,0.05)', cursor: 'pointer',
+    background: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    border: '1px solid #dee8ff',
+    cursor: 'pointer',
   },
-  cardDecor: {
-    position: 'absolute', top: 0, right: 0, width: 96, height: 96,
-    background: 'rgba(245,158,11,0.1)', borderRadius: '0 0 0 96px',
+  tagRow: {
+    display: 'flex',
+    gap: 6,
+    marginBottom: 10,
   },
-  cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  routeCode: { background: '#dee8ff', color: '#001551', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 20 },
-  urgentTag: { background: '#fef3c7', color: '#92400e', fontSize: 12, padding: '4px 8px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 4 },
-  price: { fontSize: 20, fontWeight: 700, color: '#855300' },
-  priceUnit: { fontSize: 12, color: '#534434' },
-  routeSection: { display: 'flex', gap: 16, marginBottom: 16 },
-  routeDots: { display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  routeDot: { width: 12, height: 12, borderRadius: '50%', border: '2px solid #1d4ed8', background: '#ffffff', zIndex: 10 },
-  routeLine: { width: 2, height: 40, background: '#dee8ff', marginTop: -2, marginBottom: -2 },
-  routeDotEnd: { width: 12, height: 12, borderRadius: '50%', background: '#1d4ed8', zIndex: 10 },
-  routePlaces: { flex: 1, display: 'flex', flexDirection: 'column', gap: 24 },
-  placeName: { fontSize: 14, fontWeight: 600, color: '#111c2d' },
-  placeTime: { fontSize: 12, color: '#5f5f59', marginTop: 2 },
-  cardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 16, borderTop: '1px solid #dee8ff' },
-  driverInfo: { display: 'flex', alignItems: 'center', gap: 12 },
-  driverAvatar: { width: 40, height: 40, borderRadius: '50%', border: '2px solid #dee8ff' },
-  driverName: { fontSize: 14, fontWeight: 600, color: '#111c2d', display: 'flex', alignItems: 'center' },
-  driverMeta: { fontSize: 12, color: '#5f5f59', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 },
-  seatInfo: { display: 'flex', alignItems: 'center', gap: 8 },
-  seatIcons: { display: 'flex' },
-  seatBadge: { fontSize: 12, color: '#534434', background: '#e7eeff', padding: '4px 8px', borderRadius: 8 },
+  tag: {
+    fontSize: 11,
+    background: '#dee8ff',
+    color: '#001551',
+    padding: '2px 8px',
+    borderRadius: 8,
+    fontWeight: 600,
+  },
+  driverRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    border: '2px solid #dee8ff',
+  },
+  driverInfo: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+  },
+  driverName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#111c2d',
+  },
+  driverMeta: {
+    fontSize: 12,
+    color: '#5f5f59',
+  },
+  routeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    padding: '10px 12px',
+    background: '#f9f9ff',
+    borderRadius: 10,
+  },
+  routeStart: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#111c2d',
+    whiteSpace: 'nowrap' as const,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  routeArrow: {
+    fontSize: 18,
+    color: '#1d4ed8',
+    fontWeight: 700,
+  },
+  routeEnd: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#111c2d',
+    textAlign: 'right' as const,
+    whiteSpace: 'nowrap' as const,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  time: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 13,
+    color: '#5f5f59',
+  },
+  seats: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 13,
+    color: '#855300',
+    fontWeight: 600,
+  },
+  joinBtn: {
+    width: '100%',
+    padding: '10px',
+    background: '#f59e0b',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 12,
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
 }

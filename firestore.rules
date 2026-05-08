@@ -19,24 +19,16 @@ service cloud.firestore {
     
     // ========== LISTINGS (Carousell Model) ==========
     // Simple: OPEN → SOLD/CANCELLED
-    
+    // Allow public read for browsing (no auth required to see offers)
+
     match /listings/{listingId} {
-      allow read: if isAuthenticated();
-      
-      // Anyone can create a listing (driver offer or passenger request)
+      allow read: if true; // Public read for browsing
       allow create: if isAuthenticated() && request.resource.data.initiatorId == uid();
-      
-      // Update allowed if:
-      // - initiator can update their listing
-      // - anyone can add to interested parties (for tracking)
-      // - buyer can mark as sold (when agreement reached)
       allow update: if isAuthenticated() && (
         resource.data.initiatorId == uid() ||
         request.resource.data.buyerId == uid() ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['interestedParties', 'updatedAt'])
       );
-      
-      // Only initiator can delete, and only if still OPEN
       allow delete: if isAuthenticated() && resource.data.initiatorId == uid() && resource.data.status == 'OPEN';
     }
     
@@ -57,20 +49,29 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     
-    // ========== LEGACY COLLECTIONS (Keep for migration) ==========
-    
+    // ========== TRIPS (Driver Routes) ==========
+    // Allow public read for browsing (no auth required)
+
     match /trips/{tripId} {
-      allow read: if isAuthenticated();
+      allow read: if true; // Public read for browsing
       allow create: if isAuthenticated() && request.resource.data.driverId == uid();
-      allow update: if isAuthenticated() && (resource.data.driverId == uid() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingPassengers', 'updatedAt']));
+      allow update: if isAuthenticated() && (
+        resource.data.driverId == uid() ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingPassengers', 'updatedAt', 'joinedTrips'])
+      );
       allow delete: if isAuthenticated() && resource.data.driverId == uid();
     }
     
+    // ========== PASSENGER REQUESTS ==========
+    // Allow public read for browsing
+
     match /passengerRequests/{requestId} {
-      allow read: if isAuthenticated();
+      allow read: if true; // Public read for browsing
       allow create: if isAuthenticated() && request.resource.data.passengerId == uid();
       allow update, delete: if isAuthenticated() && resource.data.passengerId == uid();
     }
+    
+    // ========== LEGACY COLLECTIONS ==========
     
     match /priceQuotes/{quoteId} {
       allow read: if isAuthenticated();

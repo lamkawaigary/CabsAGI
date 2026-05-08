@@ -16,6 +16,7 @@ const EditTripPage = lazy(() => import('./pages/driver/EditTripPage'))
 const PassengerHomePage = lazy(() => import('./pages/passenger/PassengerHomePage'))
 const PassengerBrowsePage = lazy(() => import('./pages/passenger/PassengerBrowsePage'))
 const PassengerRequestsPage = lazy(() => import('./pages/passenger/PassengerRequestsPage'))
+const MyTripsPage = lazy(() => import('./pages/passenger/MyTripsPage'))
 const PassengerSettingsPage = lazy(() => import('./pages/passenger/PassengerSettingsPage'))
 const FavoritePlacesPage = lazy(() => import('./pages/passenger/FavoritePlacesPage'))
 const CreateRequestPage = lazy(() => import('./pages/passenger/CreateRequestPage'))
@@ -115,7 +116,7 @@ function AppShell() {
             <>
               <Route path="/passenger-home" element={<PassengerHomePage />} />
               <Route path="/browse-trips" element={<PassengerBrowsePage />} />
-              <Route path="/my-requests" element={<PassengerRequestsPage />} />
+              <Route path="/my-trips" element={<MyTripsPage />} />
               <Route path="/passenger-settings" element={<PassengerSettingsPage />} />
               <Route path="/create-request" element={<CreateRequestPage />} />
               <Route path="/favorite-places" element={<FavoritePlacesPage />} />

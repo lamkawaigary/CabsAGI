@@ -38,6 +38,8 @@ export const tripService = {
     departureTime: string
     totalSeats: number
     notes?: string
+    tags?: string[]
+    vehicleType?: 'sedan' | '7seater'
   }): Promise<string> {
     const trip = {
       driverId: tripData.driverId,
@@ -49,11 +51,18 @@ export const tripService = {
       },
       departureTime: tripData.departureTime,
       totalSeats: tripData.totalSeats,
+      availableSeats: tripData.totalSeats,
+      vehicleType: tripData.vehicleType || '7seater',
       passengers: [],
+      pendingPassengers: [],
+      rejectedPassengers: [],
+      leftPassengers: [],
+      noShowPassengers: [],
       status: 'OPEN' as TripStatus,
       confirmedByDriver: false,
       confirmedByPassengers: [],
       notes: tripData.notes || null,
+      tags: tripData.tags || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -66,16 +75,21 @@ export const tripService = {
    * 獲取所有公開行程 (乘客瀏覽)
    */
   async getPublicTrips(): Promise<Trip[]> {
-    let q = query(
-      collection(db, TRIPS_COLLECTION),
-      where('status', '==', 'OPEN')
-    )
-    
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Trip[]
+    try {
+      console.log('[tripService] Getting public trips, collection:', TRIPS_COLLECTION)
+      const snapshot = await getDocs(collection(db, TRIPS_COLLECTION))
+      console.log('[tripService] Docs found:', snapshot.size)
+      const trips = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Trip[]
+      // Return all trips regardless of status for browsing
+      // Filter out trips that are explicitly cancelled or expired
+      return trips.filter(t => t.status !== 'CANCELLED' && t.status !== 'EXPIRED')
+    } catch (e) {
+      console.error('Error getting public trips:', e)
+      return []
+    }
   },
 
   /**
@@ -160,23 +174,15 @@ export const tripService = {
     phone: string
   }): Promise<void> {
     const tripRef = doc(db, TRIPS_COLLECTION, tripId)
-    const userRef = doc(db, 'users', passenger.passengerId)
     
-    // Add to trip's pendingPassengers
+    // Use set with merge to avoid permission issues, or just arrayUnion on pendingPassengers only
     await updateDoc(tripRef, {
-      pendingPassengers: arrayUnion({
-        ...passenger,
+      [`pendingPassengers`]: arrayUnion({
+        passengerId: passenger.passengerId,
+        name: passenger.name,
+        phone: passenger.phone,
         joinedAt: new Date().toISOString()
-      }),
-      updatedAt: new Date().toISOString(),
-    })
-    
-    // Also add tripId to user's trips array for easier lookup
-    await updateDoc(userRef, {
-      joinedTrips: arrayUnion(tripId),
-      updatedAt: new Date().toISOString(),
-    }).catch(() => {
-      // User document might not exist yet, ignore error
+      })
     })
   },
 
@@ -453,6 +459,7 @@ export const requestService = {
     vehicleType?: 'sedan' | '7seater'
     isCarpool?: boolean
     notes?: string
+    tags?: string[]
   }): Promise<string> {
     const request = {
       passengerId: data.passengerId,
@@ -468,6 +475,7 @@ export const requestService = {
       joinedPassengers: [],
       status: 'OPEN' as RequestStatus,
       notes: data.notes || null,
+      tags: data.tags || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }

@@ -1,36 +1,211 @@
-// Cabs Carpool - Create Trip Page v3.0
-// Improved UI with Design System
+// Cabs Carpool - Create Trip Page v6.0
+// Custom date/time picker + Vehicle type selector
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { listingService } from '../services/listingService'
+import { tripService } from '../services/tripService'
+import { chatService } from '../services/chatService'
 import { colors, radius } from '../styles/designSystem'
+
+// ============ TAGS ============
+const TAGS = ['演唱會', '迪士尼', '機場', '口岸', '商務', '婚禮', '體育賽事', '其他']
+
+const getTagIcon = (tag: string) => {
+  switch (tag) {
+    case '演唱會': return '🎵'
+    case '迪士尼': return '🏰'
+    case '機場': return '✈️'
+    case '口岸': return '🚪'
+    case '商務': return '💼'
+    case '婚禮': return '💒'
+    case '體育賽事': return '⚽'
+    default: return '🏷️'
+  }
+}
+
+const Icon = ({ name, style = {} }: { name: string; style?: React.CSSProperties }) => (
+  <span style={{
+    fontFamily: "'Material Symbols Outlined'",
+    fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24",
+    fontSize: 20,
+    ...style
+  }}>{name}</span>
+)
+
+// Date picker component
+const DatePicker = ({ value, onChange }: { value: string; onChange: (d: string) => void }) => {
+  const today = new Date()
+  const dates = Array.from({ length: 30 }, (_, i) => {
+    const date = new Date(today)
+    date.setDate(today.getDate() + i)
+    return date
+  })
+
+  return (
+    <div style={pickerStyles.grid}>
+      {dates.map(date => {
+        const dateStr = date.toISOString().split('T')[0]
+        const isSelected = value === dateStr
+        return (
+          <button
+            key={dateStr}
+            type="button"
+            style={{
+              ...pickerStyles.dateBtn,
+              ...(isSelected ? pickerStyles.dateBtnSelected : {})
+            }}
+            onClick={() => onChange(dateStr)}
+          >
+            <div style={pickerStyles.dateDay}>
+              {date.toLocaleDateString('zh-TW', { weekday: 'short' })}
+            </div>
+            <div style={pickerStyles.dateNum}>
+              {date.getDate()}
+            </div>
+            <div style={pickerStyles.dateMonth}>
+              {date.toLocaleDateString('zh-TW', { month: 'short' })}
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// Time picker component
+const TimePicker = ({ value, onChange }: { value: string; onChange: (t: string) => void }) => {
+  const times = Array.from({ length: 24 * 2 }, (_, i) => {
+    const hour = Math.floor(i / 2)
+    const minute = (i % 2) * 30
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+  })
+
+  return (
+    <div style={pickerStyles.timeGrid}>
+      {times.map(time => (
+        <button
+          key={time}
+          type="button"
+          style={{
+            ...pickerStyles.timeBtn,
+            ...(value === time ? pickerStyles.timeBtnSelected : {})
+          }}
+          onClick={() => onChange(time)}
+        >
+          {time}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const pickerStyles: Record<string, React.CSSProperties> = {
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gap: 8,
+    maxHeight: 200,
+    overflowY: 'auto' as const,
+    padding: 4,
+    marginTop: 8,
+    background: colors.white,
+    border: `1px solid ${colors.border}`,
+    borderRadius: radius.sm,
+  },
+  dateBtn: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    padding: '8px 4px',
+    border: `2px solid ${colors.border}`,
+    borderRadius: radius.sm,
+    background: colors.white,
+    cursor: 'pointer',
+    fontSize: 12,
+  },
+  dateBtnSelected: {
+    border: `2px solid ${colors.primary}`,
+    background: colors.primary,
+    color: colors.white,
+  },
+  dateDay: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  dateNum: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: colors.textPrimary,
+  },
+  dateMonth: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  timeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: 8,
+    maxHeight: 200,
+    overflowY: 'auto' as const,
+    padding: 4,
+    marginTop: 8,
+    background: colors.white,
+    border: `1px solid ${colors.border}`,
+    borderRadius: radius.sm,
+  },
+  timeBtn: {
+    padding: '10px 8px',
+    border: `2px solid ${colors.border}`,
+    borderRadius: radius.sm,
+    background: colors.white,
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: 'pointer',
+    textAlign: 'center' as const,
+  },
+  timeBtnSelected: {
+    border: `2px solid ${colors.primary}`,
+    background: colors.primary,
+    color: colors.white,
+  },
+}
 
 export default function CreateTripPage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [showTimePicker, setShowTimePicker] = useState(false)
+  const [vehicleType, setVehicleType] = useState<'sedan' | '7seater'>('7seater')
 
   const [pickup, setPickup] = useState('')
   const [dropoff, setDropoff] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
+  const [date, setDate] = useState(() => {
+    const today = new Date().toISOString().split('T')[0]
+    return today
+  })
+  const [time, setTime] = useState('12:00')
   const [seats, setSeats] = useState(3)
-  const [vehicleType, setVehicleType] = useState<'sedan' | '7seater'>('7seater')
-  const [isCarpool, setIsCarpool] = useState(true)
   const [notes, setNotes] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+
+  // Max seats based on vehicle type
+  const maxSeats = vehicleType === 'sedan' ? 4 : 6
 
   // Quick presets
   const presets = [
-    { label: '香港機場→深圳灣', pickup: '香港國際機場', dropoff: '深圳灣口岸' },
+    { label: '機場→深圳灣', pickup: '香港國際機場', dropoff: '深圳灣口岸' },
     { label: '機場→廣州', pickup: '香港國際機場', dropoff: '廣州白雲機場' },
     { label: '中環→羅湖', pickup: '中環', dropoff: '深圳羅湖' },
   ]
 
   const handleSubmit = async () => {
     if (!currentUser || !pickup || !dropoff || !date || !time) {
-      alert('請填寫所有必填欄位')
+      alert('請填寫上下車地點、日期和時間')
       return
     }
 
@@ -38,18 +213,29 @@ export default function CreateTripPage() {
       setLoading(true)
       const departureTime = new Date(`${date}T${time}`).toISOString()
       
-      await listingService.create({
-        type: 'driver_offer',
-        initiatorId: currentUser.id,
-        initiatorName: currentUser.name || '司機',
-        initiatorPhone: currentUser.phone || '',
+      // Create trip
+      const tripId = await tripService.create({
+        driverId: currentUser.id,
+        driverName: currentUser.name || '司機',
+        driverPhone: currentUser.phone || '',
         pickup: { placeName: pickup, latitude: 0, longitude: 0 },
         dropoff: { placeName: dropoff, latitude: 0, longitude: 0 },
         departureTime,
-        passengerCount: seats,
-        vehicleType,
-        isCarpool,
+        totalSeats: seats,
         notes,
+        tags,
+        vehicleType,
+      })
+      
+      // Create chat room
+      await chatService.createTripChatRoom({
+        tripId,
+        driverId: currentUser.id,
+        driverName: currentUser.name || '司機',
+        driverPhone: currentUser.phone || '',
+        pickup,
+        dropoff,
+        departureTime,
       })
 
       alert('行程發佈成功！')
@@ -62,20 +248,32 @@ export default function CreateTripPage() {
     }
   }
 
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '選擇日期'
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('zh-TW', { month: 'long', day: 'numeric', weekday: 'long' })
+  }
+
   return (
     <div style={styles.container}>
       {/* Header */}
-      <header style={styles.header}>
-        <button style={styles.backBtn} onClick={() => navigate(-1)}>←</button>
-        <h1 style={styles.title}>🚗 發佈行程</h1>
-        <div style={{ width: 40 }} />
-      </header>
+      <div style={styles.header}>
+        <div style={styles.headerContent}>
+          <div>
+            <h1 style={styles.headerTitle}>🚗 發佈行程</h1>
+            <p style={styles.headerSubtitle}>讓乘客找到你</p>
+          </div>
+          <button onClick={() => navigate(-1)} style={styles.backBtn}>
+            <Icon name="close" style={{ fontSize: 24 }} />
+          </button>
+        </div>
+      </div>
 
-      {/* Content */}
-      <div style={styles.content}>
+      {/* Form */}
+      <div style={styles.form}>
         {/* Quick Presets */}
-        <div style={styles.section}>
-          <p style={styles.sectionLabel}>快速選擇路線</p>
+        <div style={styles.card}>
+          <p style={styles.presetLabel}>快速選擇路線</p>
           <div style={styles.presets}>
             {presets.map((preset, idx) => (
               <button
@@ -95,7 +293,10 @@ export default function CreateTripPage() {
         {/* Route Card */}
         <div style={styles.card}>
           <div style={styles.field}>
-            <label style={styles.label}>📍 上車地點</label>
+            <label style={styles.label}>
+              <Icon name="near_me" style={{ fontSize: 16, color: colors.success }} />
+              {' '}上車地點
+            </label>
             <input
               style={styles.input}
               placeholder="例如：香港國際機場"
@@ -105,7 +306,10 @@ export default function CreateTripPage() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>📍 目的地</label>
+            <label style={styles.label}>
+              <Icon name="place" style={{ fontSize: 16, color: colors.primary }} />
+              {' '}目的地
+            </label>
             <input
               style={styles.input}
               placeholder="例如：深圳灣口岸"
@@ -115,35 +319,105 @@ export default function CreateTripPage() {
           </div>
         </div>
 
-        {/* Date & Time Row */}
-        <div style={styles.row}>
-          <div style={{...styles.field, flex: 1}}>
-            <label style={styles.label}>📅 日期</label>
-            <input
-              style={styles.input}
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-            />
-          </div>
-          <div style={{...styles.field, flex: 1}}>
-            <label style={styles.label}>⏰ 時間</label>
-            <input
-              style={styles.input}
-              type="time"
-              value={time}
-              onChange={e => setTime(e.target.value)}
-            />
+        {/* Vehicle Type */}
+        <div style={styles.card}>
+          <label style={styles.label}>
+            <Icon name="directions_car" style={{ fontSize: 16 }} />
+            {' '}車型
+          </label>
+          <div style={styles.vehicleSelector}>
+            <button
+              type="button"
+              style={{
+                ...styles.vehicleBtn,
+                ...(vehicleType === 'sedan' ? styles.vehicleBtnActive : {})
+              }}
+              onClick={() => {
+                setVehicleType('sedan')
+                if (seats > 4) setSeats(4)
+              }}
+            >
+              <Icon name="directions_car" style={{ fontSize: 24 }} />
+              <span>轎車</span>
+              <span style={styles.vehicleHint}>最多4位</span>
+            </button>
+            <button
+              type="button"
+              style={{
+                ...styles.vehicleBtn,
+                ...(vehicleType === '7seater' ? styles.vehicleBtnActive : {})
+              }}
+              onClick={() => {
+                setVehicleType('7seater')
+                if (seats > 6) setSeats(6)
+              }}
+            >
+              <Icon name="airport_shuttle" style={{ fontSize: 24 }} />
+              <span>七人車</span>
+              <span style={styles.vehicleHint}>最多6位</span>
+            </button>
           </div>
         </div>
 
-        {/* Seats Card */}
+        {/* Date */}
         <div style={styles.card}>
-          <label style={styles.label}>💺 座位數</label>
+          <div style={styles.field}>
+            <label style={styles.label}>
+              <Icon name="calendar_today" style={{ fontSize: 16 }} />
+              {' '}出發日期
+            </label>
+            <button
+              type="button"
+              style={styles.pickerToggle}
+              onClick={() => {
+                setShowDatePicker(!showDatePicker)
+                setShowTimePicker(false)
+              }}
+            >
+              {formatDisplayDate(date)}
+              <Icon name={showDatePicker ? "expand_less" : "expand_more"} style={{ fontSize: 18 }} />
+            </button>
+            {showDatePicker && (
+              <DatePicker value={date} onChange={(d) => { setDate(d); setShowDatePicker(false) }} />
+            )}
+          </div>
+        </div>
+
+        {/* Time */}
+        <div style={styles.card}>
+          <div style={styles.field}>
+            <label style={styles.label}>
+              <Icon name="schedule" style={{ fontSize: 16 }} />
+              {' '}出發時間
+            </label>
+            <button
+              type="button"
+              style={styles.pickerToggle}
+              onClick={() => {
+                setShowTimePicker(!showTimePicker)
+                setShowDatePicker(false)
+              }}
+            >
+              {time}
+              <Icon name={showTimePicker ? "expand_less" : "expand_more"} style={{ fontSize: 18 }} />
+            </button>
+            {showTimePicker && (
+              <TimePicker value={time} onChange={(t) => { setTime(t); setShowTimePicker(false) }} />
+            )}
+          </div>
+        </div>
+
+        {/* Seats */}
+        <div style={styles.card}>
+          <label style={styles.label}>
+            <Icon name="airline_seat_recline_normal" style={{ fontSize: 16 }} />
+            {' '}座位數（{vehicleType === 'sedan' ? '轎車最多4位' : '七人車最多6位'}）
+          </label>
           <div style={styles.seatSelector}>
-            {[1, 2, 3, 4, 5, 6, 7].map(n => (
+            {Array.from({ length: maxSeats }, (_, i) => i + 1).map(n => (
               <button
                 key={n}
+                type="button"
                 style={{
                   ...styles.seatBtn,
                   ...(seats === n ? styles.seatBtnActive : {})
@@ -156,34 +430,45 @@ export default function CreateTripPage() {
           </div>
         </div>
 
-        {/* Vehicle Type Card */}
+        {/* Tags */}
         <div style={styles.card}>
-          <label style={styles.label}>🚗 車型</label>
-          <div style={styles.options}>
-            <button
-              style={{
-                ...styles.optionBtn,
-                ...(vehicleType === 'sedan' ? styles.optionBtnActive : {})
-              }}
-              onClick={() => setVehicleType('sedan')}
-            >
-              🚙 轎車
-            </button>
-            <button
-              style={{
-                ...styles.optionBtn,
-                ...(vehicleType === '7seater' ? styles.optionBtnActive : {})
-              }}
-              onClick={() => setVehicleType('7seater')}
-            >
-              🚐 七人車
-            </button>
+          <label style={styles.label}>
+            <Icon name="label" style={{ fontSize: 16 }} />
+            {' '}標籤（可選）
+          </label>
+          <p style={styles.tagHint}>選擇適合的標籤，讓乘客更容易找到你的行程</p>
+          <div style={styles.tagGrid}>
+            {TAGS.map(tag => {
+              const isSelected = tags.includes(tag)
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  style={{
+                    ...styles.tagBtn,
+                    ...(isSelected ? styles.tagBtnActive : {})
+                  }}
+                  onClick={() => {
+                    if (isSelected) {
+                      setTags(tags.filter(t => t !== tag))
+                    } else {
+                      setTags([...tags, tag])
+                    }
+                  }}
+                >
+                  {getTagIcon(tag)} {tag}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Notes Card */}
+        {/* Notes */}
         <div style={styles.card}>
-          <label style={styles.label}>📝 備註（可選）</label>
+          <label style={styles.label}>
+            <Icon name="notes" style={{ fontSize: 16 }} />
+            {' '}備註（可選）
+          </label>
           <textarea
             style={styles.textarea}
             placeholder="任何特別要求或備註..."
@@ -195,11 +480,17 @@ export default function CreateTripPage() {
 
         {/* Submit Button */}
         <button
-          style={styles.submitBtn}
+          style={{
+            ...styles.submitBtn,
+            background: loading ? colors.textLight : colors.primary,
+          }}
           onClick={handleSubmit}
           disabled={loading}
+          type="button"
         >
-          {loading ? '發佈中...' : '🚗 發佈行程'}
+          <Icon name="directions_car" style={{ fontSize: 18 }} />
+          {' '}
+          {loading ? '發佈中...' : '發佈行程'}
         </button>
       </div>
     </div>
@@ -212,45 +503,83 @@ const styles: Record<string, React.CSSProperties> = {
     background: colors.background,
   },
   header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '14px 18px',
     background: colors.white,
+    padding: '16px',
     borderBottom: `1px solid ${colors.border}`,
   },
-  backBtn: {
-    fontSize: 22,
-    background: 'none',
-    border: 'none',
-    color: colors.primary,
-    cursor: 'pointer',
-    padding: '4px 8px',
+  headerContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  title: {
+  headerTitle: {
     margin: 0,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.textPrimary,
   },
-  content: {
-    padding: 18,
-    paddingBottom: 100,
+  headerSubtitle: {
+    margin: '4px 0 0',
+    fontSize: 13,
+    color: colors.textSecondary,
   },
-  section: {
-    marginBottom: 16,
+  backBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 8,
+    borderRadius: radius.sm,
+    color: colors.textSecondary,
   },
-  sectionLabel: {
-    margin: '0 0 8px',
+  form: {
+    padding: 16,
+    paddingBottom: 120,
+  },
+  card: {
+    background: colors.white,
+    borderRadius: radius.md,
+    padding: 16,
+    marginBottom: 12,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+  },
+  field: {
+    marginBottom: 12,
+    position: 'relative' as const,
+  },
+  row: {
+    display: 'flex',
+    gap: 12,
+  },
+  label: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
     fontSize: 13,
     fontWeight: 600,
     color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  input: {
+    width: '100%',
+    padding: '12px 16px',
+    fontSize: 15,
+    border: `1px solid ${colors.border}`,
+    borderRadius: radius.sm,
+    background: colors.white,
+    color: colors.textPrimary,
+    boxSizing: 'border-box' as const,
   },
   presets: {
     display: 'flex',
     gap: 8,
     overflowX: 'auto',
     paddingBottom: 4,
+  },
+  presetLabel: {
+    margin: '0 0 8px 0',
+    fontSize: 13,
+    fontWeight: 600,
+    color: colors.textSecondary,
   },
   presetBtn: {
     flexShrink: 0,
@@ -264,34 +593,44 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
   },
-  card: {
-    background: colors.white,
-    borderRadius: radius.md,
-    padding: 16,
-    marginBottom: 16,
-  },
-  field: {
-    marginBottom: 12,
-  },
-  row: {
+  vehicleSelector: {
     display: 'flex',
     gap: 12,
-    marginBottom: 16,
   },
-  label: {
-    display: 'block',
-    fontSize: 13,
-    fontWeight: 600,
+  vehicleBtn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: 4,
+    padding: '16px 12px',
+    border: `2px solid ${colors.border}`,
+    borderRadius: radius.md,
+    background: colors.white,
     color: colors.textSecondary,
-    marginBottom: 6,
+    cursor: 'pointer',
   },
-  input: {
+  vehicleBtnActive: {
+    border: `2px solid ${colors.primary}`,
+    background: colors.primaryLight,
+    color: colors.primary,
+  },
+  vehicleHint: {
+    fontSize: 11,
+    color: colors.textLight,
+  },
+  pickerToggle: {
     width: '100%',
-    padding: 12,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 16px',
     border: `1px solid ${colors.border}`,
     borderRadius: radius.sm,
+    background: colors.white,
+    color: colors.textPrimary,
     fontSize: 15,
-    boxSizing: 'border-box' as const,
+    cursor: 'pointer',
   },
   seatSelector: {
     display: 'flex',
@@ -313,21 +652,30 @@ const styles: Record<string, React.CSSProperties> = {
     background: colors.primary,
     color: colors.white,
   },
-  options: {
+  tagHint: {
+    margin: '0 0 12px 0',
+    fontSize: 12,
+    color: colors.textLight,
+  },
+  tagGrid: {
     display: 'flex',
-    gap: 12,
+    flexWrap: 'wrap' as const,
+    gap: 8,
   },
-  optionBtn: {
-    flex: 1,
-    padding: 12,
+  tagBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '8px 14px',
+    borderRadius: radius.full,
     border: `2px solid ${colors.border}`,
-    borderRadius: radius.sm,
     background: colors.white,
-    fontSize: 14,
-    cursor: 'pointer',
     color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
   },
-  optionBtnActive: {
+  tagBtnActive: {
     border: `2px solid ${colors.primary}`,
     background: colors.primaryLight,
     color: colors.primary,
@@ -335,14 +683,20 @@ const styles: Record<string, React.CSSProperties> = {
   textarea: {
     width: '100%',
     padding: 12,
+    fontSize: 15,
     border: `1px solid ${colors.border}`,
     borderRadius: radius.sm,
-    fontSize: 15,
-    resize: 'vertical' as const,
+    background: colors.white,
+    color: colors.textPrimary,
+    resize: 'none' as const,
     fontFamily: 'inherit',
     boxSizing: 'border-box' as const,
   },
   submitBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     width: '100%',
     padding: 16,
     background: colors.primary,
@@ -350,7 +704,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: radius.md,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: 600,
     cursor: 'pointer',
+    marginTop: 8,
   },
 }

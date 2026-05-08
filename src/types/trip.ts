@@ -41,6 +41,10 @@ export interface Trip {
   // 座位
   totalSeats: number
   availableSeats: number  // 剩餘座位
+  pricePerSeat?: number  // 每人價格
+  
+  // 車輛類型
+  vehicleType: 'sedan' | '7seater'
   
   // 乘客名單 (已批准的聊天參與者)
   passengers: {
@@ -87,6 +91,9 @@ export interface Trip {
   
   // 備註
   notes?: string
+  
+  // 標籤
+  tags?: string[]
   
   // Metadata
   createdAt: string
@@ -138,6 +145,9 @@ export interface PassengerRequest {
     phone: string
     confirmed: boolean
   }[]
+  
+  // 標籤
+  tags?: string[]
   
   // 狀態
   status: RequestStatus

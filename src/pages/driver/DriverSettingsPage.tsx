@@ -81,7 +81,7 @@ export default function DriverSettingsPage() {
       </div>
 
       {/* Danger Zone */}
-      <div style={styles.section}>
+      <div style={styles.dangerZone}>
         <div style={styles.sectionTitle}>危險區域</div>
         
         <div style={{...styles.menuItem, ...styles.logoutItem}} onClick={handleLogout}>
@@ -196,7 +196,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   section: {
     padding: 20,
-    paddingBottom: 90, // Extra space for BottomNav
+    paddingBottom: 20,
   },
   sectionTitle: {
     fontSize: 12,
@@ -217,6 +217,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 15,
     color: '#4a3728',
     cursor: 'pointer',
+  },
+  dangerZone: {
+    padding: 20,
+    paddingBottom: 120, // Extra space so BottomNav doesn't cover buttons
   },
   arrow: {
     color: '#8b7355',

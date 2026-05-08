@@ -67,6 +67,19 @@ export default function ChatPage() {
       
       // Load room
       const roomData = await chatService.getRoom(roomId)
+      
+      // If no room found, might be a trip ID without chat room yet
+      if (!roomData && roomId) {
+        // Try to find chat room for this trip
+        let tripRoomId = await chatService.getTripRoom(roomId)
+        if (tripRoomId) {
+          // Redirect to actual chat room
+          navigate(`/chat/${tripRoomId}`, { replace: true })
+          setLoading(false)
+          return
+        }
+      }
+      
       if (!roomData) {
         setError('找不到聊天室')
         setLoading(false)
@@ -107,7 +120,7 @@ export default function ChatPage() {
       // Check if trip is completed and user hasn't rated yet
       if (tripInfo && (tripInfo.status === 'COMPLETED' || tripInfo.status === 'IN_PROGRESS')) {
         const otherParticipant = roomData.participants?.find(
-          (p: any) => p.oderId !== currentUser?.id
+          (p: any) => p.passengerId !== currentUser?.id
         )
         if (otherParticipant && tripInfo.status === 'COMPLETED') {
           // Check if current user has already rated
@@ -379,7 +392,7 @@ export default function ChatPage() {
 
   const getOtherName = () => {
     if (!room || !currentUser) return '未知'
-    const other = room.participants?.find((p: any) => p.oderId !== currentUser.id)
+    const other = room.participants?.find((p: any) => p.passengerId !== currentUser.id)
     return other?.name || '未知'
   }
 
@@ -454,7 +467,15 @@ export default function ChatPage() {
             <div>💺 {tripInfo.availableSeats || tripInfo.totalSeats} 剩餘 / {tripInfo.totalSeats} 總位</div>
             <div>👤 司機: {tripInfo.driverName}</div>
           </div>
-          {currentUser.role === 'passenger' && tripInfo.passengers?.some((p: any) => p.oderId === currentUser.id) && (
+          {/* Pending Passenger Status */}
+          {currentUser.role === 'passenger' && tripInfo.pendingPassengers?.some((p: any) => p.passengerId === currentUser.id) && (
+            <div style={styles.tripStatusActions}>
+              <div style={{...styles.tripActionBtn, background: '#fff3cd', color: '#856404', cursor: 'default'}}>
+                ⏳ 等待司機確認你的加入請求
+              </div>
+            </div>
+          )}
+          {currentUser.role === 'passenger' && tripInfo.passengers?.some((p: any) => p.passengerId === currentUser.id) && (
             <div style={styles.tripStatusActions}>
               {tripInfo.status === 'IN_PROGRESS' && (
                 <button 

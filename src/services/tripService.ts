@@ -247,6 +247,15 @@ export const tripService = {
     await updateDoc(tripRef, { status, updatedAt: new Date().toISOString() })
   },
 
+
+  /**
+   * Update trip with chat room ID (after creating chat room)
+   */
+  async updateTripChatRoom(tripId: string, chatRoomId: string): Promise<void> {
+    const tripRef = doc(db, TRIPS_COLLECTION, tripId)
+    await updateDoc(tripRef, { chatRoomId, updatedAt: new Date().toISOString() })
+  },
+
   /**
    * 乘客主動離開行程（行程開始前）
    */

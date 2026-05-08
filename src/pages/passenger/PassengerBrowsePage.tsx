@@ -86,34 +86,24 @@ export default function PassengerBrowsePage() {
 
   const handleJoinTrip = async (trip: any) => {
     try {
+      // First check if already a passenger or pending
+      if (trip.passengers?.some((p: any) => p.passengerId === currentUser!.id)) {
+        alert('你已是這個行程的乘客')
+        return
+      }
+      if (trip.pendingPassengers?.some((p: any) => p.passengerId === currentUser!.id)) {
+        alert('你已在等待確認中')
+        return
+      }
+
       await tripService.requestJoin(trip.id, {
         passengerId: currentUser!.id,
         name: currentUser!.name || '乘客',
         phone: currentUser!.phone || '',
       })
 
-      let roomId = await chatService.getTripRoom(trip.id)
-      
-      if (!roomId) {
-        roomId = await chatService.createTripChatRoom({
-          tripId: trip.id,
-          driverId: trip.driverId,
-          driverName: trip.driverName,
-          driverPhone: trip.driverPhone,
-          pickup: trip.route?.pickup?.placeName || trip.pickup?.placeName || '',
-          dropoff: trip.route?.dropoff?.placeName || trip.dropoff?.placeName || '',
-          departureTime: trip.departureTime,
-        })
-      } else {
-        await chatService.joinChatRoom(roomId, {
-          passengerId: currentUser!.id,
-          name: currentUser!.name || '乘客',
-          role: 'passenger',
-          phone: currentUser!.phone || '',
-        })
-      }
-
-      navigate(`/chat/${roomId}`)
+      alert('✅ 加入請求已提交！請等待司機確認。\n確認後你可以在「我的行程」查看。')
+      navigate('/chats')
     } catch (error: any) {
       console.error('Error joining trip:', error)
       alert('無法加入，請重試: ' + (error?.message || '未知錯誤'))

@@ -90,7 +90,12 @@ export default function PassengerHomePage() {
       <div 
         key={trip.id} 
         style={styles.card}
-        onClick={() => navigate(`/listing/${trip.id}`)}
+        onClick={() => {
+          // Navigate to chat room directly - try chatRoomId first, then trip id
+          const tripData = trip as any
+          const roomId = tripData.chatRoomId || trip.id
+          navigate(`/chat/${roomId}`)
+        }}
       >
         {/* Decorative corner */}
         <div style={styles.cardDecor} />

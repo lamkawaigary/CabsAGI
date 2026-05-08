@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tripService } from '../../services/tripService'
+import { chatService } from '../../services/chatService'
 import { useAuth } from '../../context/AuthContext'
 import BottomNav from '../../components/BottomNav'
 import TripProgressBar from '../../components/TripProgressBar'
@@ -30,6 +31,7 @@ export default function MyTripsPage() {
   const [loading, setLoading] = useState(true)
   const [showQRModal, setShowQRModal] = useState(false)
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -260,7 +262,11 @@ export default function MyTripsPage() {
           ))}
 
           <button
-            onClick={() => navigate(`/chat/${trip.id}`)}
+            onClick={() => {
+              const tripData = trip as any
+              const roomId = tripData.chatRoomId || trip.id
+              navigate(`/chat/${roomId}`)
+            }}
             style={{ ...styles.actionBtn, background: colors.secondary, color: colors.white }}
           >
             <Icon name="chat" style={{ fontSize: 16 }} />
@@ -287,12 +293,59 @@ export default function MyTripsPage() {
     <div style={styles.container}>
       {/* Top App Bar */}
       <header style={styles.appBar}>
-        <button style={styles.backBtn} onClick={() => navigate('/passenger-home')}>
-          <Icon name="arrow_back" style={{ color: colors.primary }} />
+        <button style={styles.menuBtn} onClick={() => setDrawerOpen(true)}>
+          <Icon name="menu" style={{ color: colors.primary }} />
         </button>
-        <h1 style={styles.title}>我的行程</h1>
-        <div style={{ width: 40 }} />
+        <h1 style={styles.logo}>OpenCabs</h1>
+        <div style={styles.avatar} onClick={() => navigate('/profile')}>
+          <img
+            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'U')}&background=ffddb8&color=855300`}
+            alt="User"
+          />
+        </div>
       </header>
+
+
+      {/* Side Drawer */}
+      {drawerOpen && (
+        <>
+          <div style={styles.drawerOverlay} onClick={() => setDrawerOpen(false)} />
+          <div style={styles.drawer}>
+            <div style={styles.drawerHeader}>
+              <h2 style={styles.drawerLogo}>OpenCabs</h2>
+              <button style={styles.drawerClose} onClick={() => setDrawerOpen(false)}>
+                <Icon name="close" style={{ fontSize: 24 }} />
+              </button>
+            </div>
+            <nav style={styles.drawerNav}>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/passenger-home') }}>
+                <Icon name="home" style={{ fontSize: 20 }} />
+                <span>首頁</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/browse-trips') }}>
+                <Icon name="search" style={{ fontSize: 20 }} />
+                <span>瀏覽行程</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/my-requests') }}>
+                <Icon name="assignment" style={{ fontSize: 20 }} />
+                <span>我的需求</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/my-trips') }}>
+                <Icon name="directions_car" style={{ fontSize: 20 }} />
+                <span>我的行程</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/chats') }}>
+                <Icon name="chat" style={{ fontSize: 20 }} />
+                <span>收件箱</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/profile') }}>
+                <Icon name="person" style={{ fontSize: 20 }} />
+                <span>個人資料</span>
+              </button>
+            </nav>
+          </div>
+        </>
+      )}
 
       {/* Content */}
       <main style={styles.main}>
@@ -359,17 +412,89 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  backBtn: {
+  menuBtn: {
     padding: 8,
     background: 'none',
     border: 'none',
     cursor: 'pointer',
     borderRadius: '50%',
   },
-  title: {
-    fontSize: 17,
-    fontWeight: 600,
+  logo: {
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: 20,
+    fontWeight: 800,
+    color: colors.primary,
+    fontStyle: 'italic',
+    letterSpacing: '-0.02em',
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    overflow: 'hidden',
+    border: `2px solid ${colors.outlineVariant}`,
+  },
+  drawerOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+    zIndex: 100,
+  },
+  drawer: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: 280,
+    height: '100%',
+    background: colors.surface,
+    boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
+    zIndex: 101,
+    padding: '20px 0',
+  },
+  drawerHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0 20px 20px',
+    borderBottom: `1px solid ${colors.outlineVariant}`,
+  },
+  drawerLogo: {
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: 20,
+    fontWeight: 800,
+    color: colors.primary,
+    fontStyle: 'italic',
+    letterSpacing: '-0.02em',
+  },
+  drawerClose: {
+    padding: 8,
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    borderRadius: '50%',
+  },
+  drawerNav: {
+    padding: '16px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  drawerItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 14,
+    padding: '12px 16px',
+    borderRadius: radius.lg,
+    border: 'none',
+    background: 'none',
+    cursor: 'pointer',
+    fontSize: 15,
+    fontWeight: 500,
     color: colors.textPrimary,
+    transition: 'background 0.2s',
   },
   main: {
     paddingTop: 80,

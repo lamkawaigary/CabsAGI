@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { tripService } from '../../services/tripService'
+import { chatService } from '../../services/chatService'
 import type { Trip, TripStatus } from '../../types/trip'
 import BottomNav from '../../components/BottomNav'
 
@@ -339,10 +340,37 @@ export default function DriverTripsManager() {
                           <div style={styles.pendingActions}>
                             <button 
                               style={styles.approveBtn}
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation()
-                                tripService.approvePassenger(trip.id, p.passengerId)
-                                loadTrips()
+                                try {
+                                  // Approve passenger in trip
+                                  await tripService.approvePassenger(trip.id, p.passengerId)
+                                  // Find or create chat room for this trip
+                                  let roomId = await chatService.getTripRoom(trip.id)
+                                  if (!roomId) {
+                                    roomId = await chatService.createTripChatRoom({
+                                      tripId: trip.id,
+                                      driverId: trip.driverId,
+                                      driverName: trip.driverName,
+                                      driverPhone: trip.driverPhone || '',
+                                      pickup: trip.route?.pickup?.placeName || '',
+                                      dropoff: trip.route?.dropoff?.placeName || '',
+                                      departureTime: trip.departureTime || '',
+                                    })
+                                    // Store chatRoomId on trip for future reference
+                                    await tripService.updateTripChatRoom(trip.id, roomId)
+                                  }
+                                  // Add passenger to chat room
+                                  await chatService.joinChatRoom(roomId, {
+                                    passengerId: p.passengerId,
+                                    name: p.name,
+                                    role: 'passenger',
+                                    phone: p.phone || '',
+                                  })
+                                  loadTrips()
+                                } catch (err: any) {
+                                  alert('操作失敗: ' + err.message)
+                                }
                               }}
                             >
                               ✅

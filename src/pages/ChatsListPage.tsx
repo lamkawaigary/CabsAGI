@@ -22,6 +22,7 @@ export default function ChatsListPage() {
   const { currentUser } = useAuth()
   const [rooms, setRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
     if (!currentUser?.id) return
@@ -58,20 +59,60 @@ export default function ChatsListPage() {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerContent}>
-          <div>
-            <h1 style={styles.headerTitle}>💬 聊天室</h1>
-            <p style={styles.headerSubtitle}>
-              {currentUser?.name ? `${currentUser.name}` : '用戶'}
-            </p>
-          </div>
-          <button onClick={() => navigate('/profile')} style={styles.profileBtn}>
-            👤
-          </button>
+      {/* Top App Bar */}
+      <header style={styles.appBar}>
+        <button style={styles.menuBtn} onClick={() => setDrawerOpen(true)}>
+          <Icon name="menu" style={{ color: colors.primary }} />
+        </button>
+        <h1 style={styles.logo}>OpenCabs</h1>
+        <div style={styles.headerAvatar} onClick={() => navigate('/profile')}>
+          <img
+            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'U')}&background=ffddb8&color=855300`}
+            alt="User"
+          />
         </div>
-      </div>
+      </header>
+
+      {/* Side Drawer */}
+      {drawerOpen && (
+        <div style={styles.drawerWrapper}>
+          <div style={styles.drawerOverlay} onClick={() => setDrawerOpen(false)} />
+          <div style={styles.drawer}>
+            <div style={styles.drawerHeader}>
+              <h2 style={styles.drawerLogo}>OpenCabs</h2>
+              <button style={styles.drawerClose} onClick={() => setDrawerOpen(false)}>
+                <Icon name="close" style={{ fontSize: 24 }} />
+              </button>
+            </div>
+            <nav style={styles.drawerNav}>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/passenger-home') }}>
+                <Icon name="home" style={{ fontSize: 20 }} />
+                <span>首頁</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/browse-trips') }}>
+                <Icon name="search" style={{ fontSize: 20 }} />
+                <span>瀏覽行程</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/my-requests') }}>
+                <Icon name="assignment" style={{ fontSize: 20 }} />
+                <span>我的需求</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/my-trips') }}>
+                <Icon name="directions_car" style={{ fontSize: 20 }} />
+                <span>我的行程</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/chats') }}>
+                <Icon name="chat" style={{ fontSize: 20 }} />
+                <span>收件箱</span>
+              </button>
+              <button style={styles.drawerItem} onClick={() => { setDrawerOpen(false); navigate('/profile') }}>
+                <Icon name="person" style={{ fontSize: 20 }} />
+                <span>個人資料</span>
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* Chat List */}
       <div style={styles.list}>
@@ -160,39 +201,116 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
     background: colors.background,
-    paddingBottom: 100,
+    paddingBottom: 140,
   },
-  header: {
-    background: colors.white,
-    padding: '16px',
-    borderBottom: `1px solid ${colors.border}`,
-  },
-  headerContent: {
+  appBar: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    padding: '0 20px',
+    height: 64,
+    background: 'rgba(255,251,249,0.9)',
+    backdropFilter: 'blur(12px)',
+    borderBottom: `1px solid ${colors.outlineVariant}`,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitle: {
-    margin: 0,
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-  },
-  headerSubtitle: {
-    margin: '4px 0 0',
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  profileBtn: {
-    padding: '8px 12px',
-    background: colors.primaryLight,
+  menuBtn: {
+    padding: 8,
+    background: 'none',
     border: 'none',
-    borderRadius: radius.sm,
-    fontSize: 16,
     cursor: 'pointer',
+    borderRadius: '50%',
+  },
+  logo: {
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: 20,
+    fontWeight: 800,
+    color: colors.primary,
+    fontStyle: 'italic',
+    letterSpacing: '-0.02em',
+  },
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    overflow: 'hidden',
+    border: `2px solid ${colors.outlineVariant}`,
+  },
+  drawerWrapper: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 100,
+  },
+  drawerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+  },
+  drawer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 280,
+    height: '100%',
+    background: colors.surface,
+    boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
+    padding: '20px 0',
+  },
+  drawerHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0 20px 20px',
+    borderBottom: `1px solid ${colors.outlineVariant}`,
+  },
+  drawerLogo: {
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    fontSize: 20,
+    fontWeight: 800,
+    color: colors.primary,
+    fontStyle: 'italic',
+    letterSpacing: '-0.02em',
+  },
+  drawerClose: {
+    padding: 8,
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    borderRadius: '50%',
+  },
+  drawerNav: {
+    padding: '16px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  drawerItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 14,
+    padding: '12px 16px',
+    borderRadius: radius.lg,
+    border: 'none',
+    background: 'none',
+    cursor: 'pointer',
+    fontSize: 15,
+    fontWeight: 500,
+    color: colors.textPrimary,
+    transition: 'background 0.2s',
   },
   list: {
     padding: 16,
+    paddingTop: 80,
   },
   chatItem: {
     display: 'flex',

@@ -144,6 +144,7 @@ export default function PassengerSettingsPage() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
+    paddingBottom: 80,
     background: '#fff9f5',
   },
   header: {

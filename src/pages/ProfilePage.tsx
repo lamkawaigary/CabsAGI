@@ -301,8 +301,8 @@ export default function ProfilePage() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: colors.background,
-    paddingBottom: 100,
+    paddingBottom: 80,
+    background: '#fff9f5',
   },
   header: {
     background: colors.white,

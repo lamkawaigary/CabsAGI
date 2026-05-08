@@ -145,6 +145,7 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
     background: '#fff9f5',
+    paddingBottom: 80, // Space for BottomNav
   },
   header: {
     display: 'flex',
@@ -195,6 +196,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   section: {
     padding: 20,
+    paddingBottom: 90, // Extra space for BottomNav
   },
   sectionTitle: {
     fontSize: 12,

@@ -1,6 +1,6 @@
-// Cabs Carpool - Trip Types (Chat-Centric)
-// Version: 3.0
-// 核心理念：行程只是聊天話題的起點
+// Cabs Carpool - Trip Types (Unified)
+// Version: 4.0
+// 統一的 Trip 模型：支援 FIXED 和 NEGOTIATED 兩種定價模式
 
 // ==================== Location ====================
 
@@ -11,213 +11,267 @@ export interface Location {
   longitude: number
 }
 
-// ==================== Trip (司機發佈行程 = 聊天話題) ====================
+// ==================== Trip Status ====================
 
 export type TripStatus = 
-  | 'OPEN'           // 🟢 開放中（等待乘客報名）
-  | 'CONFIRMED'      // 🟡 已確認（人數足夠，可以出發）
+  | 'OPEN'           // 🟢 開放中（等待參與者）
+  | 'CONFIRMED'      // 🟡 已確認（價格已鎖定，可出發）
   | 'IN_PROGRESS'    // 🔵 行程中
   | 'COMPLETED'      // ✅ 已完成
   | 'CANCELLED'      // ❌ 已取消
   | 'EXPIRED'        // ⏰ 已過期
 
+// ==================== Pricing Mode（核心區分）====================
+
+export type PricingMode = 
+  | 'FIXED'          // 司機發車：固定價格，司機在創建時已填寫
+  | 'NEGOTIATED'     // 乘客搵車：協商價格，等待司機報價
+
+// ==================== Initiator Role ====================
+
+export type InitiatorRole = 'driver' | 'passenger'
+
+// ==================== Quote（報價記錄）====================
+
+export interface TripQuote {
+  id: string
+  oderId: string          // 報價者 ID（司機）
+  oderName: string
+  oderPhone: string
+  pricePerSeat: number    // 每位價格 (HK$)
+  tunnelFee: number       // 隧道費 (HK$)
+  freeWaitingMinutes: number  // 免費等候分鐘
+  extraChargePer10Min: number // 超時每10分鐘收費
+  status: 'pending' | 'accepted' | 'rejected' | 'expired'
+  createdAt: string
+  respondedAt?: string
+  respondedBy?: string
+  respondedByName?: string
+}
+
+// ==================== Participant ====================
+
+export interface TripParticipant {
+  id: string
+  name: string
+  phone: string
+  role: InitiatorRole
+  joinedAt: string
+  confirmed: boolean
+  onboarded: boolean
+  qrCode?: string
+  qrCodeExpiry?: string
+  // Legacy alias for backward compatibility
+  passengerId?: string
+  driverId?: string
+  driverName?: string
+  driverPhone?: string
+}
+
+// ==================== Unified Trip（統一行程）====================
+
+// Extended Trip interface with backward compatibility
 export interface Trip {
   id: string
   
-  // 司機資料
-  driverId: string
-  driverName: string
-  driverPhone: string
+  // === 核心區分 ===
+  pricingMode: PricingMode
+  initiatorRole: InitiatorRole
+  initiatorId: string
+  initiatorName: string
+  initiatorPhone: string
   
-  // 行程資料 (聊天話題的起點)
+  // === 路線 ===
   route: {
     pickup: Location
     dropoff: Location
   }
   
-  // 時間
-  departureTime: string  // ISO timestamp
+  // === 時間 ===
+  departureTime: string
   
-  // 座位
-  totalSeats: number
-  availableSeats: number  // 剩餘座位
-  pricePerSeat?: number  // 每人價格
-  
-  // 車輛類型
+  // === 車輛 ===
   vehicleType: 'sedan' | '7seater'
+  totalSeats: number
+  availableSeats: number
   
-  // 乘客名單 (已批准的聊天參與者)
-  passengers: {
-    passengerId: string
-    name: string
-    phone: string
-    confirmed: boolean       // 是否已確認共乘
-    onboarded: boolean       // 是否已上車（司機標記）
-    qrCode?: string         // 上車驗證碼
-    qrCodeExpiry?: string   // 驗證碼過期時間
-  }[]
+  // === 定價 ===
+  pricePerSeat?: number
+  confirmedPrice?: number
+  tunnelFee?: number
   
-  // 待批准的乘客（pending approval）
-  pendingPassengers: {
-    passengerId: string
-    name: string
-    phone: string
-    joinedAt: string  // 加入時間
-  }[]
+  // === 參與者 ===
+  driver: TripParticipant | null
+  passengers: TripParticipant[]
   
-  // 已拒絕的乘客（拒絕後不再顯示）
-  rejectedPassengers: string[]  // passengerId 列表
+  // === 申請加入的乘客 ===
+  pendingPassengers: TripPendingPassenger[]
   
-  // 已離開的乘客（乘客主動離開）
-  leftPassengers: {
-    passengerId: string
-    leftAt: string
-    reason?: string
-  }[]
+  // === 報價記錄（NEGOTIATED 模式）===
+  quotes: TripQuote[]
   
-  // 司機標記的未到乘客
-  noShowPassengers: {
-    passengerId: string
-    markedAt: string
-    markedBy: string
-  }[]
-  
-  // 狀態
+  // === 狀態 ===
   status: TripStatus
   
-  // 確認情況
-  confirmedByDriver: boolean
-  confirmedByPassengers: string[]  // 已確認的乘客ID列表
-  
-  // 備註
+  // === 備註 & 標籤 ===
   notes?: string
-  
-  // 標籤
   tags?: string[]
   
-  // Metadata
+  // === 向後兼容欄位 ===
+  chatRoomId?: string
+  rejectedPassengers?: string[]
+  leftPassengers?: TripLeftPassenger[]
+  noShowPassengers?: TripNoShowPassenger[]
+  confirmedByDriver?: boolean
+  confirmedByPassengers?: string[]
+  
+  // === 舊欄位（直接訪問）===
+  driverId?: string
+  driverName?: string
+  driverPhone?: string
+  confirmedBy?: string[]
+  
+  // === 時間戳 ===
   createdAt: string
   updatedAt: string
 }
 
-// ==================== Request (乘客發佈需求 = 聊天話題) ====================
+// Additional types for backward compatibility
+export interface TripPendingPassenger {
+  id: string
+  name: string
+  phone: string
+  joinedAt: string
+  passengerId?: string  // Legacy support
+}
 
-export type RequestStatus =
-  | 'OPEN'        // 開放聊天
-  | 'CONFIRMED'   // 已確認共乘
-  | 'CANCELLED'  // 已取消
+export interface TripLeftPassenger {
+  id: string
+  leftAt: string
+  reason?: string
+  passengerId?: string  // Legacy support
+}
+
+export interface TripNoShowPassenger {
+  id: string
+  markedAt: string
+  markedBy: string
+  passengerId?: string  // Legacy support
+}
+
+// ==================== Legacy Types（向後兼容）====================
+
+// 舊的 Trip 結構（保留以便過渡期參考）
+export interface LegacyTrip {
+  driverId: string
+  driverName: string
+  driverPhone: string
+  route: { pickup: Location; dropoff: Location }
+  departureTime: string
+  totalSeats: number
+  availableSeats: number
+  pricePerSeat?: number
+  vehicleType: 'sedan' | '7seater'
+  passengers: any[]
+  pendingPassengers: any[]
+  rejectedPassengers: string[]
+  leftPassengers: any[]
+  noShowPassengers: any[]
+  status: TripStatus
+  confirmedByDriver: boolean
+  confirmedByPassengers: string[]
+  notes?: string
+  tags?: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+// ==================== Create Trip Data ====================
+
+export interface CreateTripData {
+  // 必填
+  pricingMode: PricingMode
+  initiatorRole: InitiatorRole
+  initiatorId: string
+  initiatorName: string
+  initiatorPhone: string
+  pickup: Location
+  dropoff: Location
+  departureTime: string
+  vehicleType: 'sedan' | '7seater'
+  totalSeats: number
+  
+  // FIXED 模式必填
+  pricePerSeat?: number
+  tunnelFee?: number
+  
+  // 舊欄位（向後兼容）
+  driverId?: string
+  driverName?: string
+  driverPhone?: string
+  driver?: TripParticipant | null
+  
+  // 可選
+  notes?: string
+  tags?: string[]
+}
+
+// ==================== Request Service Types（向後兼容）====================
 
 export interface PassengerRequest {
   id: string
-  
-  // 乘客資料
   passengerId: string
   passengerName: string
   passengerPhone: string
-  
-  // 需求資料 (聊天話題的起點)
   pickup: Location
   dropoff: Location
   departureDate: string
   passengerCount: number
-  
-  // 車輛類型
   vehicleType: 'sedan' | '7seater'
-  
-  // 是否共乘（true=共乘，false=包車）
   isCarpool: boolean
-  
-  // 備註
   notes: string | null
-  
-  // 有興趣的司機
   interestedDrivers: {
     driverId: string
     driverName: string
     driverPhone: string
     confirmed: boolean
   }[]
-  
-  // 其他想加入的乘客
   joinedPassengers: {
     passengerId: string
     name: string
     phone: string
     confirmed: boolean
   }[]
-  
-  // 標籤
   tags?: string[]
-  
-  // 狀態
-  status: RequestStatus
-  
-  // Metadata
+  status: 'OPEN' | 'CONFIRMED' | 'CANCELLED'
   createdAt: string
   updatedAt: string
-}
-
-// ==================== Chat Types ====================
-
-export interface ChatRoom {
-  id: string
-  
-  // 話題類型
-  roomType: 'trip' | 'request'
-  roomTypeId: string  // tripId or requestId
-  
-  // 參與者
-  participants: {
-    passengerId: string
-    name: string
-    role: 'driver' | 'passenger'
-    phone: string
-  }[]
-  
-  // 話題摘要
-  topicPickup?: string
-  topicDropoff?: string
-  topicTime?: string
-  
-  // 最後訊息
-  lastMessage?: string
-  lastMessageAt?: string
-  lastMessageBy?: string
-  
-  // 狀態
-  status: 'active' | 'closed'
-  
-  // 確認共乘
-  confirmedBy: string[]  // 已確認的用戶ID列表
-  
-  // Metadata
-  createdAt: string
-  updatedAt: string
-}
-
-export interface ChatMessage {
-  id: string
-  conversationId: string
-  
-  senderId: string
-  senderName: string
-  senderRole: 'driver' | 'passenger'
-  
-  content: string
-  messageType: 'text' | 'image' | 'location' | 'system'
-  
-  // 已讀
-  readBy: string[]
-  
-  createdAt: string
 }
 
 // ==================== Helper Types ====================
 
-export interface TripWithRoom extends Trip {
-  chatRoomId: string
+// Backward compatibility getter functions
+export const tripHelpers = {
+  getDriverId: (trip: Trip) => trip.driver?.id || (trip as any).driverId,
+  getDriverName: (trip: Trip) => trip.driver?.name || (trip as any).driverName,
+  getDriverPhone: (trip: Trip) => trip.driver?.phone || (trip as any).driverPhone,
+  getPassengerId: (p: any) => p.id || p.passengerId,
+  getPassengerName: (p: any) => p.name,
+  getPassengerPhone: (p: any) => p.phone,
 }
 
-export interface RequestWithRoom extends PassengerRequest {
-  chatRoomId: string
+// 狀態顯示文字
+export const TRIP_STATUS_TEXT: Record<TripStatus, string> = {
+  'OPEN': '等待加入',
+  'CONFIRMED': '已確認',
+  'IN_PROGRESS': '行程中',
+  'COMPLETED': '已完成',
+  'CANCELLED': '已取消',
+  'EXPIRED': '已過期'
+}
+
+// 定價模式顯示文字
+export const PRICING_MODE_TEXT: Record<PricingMode, string> = {
+  'FIXED': '固定價格',
+  'NEGOTIATED': '協商價格'
 }

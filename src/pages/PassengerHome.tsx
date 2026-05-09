@@ -130,7 +130,7 @@ export default function PassengerHome() {
   const handleJoinTrip = async (trip: Trip) => {
     try {
       await tripService.requestJoin(trip.id, {
-        passengerId: currentUser!.id,
+        id: currentUser!.id,
         name: currentUser!.name || '乘客',
         phone: currentUser!.phone || '',
       })
@@ -139,7 +139,7 @@ export default function PassengerHome() {
       if (!roomId) {
         roomId = await chatService.createTripChatRoom({
           tripId: trip.id,
-          driverId: trip.driverId,
+          driverId: trip.driver?.id || (trip as any).driverId,
           driverName: trip.driverName,
           driverPhone: trip.driverPhone,
           pickup: trip.route.pickup.placeName,

@@ -65,13 +65,15 @@ export default function EditTripPage() {
       const departureTime = `${date} ${time}`
       
       await tripService.update(tripId, {
-        pickup: { placeName: pickup, latitude: 0, longitude: 0 },
-        dropoff: { placeName: dropoff, latitude: 0, longitude: 0 },
+        route: {
+          pickup: { placeName: pickup, latitude: 0, longitude: 0 },
+          dropoff: { placeName: dropoff, latitude: 0, longitude: 0 },
+        },
         departureTime,
         totalSeats: seats,
         pricePerSeat: Number(price) || 0,
         notes,
-      })
+      } as any)
 
       alert('行程已更新！')
       navigate('/driver-trips')

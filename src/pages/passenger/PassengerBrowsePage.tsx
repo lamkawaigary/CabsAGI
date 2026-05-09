@@ -97,7 +97,7 @@ export default function PassengerBrowsePage() {
       }
 
       await tripService.requestJoin(trip.id, {
-        passengerId: currentUser!.id,
+        id: currentUser!.id,
         name: currentUser!.name || '乘客',
         phone: currentUser!.phone || '',
       })

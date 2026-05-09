@@ -78,15 +78,23 @@ export default function DriverDashboard() {
       const departureTime = new Date(`${newTrip.date}T${newTrip.time}`).toISOString()
       
       const tripId = await tripService.create({
-        driverId: currentUser!.id,
-        driverName: currentUser!.name || '司機',
-        driverPhone: currentUser!.phone || '',
+        // New format fields
+        pricingMode: 'FIXED',
+        initiatorRole: 'driver',
+        initiatorId: currentUser!.id,
+        initiatorName: currentUser!.name || '司機',
+        initiatorPhone: currentUser!.phone || '',
         pickup: { placeName: newTrip.pickup, latitude: 0, longitude: 0 },
         dropoff: { placeName: newTrip.dropoff, latitude: 0, longitude: 0 },
         departureTime,
         totalSeats: newTrip.seats,
         notes: newTrip.notes,
-      })
+        vehicleType: 'sedan',
+        // Legacy fields (for backward compatibility)
+        driverId: currentUser!.id,
+        driverName: currentUser!.name || '司機',
+        driverPhone: currentUser!.phone || '',
+      } as any)
       
       await chatService.createTripChatRoom({
         tripId,

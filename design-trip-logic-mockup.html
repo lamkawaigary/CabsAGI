@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CabsAGI Trip Logic Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { 
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f4f4f8;
+    color: #1a1a2e;
+    padding: 20px;
+  }
+  h1 { text-align: center; margin-bottom: 10px; color: #ff6b35; }
+  h3 { color: #444; margin-bottom: 8px; }
+  p.desc { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+  
+  .section { margin-bottom: 50px; }
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #ff6b35;
+  }
+  .section-title span { font-size: 24px; }
+  .section-title h2 { color: #1a1a2e; }
+
+  /* Phone Frame */
+  .phone-frame {
+    width: 375px;
+    height: 812px;
+    background: #fff;
+    border-radius: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .phone-notch {
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 150px; height: 30px;
+    background: #000;
+    border-radius: 0 0 20px 20px;
+    z-index: 100;
+  }
+  .phone-header {
+    height: 60px;
+    background: #ff6b35;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 10px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 16px;
+  }
+  .phone-content {
+    height: calc(100% - 60px - 80px);
+    overflow-y: auto;
+    padding: 16px;
+    background: #f8f9fa;
+  }
+  .phone-footer {
+    height: 80px;
+    background: #fff;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: #999;
+    font-size: 10px;
+  }
+  .nav-item.active { color: #ff6b35; }
+  .nav-icon { font-size: 24px; }
+
+  /* Cards */
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  /* Trip Flow */
+  .flow-container {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .flow-column { text-align: center; }
+  .flow-column h4 {
+    background: #ff6b35;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 20px;
+    margin-bottom: 15px;
+    font-size: 14px;
+  }
+  .flow-arrow {
+    font-size: 30px;
+    color: #ff6b35;
+    margin-top: 60px;
+  }
+
+  /* Status Badge */
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-fixed { background: #e8f5e9; color: #2e7d32; }
+  .badge-negotiated { background: #fff3e0; color: #e65100; }
+  .badge-open { background: #e3f2fd; color: #1565c0; }
+  .badge-confirmed { background: #e8f5e9; color: #2e7d32; }
+
+  /* Price Display */
+  .price-tag {
+    background: linear-gradient(135deg, #ff6b35, #ff8f65);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 18px;
+  }
+
+  /* Quote Card */
+  .quote-card {
+    background: linear-gradient(135deg, #fff8f5, #fff);
+    border: 2px solid #ff6b35;
+    border-radius: 16px;
+    padding: 16px;
+    margin: 12px 0;
+  }
+  .quote-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .quote-driver {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .driver-avatar {
+    width: 40px; height: 40px;
+    background: #ff6b35;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+  }
+  .quote-price-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px dashed #eee;
+    font-size: 13px;
+  }
+  .quote-price-row:last-child { border: none; }
+  .quote-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 2px solid #ff6b35;
+    font-weight: 700;
+    font-size: 16px;
+    color: #ff6b35;
+  }
+
+  /* Action Buttons */
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: #ff6b35; color: #fff; }
+  .btn-primary:hover { background: #e65100; }
+  .btn-secondary { background: #f5f5f5; color: #666; }
+  .btn-accept { background: #4caf50; color: #fff; flex: 1; margin-right: 8px; }
+  .btn-reject { background: #f5f5f5; color: #f44336; flex: 1; }
+
+  /* Input */
+  .input-group {
+    margin-bottom: 16px;
+  }
+  .input-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 6px;
+  }
+  .input-group input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 15px;
+    transition: border-color 0.2s;
+  }
+  .input-group input:focus {
+    outline: none;
+    border-color: #ff6b35;
+  }
+
+  /* Toggle */
+  .toggle-container {
+    display: flex;
+    background: #f0f0f0;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 20px;
+  }
+  .toggle-option {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .toggle-option.active {
+    background: #fff;
+    color: #ff6b35;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+
+  /* Chat Bubble */
+  .chat-bubble {
+    max-width: 75%;
+    padding: 12px 16px;
+    border-radius: 16px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .chat-bubble.received {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    margin-right: auto;
+    border-bottom-left-radius: 4px;
+  }
+  .chat-bubble.sent {
+    background: #ff6b35;
+    color: #fff;
+    margin-left: auto;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-bubble.system {
+    background: #e3f2fd;
+    color: #1565c0;
+    text-align: center;
+    font-size: 12px;
+    margin: 12px auto;
+    max-width: 90%;
+  }
+
+  /* Route Display */
+  .route-display {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+  .route-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .route-dot.pickup { background: #4caf50; }
+  .route-dot.dropoff { background: #f44336; }
+  .route-line {
+    width: 2px; height: 30px;
+    background: linear-gradient(to bottom, #4caf50, #f44336);
+    margin-left: 5px;
+  }
+  .route-text { font-size: 13px; }
+  .route-text .label { font-size: 11px; color: #999; }
+  .route-text .place { font-weight: 600; color: #1a1a2e; }
+
+  /* Info Grid */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .info-item {
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+  }
+  .info-item .label { font-size: 11px; color: #999; margin-bottom: 4px; }
+  .info-item .value { font-size: 15px; font-weight: 700; color: #1a1a2e; }
+
+  /* Tables */
+  .comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  .comparison-table th {
+    background: #ff6b35;
+    color: #fff;
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 13px;
+  }
+  .comparison-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+  }
+  .comparison-table tr:last-child td { border: none; }
+  .comparison-table tr:hover { background: #fafafa; }
+
+  /* Tags */
+  .tag {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #f0f0f0;
+    border-radius: 8px;
+    font-size: 11px;
+    margin-right: 6px;
+    margin-bottom: 4px;
+  }
+
+  /* Status Flow */
+  .status-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 30px 0;
+    flex-wrap: wrap;
+  }
+  .status-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-circle {
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    background: #f0f0f0;
+    color: #999;
+  }
+  .status-circle.active {
+    background: #ff6b35;
+    color: #fff;
+  }
+  .status-circle.completed {
+    background: #4caf50;
+    color: #fff;
+  }
+  .status-label {
+    font-size: 11px;
+    color: #666;
+    text-align: center;
+  }
+  .status-arrow {
+    font-size: 20px;
+    color: #ccc;
+    margin: 0 10px;
+  }
+
+  /* Pricing Mode Card */
+  .pricing-mode-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 16px;
+  }
+  .pricing-mode-card:hover { border-color: #ff6b35; }
+  .pricing-mode-card.selected {
+    border-color: #ff6b35;
+    background: #fff8f5;
+  }
+  .pricing-mode-card .icon { font-size: 40px; margin-bottom: 10px; }
+  .pricing-mode-card h4 { margin-bottom: 8px; }
+  .pricing-mode-card p { font-size: 12px; color: #666; }
+
+  /* Screenshot helper */
+  .mockup-wrapper {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>🚗 CabsAGI 行程邏輯優化 Mockup</h1>
+<p desc>統一定價模式：司機發車（固定價格）vs 乘客搵車（協商價格）</p>
+
+<!-- Section 1: Concept Overview -->
+<div class="section">
+<div class="section-title"><span>📋</span><h2>邏輯概念總覽</h2></div>
+
+<table class="comparison-table">
+  <thead>
+    <tr>
+      <th>場景</th>
+      <th>發起人</th>
+      <th>定價模式</th>
+      <th>流程</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>🚗 司機發車</strong></td>
+      <td>司機</td>
+      <td><span class="badge badge-fixed">FIXED 固定價格</span></td>
+      <td>司機填寫每位價格 → 發佈行程 → 乘客加入</td>
+    </tr>
+    <tr>
+      <td><strong>👤 乘客搵車</strong></td>
+      <td>乘客</td>
+      <td><span class="badge badge-negotiated">NEGOTIATED 協商價格</span></td>
+      <td>乘客發需求 → 司機加入報價 → 乘客接受 → 行程確認</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<!-- Section 2: Trip Status Flow -->
+<div class="section">
+<div class="section-title"><span>🔄</span><h2>Trip 狀態流轉</h2></div>
+
+<div class="status-flow">
+  <div class="status-step">
+    <div class="status-circle active">📝</div>
+    <div class="status-label">創建<br/>Trip</div>
+  </div>
+  <div class="status-arrow">→</div>
+  <div class="status-step">
+    <div class="status-circle active">🔍</div>
+    <div class="status-label">司機/乘客<br/>加入</div>
+  </div>
+  <div class="status-arrow">→</div>
+  <div class="status-step">
+    <div class="status-circle">💬</div>
+    <div class="status-label">聊天室<br/>協商</div>
+  </div>
+  <div class="status-arrow">→</div>
+  <div class="status-step">
+    <div class="status-circle">✅</div>
+    <div class="status-label">報價<br/>接受</div>
+  </div>
+  <div class="status-arrow">→</div>
+  <div class="status-step">
+    <div class="status-circle">🚗</div>
+    <div class="status-label">行程<br/>確認</div>
+  </div>
+  <div class="status-arrow">→</div>
+  <div class="status-step">
+    <div class="status-circle">🏁</div>
+    <div class="status-label">出發<br/>完成</div>
+  </div>
+</div>
+</div>
+
+<!-- Section 3: Flow Diagram -->
+<div class="section">
+<div class="section-title"><span>🔀</span><h2>兩種發起流程對比</h2></div>
+
+<div class="flow-container">
+  <div class="flow-column">
+    <h4>🚗 司機發車（FIXED）</h4>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-header">發佈行程</div>
+      <div class="phone-content">
+        <div class="card">
+          <h3 style="font-size:14px;margin-bottom:12px;">行程資料</h3>
+          <div class="route-display">
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div class="route-dot pickup"></div>
+              <div class="route-line"></div>
+              <div class="route-dot dropoff"></div>
+            </div>
+            <div class="route-text">
+              <div style="margin-bottom:16px;">
+                <div class="label">上車</div>
+                <div class="place">香港國際機場</div>
+              </div>
+              <div>
+                <div class="label">目的地</div>
+                <div class="place">深圳灣口岸</div>
+              </div>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="label">出發時間</div>
+              <div class="value">14:30</div>
+            </div>
+            <div class="info-item">
+              <div class="label">車型</div>
+              <div class="value">七人車</div>
+            </div>
+            <div class="info-item">
+              <div class="label">座位</div>
+              <div class="value">6 位</div>
+            </div>
+            <div class="info-item">
+              <div class="label">模式</div>
+              <div class="value"><span class="badge badge-fixed">FIXED</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="background:#fff8f5;border:2px solid #ff6b35;">
+          <h3 style="font-size:14px;margin-bottom:12px;">💰 每位價格</h3>
+          <div style="text-align:center;">
+            <span class="price-tag">HK$ 120 / 位</span>
+          </div>
+          <p style="font-size:11px;color:#999;margin-top:8px;text-align:center;">司機已設定固定價格</p>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#666;margin-top:12px;">司機在發佈時<br/>直接填寫每位價格</p>
+  </div>
+
+  <div class="flow-arrow">⟷</div>
+
+  <div class="flow-column">
+    <h4>👤 乘客搵車（NEGOTIATED）</h4>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-header">發佈需求</div>
+      <div class="phone-content">
+        <div class="card">
+          <h3 style="font-size:14px;margin-bottom:12px;">行程資料</h3>
+          <div class="route-display">
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div class="route-dot pickup"></div>
+              <div class="route-line"></div>
+              <div class="route-dot dropoff"></div>
+            </div>
+            <div class="route-text">
+              <div style="margin-bottom:16px;">
+                <div class="label">上車</div>
+                <div class="place">荃灣如心廣場</div>
+              </div>
+              <div>
+                <div class="label">目的地</div>
+                <div class="place">廣州白雲機場</div>
+              </div>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="label">出發時間</div>
+              <div class="value">5月15日 08:00</div>
+            </div>
+            <div class="info-item">
+              <div class="label">人數</div>
+              <div class="value">2 位</div>
+            </div>
+            <div class="info-item">
+              <div class="label">車型</div>
+              <div class="value">七人車</div>
+            </div>
+            <div class="info-item">
+              <div class="label">模式</div>
+              <div class="value"><span class="badge badge-negotiated">協商</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="background:#fff3e0;border:2px dashed #e65100;">
+          <div style="text-align:center;">
+            <span style="font-size:40px;">⏳</span>
+            <h3 style="font-size:14px;margin-top:8px;">等待司機報價</h3>
+            <p style="font-size:12px;color:#666;margin-top:4px;">司機加入後將在此報價</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#666;margin-top:12px;">乘客只填路線<br/>等待司機報價</p>
+  </div>
+</div>
+</div>
+
+<!-- Section 4: Chat Page - Driver Quote -->
+<div class="section">
+<div class="section-title"><span>💬</span><h2>聊天室 - 司機報價場景</h2></div>
+
+<div class="mockup-wrapper">
+  <div>
+    <h4 style="text-align:center;margin-bottom:12px;color:#666;">司機視角 - 填寫報價</h4>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-header">填寫報價</div>
+      <div class="phone-content">
+        <div class="card" style="background:#e3f2fd;padding:10px;font-size:12px;text-align:center;">
+          👤 乘客 Peter 想確認價格
+        </div>
+        <div class="card">
+          <h3 style="font-size:14px;margin-bottom:12px;">📋 行程詳情</h3>
+          <div style="font-size:12px;color:#666;margin-bottom:12px;">
+            荃灣 → 廣州白雲機場｜5月15日 08:00｜2位
+          </div>
+          <div class="input-group">
+            <label>每位價格 (HK$)</label>
+            <input type="number" value="180" placeholder="輸入每位價格">
+          </div>
+          <div class="input-group">
+            <label>隧道費 (HK$)</label>
+            <input type="number" value="30" placeholder="可選">
+          </div>
+          <div class="input-group">
+            <label>免費等候分鐘</label>
+            <input type="number" value="15" style="width:50%;">
+          </div>
+          <div class="input-group">
+            <label>超時附加費 (/10分鐘)</label>
+            <input type="number" value="30" style="width:50%;">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn btn-secondary" style="flex:1;">取消</button>
+          <button class="btn btn-primary" style="flex:1;">發送報價</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h4 style="text-align:center;margin-bottom:12px;color:#666;">乘客視角 - 查看 & 接受報價</h4>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-header">聊天室</div>
+      <div class="phone-content">
+        <div class="chat-bubble received">
+          請問師傅幾多錢？
+        </div>
+        <div class="chat-bubble sent">
+          想問下價格係幾多？
+        </div>
+        <div class="chat-bubble system">
+          🚗 司機David已發送報價
+        </div>
+        <div class="quote-card">
+          <div class="quote-header">
+            <div class="quote-driver">
+              <div class="driver-avatar">D</div>
+              <div>
+                <div style="font-weight:600;font-size:13px;">司機 David</div>
+                <div style="font-size:11px;color:#666;">剛剛</div>
+              </div>
+            </div>
+            <span class="badge badge-negotiated">待確認</span>
+          </div>
+          <div class="quote-price-row">
+            <span style="color:#666;">每位價格</span>
+            <span style="font-weight:600;">HK$ 180</span>
+          </div>
+          <div class="quote-price-row">
+            <span style="color:#666;">隧道費</span>
+            <span>HK$ 30</span>
+          </div>
+          <div class="quote-price-row">
+            <span style="color:#666;">等候時間</span>
+            <span>15分鐘免費</span>
+          </div>
+          <div class="quote-price-row">
+            <span style="color:#666;">超時附加</span>
+            <span>HK$ 30/10分鐘</span>
+          </div>
+          <div class="quote-total">
+            <span>2位總價</span>
+            <span>HK$ 420</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn btn-reject">拒絕</button>
+          <button class="btn btn-accept">✅ 接受報價</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Section 5: Chat Page - FIXED Price -->
+<div class="section">
+<div class="section-title"><span>💬</span><h2>聊天室 - 固定價格司機行程</h2></div>
+
+<div class="mockup-wrapper">
+  <div>
+    <h4 style="text-align:center;margin-bottom:12px;color:#666;">司機視角</h4>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-header">我的行程</div>
+      <div class="phone-content">
+        <div class="card" style="background:#e8f5e9;border:2px solid #4caf50;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span class="badge badge-confirmed">已確認</span>
+            <span style="font-size:11px;color:#666;">5月10日 14:30</span>
+          </div>
+          <div class="route-display" style="margin-bottom:12px;">
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div class="route-dot pickup"></div>
+              <div class="route-line"></div>
+              <div class="route-dot dropoff"></div>
+            </div>
+            <div class="route-text">
+              <div style="margin-bottom:16px;">
+                <div class="place">香港國際機場</div>
+              </div>
+              <div>
+                <div class="place">深圳灣口岸</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:11px;color:#666;">每位</div>
+              <div style="font-size:20px;font-weight:700;color:#ff6b35;">HK$ 120</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px;color:#666;">已報名</div>
+              <div style="font-size:16px;font-weight:600;">3/6 位</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="btn btn-primary" style="width:100%;">💬 進入聊天室</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h4 style="text-align:center;margin-bottom:12px;color:#666;">乘客視角 - 看到固定價格</h4>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-header">聊天室</div>
+      <div class="phone-content">
+        <div class="chat-bubble system">
+          🚗 司機已發佈固定價格行程
+        </div>
+        <div class="quote-card" style="border-color:#4caf50;background:#e8f5e9;">
+          <div class="quote-header">
+            <div class="quote-driver">
+              <div class="driver-avatar" style="background:#4caf50;">D</div>
+              <div>
+                <div style="font-weight:600;font-size:13px;">司機 David</div>
+                <div style="font-size:11px;color:#666;">七人車 · 6座</div>
+              </div>
+            </div>
+          </div>
+          <div class="quote-price-row">
+            <span style="color:#666;">每位價格</span>
+            <span style="font-weight:700;font-size:18px;color:#ff6b35;">HK$ 120</span>
+          </div>
+          <div class="quote-total">
+            <span>可載人數</span>
+            <span>6 位</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn btn-primary" style="flex:1;">✅ 加入行程</button>
+        </div>
+        <p style="font-size:11px;color:#999;margin-top:8px;text-align:center;">固定價格，直接加入</p>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Section 6: Create Trip Page -->
+<div class="section">
+<div class="section-title"><span>📝</span><h2>發佈行程頁面 - 統一流程</h2></div>
+
+<div class="mockup-wrapper">
+  <div>
+    <h4 style="text-align:center;margin-bottom:12px;color:#666;">Step 1: 選擇發起類型</h4>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-header">發佈行程</div>
+      <div class="phone-content">
+        <div class="pricing-mode-card selected">
+          <div class="icon">🚗</div>
+          <h4>我要發車</h4>
+          <p>司機身份，填寫固定價格</p>
+          <div style="margin-top:8px;"><span class="badge badge-fixed">FIXED 定價</span></div>
+        </div>
+        <div class="pricing-mode-card">
+          <div class="icon">👤</div>
+          <h4>我需要車</h4>
+          <p>乘客身份，等待司機報價</p>
+          <div style="margin-top:8px;"><span class="badge badge-negotiated">協商定價</span></div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;">繼續</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <h4 style="text-align:center;margin-bottom:12px;color:#666;">Step 2: 填寫資料（司機模式）</h4>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-header">填寫行程資料</div>
+      <div class="phone-content">
+        <div class="card">
+          <h3 style="font-size:13px;margin-bottom:12px;">路線</h3>
+          <div class="input-group">
+            <label>上車地點</label>
+            <input type="text" value="香港國際機場">
+          </div>
+          <div class="input-group">
+            <label>目的地</label>
+            <input type="text" value="深圳灣口岸">
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:13px;margin-bottom:12px;">車型 & 座位</h3>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <div style="flex:1;padding:12px;border:2px solid #e0e0e0;border-radius:10px;text-align:center;">
+              <div style="font-size:20px;">🚗</div>
+              <div style="font-size:12px;">轎車</div>
+            </div>
+            <div style="flex:1;padding:12px;border:2px solid #ff6b35;background:#fff8f5;border-radius:10px;text-align:center;">
+              <div style="font-size:20px;">🚐</div>
+              <div style="font-size:12px;color:#ff6b35;">七人車 ✓</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <div style="width:40px;height:40px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;">1</div>
+            <div style="width:40px;height:40px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;">2</div>
+            <div style="width:40px;height:40px;border-radius:50%;border:2px solid #ff6b35;background:#ff6b35;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;">3</div>
+            <div style="width:40px;height:40px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;">4</div>
+            <div style="width:40px;height:40px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;">5</div>
+            <div style="width:40px;height:40px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;">6</div>
+          </div>
+        </div>
+        <div class="card" style="background:#fff8f5;">
+          <h3 style="font-size:13px;margin-bottom:12px;">💰 每位價格（必填）</h3>
+          <div class="input-group">
+            <label>每位價格 (HK$)</label>
+            <input type="number" value="120" style="font-size:20px;font-weight:700;border-color:#ff6b35;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Section 7: Summary -->
+<div class="section">
+<div class="section-title"><span>📊</span><h2>修改檔案清單</h2></div>
+
+<table class="comparison-table">
+  <thead>
+    <tr>
+      <th>優先級</th>
+      <th>檔案</th>
+      <th>修改內容</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong style="color:#f44336;">🔴 P1</strong></td>
+      <td>types/trip.ts</td>
+      <td>重新定義 Trip 介面，新增 pricingMode</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#f44336;">🔴 P1</strong></td>
+      <td>types/chat.ts</td>
+      <td>簡化 ChatRoom，統一 roomType</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#f44336;">🔴 P1</strong></td>
+      <td>services/tripService.ts</td>
+      <td>統一 create/update/join 邏輯</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#f44336;">🔴 P1</strong></td>
+      <td>services/chatService.ts</td>
+      <td>簡化聊天室創建流程</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#f44336;">🔴 P1</strong></td>
+      <td>pages/CreateTripPage.tsx</td>
+      <td>新增定價模式選擇，分離 FIXED/NEGOTIATED</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#f44336;">🔴 P1</strong></td>
+      <td>pages/ChatPage.tsx</td>
+      <td>重新設計報價卡片，統一顯示邏輯</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#ff9800;">🟡 P2</strong></td>
+      <td>pages/PassengerHomePage.tsx</td>
+      <td>統一瀏覽入口</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#ff9800;">🟡 P2</strong></td>
+      <td>pages/DriverHomePage.tsx</td>
+      <td>顯示自己行程 + 收到的需求</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#ff9800;">🟡 P2</strong></td>
+      <td>services/priceQuoteService.ts</td>
+      <td>整合到 Trip 內的 quotes 陣列</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#4caf50;">🟢 P3</strong></td>
+      <td>pages/passenger/CreateRequestPage.tsx</td>
+      <td>合併到統一發佈流程</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div style="text-align:center;margin-top:40px;padding:20px;background:#fff8f5;border-radius:16px;">
+  <h2 style="color:#ff6b35;">🚀 下一步行動</h2>
+  <p style="margin:16px 0;color:#666;">1. 確認並清除 Firebase 內所有舊數據</p>
+  <p style="margin:16px 0;color:#666;">2. 按優先順序修改類型定義和服務層</p>
+  <p style="margin:16px 0;color:#666;">3. 實現新的 UI 頁面</p>
+  <p style="margin:16px 0;color:#666;">4. 測試完整流程</p>
+</div>
+
+</body>
+</html>

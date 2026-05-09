@@ -1,40 +1,43 @@
-// Cabs Carpool - Chat Types
-// Version: 2.0
+// Cabs Carpool - Chat Types (Simplified)
+// Version: 4.0
+// 統一聊天室：只關聯 Trip，roomType 只有 'trip'
 
-export type ChatParticipantRole = 'driver' | 'passenger' | 'admin'
+export type ChatParticipantRole = 'driver' | 'passenger'
 
 export interface ChatParticipant {
   id: string
   name: string
   role: ChatParticipantRole
   phone?: string
-  lastSeen?: string
 }
 
-export interface ChatConversation {
+// ==================== Chat Room（統一）====================
+
+export interface ChatRoom {
   id: string
-  // Trip relation (replaces shift)
-  tripId?: string
   
-  // Participants
-  participants: string[]  // user IDs
-  participantInfo: Record<string, {
-    name: string
-    role: ChatParticipantRole
-    phone?: string
-  }>
+  // 統一只關聯 Trip
+  tripId: string              // 唯一的行程關聯
+  roomType: 'trip'           // 固定為 'trip'
   
-  // Trip summary (for display)
-  tripPickup?: string
-  tripDropoff?: string
-  tripTime?: string
+  // 向後兼容欄位
+  roomTypeId?: string         // 舊欄位（現在用 tripId）
   
-  // Last message preview
+  // 參與者
+  participants: ChatParticipant[]
+  
+  // 話題摘要（冗餘存儲，方便顯示）
+  topicPickup?: string
+  topicDropoff?: string
+  topicTime?: string
+  topicVehicleType?: 'sedan' | '7seater'
+  
+  // 最後訊息
   lastMessage?: string
   lastMessageAt?: string
   lastMessageBy?: string
   
-  // Status
+  // 狀態
   status: 'active' | 'closed'
   
   // Metadata
@@ -42,24 +45,41 @@ export interface ChatConversation {
   updatedAt: string
 }
 
+// ==================== Chat Message ====================
+
+export type MessageType = 
+  | 'text' 
+  | 'image' 
+  | 'location' 
+  | 'system'
+  | 'price_offer'      // 報價訊息
+  | 'price_confirmed'   // 價格已確認
+  | 'price_update'      // 價格更新（FIXED 模式）
+
 export interface ChatMessage {
   id: string
-  conversationId: string
+  conversationId: string   // ChatRoom.id
   
-  // Sender
   senderId: string
   senderName: string
   senderRole: ChatParticipantRole
   
-  // Message content
   content: string
-  messageType: 'text' | 'image' | 'location' | 'system'
+  messageType: MessageType
   
-  // Media (if image)
+  // 報價資料（可選）
+  quoteData?: {
+    pricePerSeat: number
+    tunnelFee?: number
+    freeWaitingMinutes?: number
+    extraChargePer10Min?: number
+    status: 'pending' | 'accepted' | 'rejected'
+  }
+  
+  // 媒體（如果 image）
   mediaUrl?: string
-  mediaType?: string
   
-  // Location (if location share)
+  // 位置（如果 location share）
   location?: {
     latitude: number
     longitude: number
@@ -67,18 +87,31 @@ export interface ChatMessage {
     placeName?: string
   }
   
-  // Read status
-  readBy: string[]  // user IDs who have read
+  // 已讀
+  readBy: string[]
   
-  // Metadata
   createdAt: string
 }
 
-export interface NewConversationData {
+// ==================== Create Chat Room Data ====================
+
+export interface CreateChatRoomData {
   tripId: string
-  participants: string[]
-  participantInfo: Record<string, { name: string; role: ChatParticipantRole; phone?: string }>
-  tripPickup: string
-  tripDropoff: string
-  tripTime: string
+  initiatorId: string
+  initiatorName: string
+  initiatorPhone: string
+  initiatorRole: ChatParticipantRole
+  topicPickup: string
+  topicDropoff: string
+  topicTime: string
+  topicVehicleType?: 'sedan' | '7seater'
+}
+
+// ==================== Join Chat Room Data ====================
+
+export interface JoinChatRoomData {
+  oderId: string
+  oderName: string
+  oderPhone: string
+  oderRole: ChatParticipantRole
 }

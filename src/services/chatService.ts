@@ -16,7 +16,7 @@ import {
   arrayUnion
 } from 'firebase/firestore'
 import { db } from '../firebaseConfig'
-import type { ChatRoom, ChatMessage } from '../types/trip'
+import type { ChatRoom, ChatMessage } from '../types/chat'
 
 const CHAT_ROOMS_COLLECTION = 'chatRooms'
 const MESSAGES_COLLECTION = 'chatMessages'

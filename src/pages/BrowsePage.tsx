@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tripService } from '../services/tripService'
+import { migrateListingsToTrips } from '../services/migrateToTrips'
 import { useAuth } from '../context/AuthContext'
 
 export default function BrowsePage() {
@@ -21,6 +22,19 @@ export default function BrowsePage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      
+      // One-time migration: move old listings to trips
+      if (viewMode === 'trips') {
+        try {
+          const { migrated } = await migrateListingsToTrips()
+          if (migrated > 0) {
+            console.log(`[BrowsePage] Migrated ${migrated} old listings to trips`)
+          }
+        } catch (e) {
+          console.warn('[BrowsePage] Migration check failed (non-critical):', e)
+        }
+      }
+      
       console.log('[BrowsePage] Calling getPublicTrips...')
       const allTrips = await tripService.getPublicTrips()
       console.log('[BrowsePage] getPublicTrips returned:', allTrips.length, 'trips')

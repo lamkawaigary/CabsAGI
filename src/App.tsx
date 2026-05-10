@@ -117,7 +117,6 @@ function AppShell() {
           {userRole === 'passenger' && (
             <>
               <Route path="/passenger-home" element={<PassengerHomePage />} />
-              <Route path="/browse-trips" element={<PassengerBrowsePage />} />
               <Route path="/my-trips" element={<MyTripsPage />} />
               <Route path="/passenger-settings" element={<PassengerSettingsPage />} />
               <Route path="/create-request" element={<CreateRequestPage />} />
@@ -125,7 +124,8 @@ function AppShell() {
             </>
           )}
           
-          {/* Shared routes */}
+          {/* Shared routes - available to all logged-in users */}
+          <Route path="/browse-trips" element={<PassengerBrowsePage />} />
           <Route path="/chats" element={<ChatsListPage />} />
           <Route path="/chat/:roomId" element={<ChatPage />} />
           <Route path="/listing/:listingId" element={<ListingDetailPage />} />

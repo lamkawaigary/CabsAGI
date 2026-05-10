@@ -129,13 +129,17 @@ export const tripService = {
       )
       const snapshot = await getDocs(q)
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip))
-    } catch (e) {
-      console.error('[tripService] Error getting public trips:', e)
+    } catch (e: any) {
+      console.warn('[tripService] Query failed (likely missing composite index):', e.message)
       // Fallback: get all and filter
+      console.log('[tripService] Trying fallback - get all docs...')
       const allDocs = await getDocs(collection(db, TRIPS_COLLECTION))
-      return allDocs.docs
+      console.log('[tripService] Fallback got', allDocs.size, 'total docs')
+      const filtered = allDocs.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Trip))
         .filter(t => t.status === 'OPEN' || t.status === 'CONFIRMED')
+      console.log('[tripService] Filtered to', filtered.length, 'trips with OPEN/CONFIRMED status')
+      return filtered
     }
   },
 

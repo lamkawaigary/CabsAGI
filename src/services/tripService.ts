@@ -65,9 +65,9 @@ export const tripService = {
       availableSeats: data.totalSeats,
       
       // 定價
-      // Only include pricePerSeat for FIXED mode (Firestore doesn't accept undefined)
-      ...(data.pricingMode === 'FIXED' && { pricePerSeat: data.pricePerSeat }),
-      tunnelFee: data.tunnelFee,
+      // Only include numeric fields for FIXED mode (Firestore doesn't accept undefined)
+      ...(data.pricingMode === 'FIXED' && data.pricePerSeat !== undefined && { pricePerSeat: data.pricePerSeat }),
+      ...(data.tunnelFee !== undefined && { tunnelFee: data.tunnelFee }),
       
       // 參與者
       driver: isDriverInitiator ? {

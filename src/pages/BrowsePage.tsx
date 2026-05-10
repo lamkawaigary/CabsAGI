@@ -22,7 +22,10 @@ export default function BrowsePage() {
     try {
       setLoading(true)
       if (viewMode === 'trips') {
+        console.log('[BrowsePage] Calling getPublicTrips...')
         const allTrips = await tripService.getPublicTrips()
+        console.log('[BrowsePage] getPublicTrips returned:', allTrips.length, 'trips')
+        console.log('[BrowsePage] Trips:', JSON.stringify(allTrips.map(t => ({id: t.id, status: t.status}))))
         setTrips(allTrips)
       } else {
         const allRequests = await requestService.getPublicRequests()

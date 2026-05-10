@@ -99,8 +99,8 @@ export const tripService = {
     }
     
     const docRef = await addDoc(collection(db, TRIPS_COLLECTION), trip)
-    console.log('[tripService.create] Trip created in Firestore:', docRef.id)
-    console.log('[tripService.create] Trip data:', JSON.stringify(trip))
+    console.log('[tripService.create] ✅ SUCCESS - Trip created in Firestore:', docRef.id)
+    console.log('[tripService.create] Trip data:', JSON.stringify(trip, null, 2))
     
     // 自動創建聊天室
     const chatRoomId = await chatService.createForTrip({

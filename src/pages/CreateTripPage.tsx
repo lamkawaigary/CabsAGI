@@ -227,7 +227,7 @@ export default function CreateTripPage() {
         notes,
         tags,
       })
-
+      console.log('[CreateTripPage] Trip created successfully! ID:', tripId)
       alert(pricingMode === 'FIXED' ? '行程發佈成功！' : '需求已發佈，等待司機報價！')
       navigate(pricingMode === 'FIXED' ? '/driver-home' : '/passenger-home')
     } catch (error) {

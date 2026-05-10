@@ -17,67 +17,76 @@ service cloud.firestore {
       allow write: if isAuthenticated() && uid() == userId;
     }
     
-    // ========== LISTINGS (Carousell Model) ==========
-    // Simple: OPEN → SOLD/CANCELLED
-    // Allow public read for browsing (no auth required to see offers)
-
-    match /listings/{listingId} {
-      allow read: if true; // Public read for browsing
-      allow create: if isAuthenticated() && request.resource.data.initiatorId == uid();
-      allow update: if isAuthenticated() && (
-        resource.data.initiatorId == uid() ||
-        request.resource.data.buyerId == uid() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['interestedParties', 'updatedAt'])
-      );
-      allow delete: if isAuthenticated() && resource.data.initiatorId == uid() && resource.data.status == 'OPEN';
+    // ========== TRIPS ==========
+    
+    match /trips/{tripId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
     
     // ========== CHAT ROOMS ==========
     
     match /chatRooms/{roomId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if false;
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
     
     // ========== CHAT MESSAGES ==========
     
     match /chatMessages/{messageId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.senderId == uid();
-      allow update, delete: if false;
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
     
-    // ========== TRIPS (Driver Routes) ==========
-    // Allow public read for browsing (no auth required)
-
-    match /trips/{tripId} {
-      allow read: if true; // Public read for browsing
-      allow create: if isAuthenticated() && request.resource.data.driverId == uid();
-      allow update: if isAuthenticated() && (
-        resource.data.driverId == uid() ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingPassengers', 'updatedAt', 'joinedTrips'])
-      );
-      allow delete: if isAuthenticated() && resource.data.driverId == uid();
+    // ========== PRICE QUOTES ==========
+    
+    match /priceQuotes/{quoteId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
     
     // ========== PASSENGER REQUESTS ==========
-    // Allow public read for browsing
-
+    
     match /passengerRequests/{requestId} {
-      allow read: if true; // Public read for browsing
-      allow create: if isAuthenticated() && request.resource.data.passengerId == uid();
-      allow update, delete: if isAuthenticated() && resource.data.passengerId == uid();
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
     
-    // ========== LEGACY COLLECTIONS ==========
+    // ========== LISTINGS ==========
     
-    match /priceQuotes/{quoteId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && resource.data.status == 'pending';
-      allow delete: if false;
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+    
+    // ========== SHIFTS ==========
+    
+    match /shifts/{shiftId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+    
+    // ========== BOOKINGS ==========
+    
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
   }
 }

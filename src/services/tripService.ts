@@ -120,6 +120,7 @@ export const tripService = {
    * 獲取所有公開 Trip（乘客瀏覽）
    */
   async getPublicTrips(): Promise<Trip[]> {
+    console.log("[tripService] getPublicTrips called, collection:", TRIPS_COLLECTION)
     try {
       const q = query(
         collection(db, TRIPS_COLLECTION),

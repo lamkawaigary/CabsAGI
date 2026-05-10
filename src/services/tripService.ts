@@ -121,25 +121,36 @@ export const tripService = {
    */
   async getPublicTrips(): Promise<Trip[]> {
     console.log("[tripService] getPublicTrips called, collection:", TRIPS_COLLECTION)
+    
+    // First, try to get ALL docs without any filters
+    // This bypasses composite index requirements
     try {
-      const q = query(
-        collection(db, TRIPS_COLLECTION),
-        where('status', 'in', ['OPEN', 'CONFIRMED']),
-        orderBy('createdAt', 'desc')
-      )
-      const snapshot = await getDocs(q)
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip))
-    } catch (e: any) {
-      console.warn('[tripService] Query failed (likely missing composite index):', e.message)
-      // Fallback: get all and filter
-      console.log('[tripService] Trying fallback - get all docs...')
+      console.log('[tripService] Fetching all docs from trips collection...')
       const allDocs = await getDocs(collection(db, TRIPS_COLLECTION))
-      console.log('[tripService] Fallback got', allDocs.size, 'total docs')
-      const filtered = allDocs.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as Trip))
-        .filter(t => t.status === 'OPEN' || t.status === 'CONFIRMED')
-      console.log('[tripService] Filtered to', filtered.length, 'trips with OPEN/CONFIRMED status')
-      return filtered
+      console.log('[tripService] getDocs returned', allDocs.size, 'documents')
+      
+      // Filter client-side for OPEN or CONFIRMED status
+      const trips: Trip[] = []
+      allDocs.forEach(doc => {
+        const data = doc.data() as Trip
+        console.log('[tripService] Doc', doc.id, 'status:', data.status, 'mode:', data.pricingMode)
+        if (data.status === 'OPEN' || data.status === 'CONFIRMED') {
+          trips.push({ id: doc.id, ...data })
+        }
+      })
+      console.log('[tripService] Total trips with OPEN/CONFIRMED:', trips.length)
+      
+      // Sort by createdAt desc
+      trips.sort((a, b) => {
+        const aTime = (a as any).createdAt || ''
+        const bTime = (b as any).createdAt || ''
+        return bTime.localeCompare(aTime)
+      })
+      
+      return trips
+    } catch (e: any) {
+      console.error('[tripService] Error fetching trips:', e.code, e.message)
+      return []
     }
   },
 

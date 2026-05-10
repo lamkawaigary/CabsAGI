@@ -103,16 +103,14 @@ export const tripService = {
     console.log('[tripService.create] Trip data:', JSON.stringify(trip, null, 2))
     
     // 自動創建聊天室
-    const chatRoomId = await chatService.createForTrip({
+    const chatRoomId = await chatService.createTripChatRoom({
       tripId: docRef.id,
-      initiatorId: data.initiatorId,
-      initiatorName: data.initiatorName,
-      initiatorPhone: data.initiatorPhone,
-      initiatorRole: data.initiatorRole,
-      topicPickup: data.pickup.placeName,
-      topicDropoff: data.dropoff.placeName,
-      topicTime: data.departureTime,
-      topicVehicleType: data.vehicleType,
+      driverId: data.initiatorId,
+      driverName: data.initiatorName,
+      driverPhone: data.initiatorPhone,
+      pickup: data.pickup.placeName,
+      dropoff: data.dropoff.placeName,
+      departureTime: data.departureTime,
     })
     
     return docRef.id

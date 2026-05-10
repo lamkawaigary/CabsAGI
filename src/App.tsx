@@ -126,7 +126,7 @@ function AppShell() {
           )}
           
           {/* Shared routes - available to all logged-in users */}
-          <Route path="/browse-trips" element={<DebugBrowsePage />} />
+          <Route path="/browse-trips" element={<PassengerBrowsePage />} />
           <Route path="/chats" element={<ChatsListPage />} />
           <Route path="/chat/:roomId" element={<ChatPage />} />
           <Route path="/listing/:listingId" element={<ListingDetailPage />} />

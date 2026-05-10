@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { tripService, requestService } from '../services/tripService'
+import { listingService } from '../services/listingService'
 import { useAuth } from '../context/AuthContext'
 
 export default function BrowsePage() {
@@ -26,7 +27,26 @@ export default function BrowsePage() {
         const allTrips = await tripService.getPublicTrips()
         console.log('[BrowsePage] getPublicTrips returned:', allTrips.length, 'trips')
         console.log('[BrowsePage] Trips:', JSON.stringify(allTrips.map(t => ({id: t.id, status: t.status}))))
-        setTrips(allTrips)
+        
+        // Also fetch from listings collection (passenger requests)
+        console.log('[BrowsePage] Calling listingService.getOpenListings...')
+        const openListings = await listingService.getOpenListings()
+        console.log('[BrowsePage] listingService.getOpenListings returned:', openListings.length, 'listings')
+        
+        // Combine trips and listings (convert listings to trip format)
+        const formattedListings = openListings.map(l => ({
+          id: l.id,
+          route: l.route,
+          departureTime: l.departureTime,
+          status: l.status,
+          initiatorName: l.initiatorName,
+          totalSeats: l.passengerCount,
+          pricingMode: l.type === 'driver_offer' ? 'FIXED' : 'NEGOTIATED',
+          source: 'listing'
+        }))
+        
+        console.log('[BrowsePage] Combined trips + listings:', allTrips.length + formattedListings.length)
+        setTrips([...allTrips, ...formattedListings])
       } else {
         const allRequests = await requestService.getPublicRequests()
         setRequests(allRequests)

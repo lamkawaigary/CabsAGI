@@ -15,6 +15,7 @@ const EditTripPage = lazy(() => import('./pages/driver/EditTripPage'))
 // ============ Passenger Pages ============
 const PassengerHomePage = lazy(() => import('./pages/passenger/PassengerHomePage'))
 const PassengerBrowsePage = lazy(() => import('./pages/passenger/PassengerBrowsePage'))
+const DebugBrowsePage = lazy(() => import('./pages/DebugBrowsePage'))
 const PassengerRequestsPage = lazy(() => import('./pages/passenger/PassengerRequestsPage'))
 const MyTripsPage = lazy(() => import('./pages/passenger/MyTripsPage'))
 const PassengerSettingsPage = lazy(() => import('./pages/passenger/PassengerSettingsPage'))
@@ -125,7 +126,7 @@ function AppShell() {
           )}
           
           {/* Shared routes - available to all logged-in users */}
-          <Route path="/browse-trips" element={<PassengerBrowsePage />} />
+          <Route path="/browse-trips" element={<DebugBrowsePage />} />
           <Route path="/chats" element={<ChatsListPage />} />
           <Route path="/chat/:roomId" element={<ChatPage />} />
           <Route path="/listing/:listingId" element={<ListingDetailPage />} />

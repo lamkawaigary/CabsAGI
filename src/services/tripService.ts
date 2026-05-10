@@ -99,6 +99,8 @@ export const tripService = {
     }
     
     const docRef = await addDoc(collection(db, TRIPS_COLLECTION), trip)
+    console.log('[tripService.create] Trip created in Firestore:', docRef.id)
+    console.log('[tripService.create] Trip data:', JSON.stringify(trip))
     
     // 自動創建聊天室
     const chatRoomId = await chatService.createForTrip({
@@ -155,8 +157,12 @@ export const tripService = {
       const snapshot = await getDocs(q)
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip))
     } catch (e) {
-      console.error('[tripService] Error getting driver trips:', e)
-      return []
+      console.warn('[tripService] getByDriver query failed, using fallback:', e.message)
+      // Fallback: get all and filter locally
+      const allDocs = await getDocs(collection(db, TRIPS_COLLECTION))
+      return allDocs.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Trip))
+        .filter(t => t.driver?.id === driverId)
     }
   },
 
@@ -165,14 +171,18 @@ export const tripService = {
    */
   async getByPassenger(passengerId: string): Promise<Trip[]> {
     try {
-      // Find trips where this passenger is in passengers array
+      // Find trips where this passenger is in passengers array OR is the initiator
       const allDocs = await getDocs(collection(db, TRIPS_COLLECTION))
       const trips: Trip[] = []
       allDocs.forEach(doc => {
         const data = doc.data() as Trip
+        // Check if passenger is in passengers array
         const isPassenger = data.passengers?.some(p => p.id === passengerId)
+        // Check if passenger is pending
         const isPending = data.pendingPassengers?.some(p => p.id === passengerId)
-        if (isPassenger || isPending) {
+        // Check if passenger is the initiator (they created this trip/request)
+        const isInitiator = data.initiatorId === passengerId && data.initiatorRole === 'passenger'
+        if (isPassenger || isPending || isInitiator) {
           trips.push({ id: doc.id, ...data })
         }
       })

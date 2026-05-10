@@ -25,18 +25,29 @@ export default function BrowsePage() {
     try {
       setLoading(true)
       
-      // DEBUG: Test Firestore directly
+      // DEBUG: Test Firestore directly - write first to verify connectivity
       try {
-        console.log('[BrowsePage] Direct Firestore test...')
+        console.log('[BrowsePage] Testing Firestore WRITE...')
         const testRef = await addDoc(collection(db, 'trips'), {
-          _debug_direct_write: true,
-          timestamp: new Date().toISOString()
+          _browser_test: true,
+          timestamp: new Date().toISOString(),
+          source: 'BrowsePage loadData'
         })
-        console.log('[BrowsePage] Direct write success, ID:', testRef.id)
+        console.log('[BrowsePage] ✅ WRITE success! ID:', testRef.id)
+        
+        // Now try to read it back
         const snap = await getDocs(collection(db, 'trips'))
         console.log('[BrowsePage] trips collection has', snap.size, 'docs')
+        
+        // Check if our test doc is there
+        const testDoc = snap.docs.find(d => d.id === testRef.id)
+        if (testDoc) {
+          console.log('[BrowsePage] ✅ READ test doc found:', testDoc.data())
+        } else {
+          console.log('[BrowsePage] ❌ Test doc not found in collection!')
+        }
       } catch (e: any) {
-        console.error('[BrowsePage] Direct Firestore test failed:', e.code, e.message)
+        console.error('[BrowsePage] ❌ Firestore test failed:', e.code, e.message)
       }
       
       // One-time migration: move old listings to trips

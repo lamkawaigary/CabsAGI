@@ -29,6 +29,7 @@ const ChatsListPage = lazy(() => import('./pages/ChatsListPage'))
 const CreateTripPage = lazy(() => import('./pages/CreateTripPage'))
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const ListingDetailPage = lazy(() => import('./pages/ListingDetailPage'))
+const TestFirestoreWrite = lazy(() => import('./pages/TestFirestoreWrite'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const NotificationBanner = lazy(() => import('./components/NotificationBanner'))
 const BottomNav = lazy(() => import('./components/BottomNav'))
@@ -63,6 +64,7 @@ function AppShell() {
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/test-firestore" element={<TestFirestoreWrite />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -127,6 +129,7 @@ function AppShell() {
           <Route path="/chats" element={<ChatsListPage />} />
           <Route path="/chat/:roomId" element={<ChatPage />} />
           <Route path="/listing/:listingId" element={<ListingDetailPage />} />
+          <Route path="/test-firestore" element={<TestFirestoreWrite />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           

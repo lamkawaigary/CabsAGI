@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { requestService } from '../../services/tripService'
+import { tripService } from '../../services/tripService'
 import { listingService } from '../../services/listingService'
 import { chatService } from '../../services/chatService'
 import { doc, getDoc } from 'firebase/firestore'
@@ -234,38 +234,25 @@ export default function CreateRequestPage() {
       setLoading(true)
       const departureDate = `${date} ${time}`
       
-      // Create request
-      const requestId = await requestService.create({
-        passengerId: currentUser.id,
-        passengerName: currentUser.name || '乘客',
-        passengerPhone: currentUser.phone || '',
-        pickup: { placeName: pickup, latitude: 0, longitude: 0 },
-        dropoff: { placeName: dropoff, latitude: 0, longitude: 0 },
-        departureDate,
-        passengerCount: passengers,
-        notes,
-        tags,
-        vehicleType,
-      })
-      
-      // Also create a listing so drivers can find it
-      await listingService.create({
-        type: 'passenger_request',
+      // Create request - write to trips collection with NEGOTIATED pricing mode
+      const tripId = await tripService.create({
+        pricingMode: 'NEGOTIATED',
+        initiatorRole: 'passenger',
         initiatorId: currentUser.id,
         initiatorName: currentUser.name || '乘客',
         initiatorPhone: currentUser.phone || '',
         pickup: { placeName: pickup, latitude: 0, longitude: 0 },
         dropoff: { placeName: dropoff, latitude: 0, longitude: 0 },
         departureTime: departureDate,
-        passengerCount: passengers,
         vehicleType: vehicleType || 'sedan',
-        isCarpool: true,
+        totalSeats: passengers,
         notes,
+        tags,
       })
       
       // Create chat room
       await chatService.createRequestChatRoom({
-        requestId,
+        requestId: tripId,
         passengerId: currentUser.id,
         passengerName: currentUser.name || '乘客',
         passengerPhone: currentUser.phone || '',

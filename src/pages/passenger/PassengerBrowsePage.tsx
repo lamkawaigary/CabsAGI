@@ -34,9 +34,17 @@ export default function PassengerBrowsePage() {
   const loadTrips = async () => {
     try {
       setLoading(true)
+      console.log('[PassengerBrowsePage] Loading public trips...')
       const publicTrips = await tripService.getPublicTrips()
-      const filteredTrips = publicTrips.filter(t => t.driverId !== currentUser?.id)
-      setTrips(filteredTrips || [])
+      console.log('[PassengerBrowsePage] getPublicTrips returned:', publicTrips.length, 'trips')
+      
+      // Filter: show only FIXED (driver offers) where this passenger is NOT the driver
+      const driverOffers = publicTrips.filter(t => 
+        t.pricingMode === 'FIXED' && 
+        t.initiatorId !== currentUser?.id
+      )
+      console.log('[PassengerBrowsePage] Filtered to', driverOffers.length, 'driver offers')
+      setTrips(driverOffers || [])
     } catch (error) {
       console.error('Error loading trips:', error)
     } finally {

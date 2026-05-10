@@ -1,16 +1,16 @@
-// Cabs Carpool - Driver Browse Page v3.0 (Carousell Model)
-// Browse passenger requests (where driver can offer rides)
+// Cabs Carpool - Driver Browse Page v4.0
+// Browse passenger requests from trips collection (unified)
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { listingService, type Listing } from '../../services/listingService'
+import { tripService } from '../../services/tripService'
 import BottomNav from '../../components/BottomNav'
 
 export default function DriverBrowsePage() {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const [listings, setListings] = useState<Listing[]>([])
+  const [trips, setTrips] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -20,11 +20,17 @@ export default function DriverBrowsePage() {
   const loadListings = async () => {
     try {
       setLoading(true)
-      const all = await listingService.getOpenListings()
-      // Filter: show only passenger requests (where driver is the responder)
-      const passengerRequests = all.filter(l => l.type === 'passenger_request')
-      // Filter out my own
-      setListings(passengerRequests.filter(l => l.initiatorId !== currentUser?.id))
+      console.log('[DriverBrowsePage] Loading trips with NEGOTIATED pricing...')
+      const all = await tripService.getPublicTrips()
+      console.log('[DriverBrowsePage] getPublicTrips returned:', all.length, 'trips')
+      
+      // Filter: show only NEGOTIATED (passenger requests) where driver is NOT the initiator
+      const passengerRequests = all.filter(t => 
+        t.pricingMode === 'NEGOTIATED' && 
+        t.initiatorId !== currentUser?.id
+      )
+      console.log('[DriverBrowsePage] Filtered to', passengerRequests.length, 'passenger requests')
+      setTrips(passengerRequests as any[])
     } catch (error) {
       console.error('Error loading:', error)
     } finally {
@@ -50,14 +56,14 @@ export default function DriverBrowsePage() {
       <div style={styles.content}>
         {loading ? (
           <div style={styles.empty}>載入中...</div>
-        ) : listings.length === 0 ? (
+        ) : trips.length === 0 ? (
           <div style={styles.empty}>
             <div style={styles.emptyIcon}>👤</div>
             <div>暫時沒有乘客需求</div>
             <div style={styles.emptySubtext}>乘客發布需求後會在這裡顯示</div>
           </div>
         ) : (
-          listings.map(listing => (
+          trips.map(listing => (
             <div 
               key={listing.id} 
               style={styles.card}

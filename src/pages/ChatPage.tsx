@@ -18,6 +18,9 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db, storage } from '../firebaseConfig'
 import { colors, radius } from '../styles/designSystem'
 import RatingModal from '../components/RatingModal'
+import QuoteCard from '../components/chat/QuoteCard'
+import PriceUpdateBanner from '../components/chat/PriceUpdateBanner'
+import CounterOfferModal from '../components/chat/CounterOfferModal'
 
 const Icon = ({ name, filled = false, style = {} }: { name: string; filled?: boolean; style?: React.CSSProperties }) => (
   <span style={{
@@ -51,6 +54,10 @@ export default function ChatPage() {
   const [tripInfo, setTripInfo] = useState<any>(null)  // Trip info for this chat
   const [showRatingModal, setShowRatingModal] = useState(false)  // Rating modal
   const [ratingTarget, setRatingTarget] = useState<any>(null)  // User to rate
+  const [showCounterModal, setShowCounterModal] = useState(false)  // Counter offer modal
+  const [selectedQuote, setSelectedQuote] = useState<PriceQuote | null>(null)  // Quote for counter
+  const [priceUpdateInfo, setPriceUpdateInfo] = useState<{oldPrice: number; newPrice: number; updatedAt: string} | null>(null)  // FIXED price update
+  const [lastTripPrice, setLastTripPrice] = useState<number | null>(null)  // Track price changes
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -110,10 +117,17 @@ export default function ChatPage() {
         }
       }
       
-      // Check for price update system messages in trip rooms
+      // Check for price update in FIXED trip rooms
+      // If driver changes trip price, show update banner
       if (roomData.roomType === 'trip' && tripInfo?.pricePerSeat) {
-        // This would be handled by a snapshot listener in production
-        // For now, we display trip price from tripInfo
+        if (lastTripPrice && lastTripPrice !== tripInfo.pricePerSeat) {
+          setPriceUpdateInfo({
+            oldPrice: lastTripPrice,
+            newPrice: tripInfo.pricePerSeat,
+            updatedAt: tripInfo.updatedAt || new Date().toISOString(),
+          })
+        }
+        setLastTripPrice(tripInfo.pricePerSeat)
       }
       
       // Load messages using simple query
@@ -397,6 +411,70 @@ export default function ChatPage() {
     }
   }
 
+  // Handle reject quote
+  const handleRejectQuote = async (quote: PriceQuote) => {
+    if (!confirm('確定要拒絕這個報價嗎？')) return
+    try {
+      await priceQuoteService.reject(quote.id)
+      loadChat()
+    } catch (err: any) {
+      console.error('Reject error:', err)
+      alert('拒絕失敗: ' + err.message)
+    }
+  }
+
+  // Handle counter offer - open modal
+  const handleCounterQuote = (quote: PriceQuote) => {
+    setSelectedQuote(quote)
+    setShowCounterModal(true)
+  }
+
+  // Submit counter offer
+  const handleSubmitCounter = async (counterData: {
+    pricePerSeat: number
+    tunnelFee: number
+    freeWaitingMinutes: number
+    message: string
+  }) => {
+    if (!selectedQuote || !currentUser || !roomId) return
+    
+    try {
+      // Create counter quote via priceQuoteService
+      await priceQuoteService.createOrUpdate({
+        roomId,
+        oderId: currentUser.id,
+        oderName: currentUser.name || '用戶',
+        oderRole: currentUser.role as 'driver' | 'passenger',
+        type: 'counter',
+        pricePerSeat: counterData.pricePerSeat,
+        tunnelFee: counterData.tunnelFee,
+        waitingTime: counterData.freeWaitingMinutes,
+        extraChargePer10Min: 0,
+      })
+
+      // Send system message
+      const ref = collection(db, 'chatMessages')
+      await addDoc(ref, {
+        conversationId: roomId,
+        senderId: currentUser.id,
+        senderName: currentUser.name || '用戶',
+        senderRole: currentUser.role || 'passenger',
+        content: `💬 乘客還價：每位 HK$ ${counterData.pricePerSeat}${counterData.tunnelFee > 0 ? ` + 隧道費 HK$ ${counterData.tunnelFee}` : ''}`,
+        messageType: 'price_counter',
+        readBy: [currentUser.id],
+        createdAt: new Date().toISOString(),
+        participantIds: room?.participantIds || [],
+      })
+
+      setShowCounterModal(false)
+      setSelectedQuote(null)
+      loadChat()
+    } catch (err: any) {
+      console.error('Counter error:', err)
+      alert('還價失敗: ' + err.message)
+    }
+  }
+
   const formatTime = (iso?: string) => {
     if (!iso) return ''
     try {
@@ -619,12 +697,23 @@ export default function ChatPage() {
         </div>
       )}
       
+      {/* Price Update Banner (FIXED mode when driver updates price) */}
+      {isTripRoom && priceUpdateInfo && (
+        <PriceUpdateBanner
+          oldPrice={priceUpdateInfo.oldPrice}
+          newPrice={priceUpdateInfo.newPrice}
+          updatedBy={tripInfo?.driverName || '司機'}
+          updatedAt={priceUpdateInfo.updatedAt}
+          onDismiss={() => setPriceUpdateInfo(null)}
+        />
+      )}
+      
       {/* Both Confirmed Banner (if no price quote) */}
       {bothConfirmed && !hasConfirmedQuote && (
         <div style={styles.confirmedBanner}>✅ 共乘已確認</div>
       )}
 
-      {/* Price Quote Section - Collapsible */}
+      {/* Price Quote Section - Collapsible (NEGOTIATED mode) */}
       {quotes.length > 0 && !hasConfirmedQuote && isRequestRoom && (
         <div style={styles.quoteSection}>
           {/* Header */}
@@ -638,36 +727,21 @@ export default function ChatPage() {
             </span>
           </div>
           
-          {/* Expanded Content */}
+          {/* Expanded Content - Use QuoteCard for better UX */}
           {quoteExpanded && (
             <div style={styles.quoteContent}>
-              {quotes.filter(q => q.status === 'pending').slice(0, 2).map(quote => {
+              {quotes.filter(q => q.status === 'pending').map(quote => {
                 const isMyQuote = quote.oderId === currentUser?.id
                 return (
-                  <div key={quote.id} style={styles.quoteCardCompact}>
-                    <div style={styles.quoteCardTop}>
-                      <span style={styles.quoteRoleCompact}>
-                        {isMyQuote ? '📤 你的' : `📥 ${quote.oderName}`}
-                      </span>
-                      <span style={styles.quotePriceCompact}>
-                        HK$ {quote.pricePerSeat}/位
-                      </span>
-                    </div>
-                    {(quote.tunnelFee > 0 || quote.freeWaitingMinutes > 0) && (
-                      <div style={styles.quoteExtraCompact}>
-                        {quote.tunnelFee > 0 && <span>🚇+{quote.tunnelFee}</span>}
-                        {quote.freeWaitingMinutes > 0 && <span>⏱️ {quote.freeWaitingMinutes}分鐘免費</span>}
-                      </div>
-                    )}
-                    {!isMyQuote && (
-                      <button 
-                        style={styles.acceptBtnCompact}
-                        onClick={() => handleAcceptQuote(quote)}
-                      >
-                        ✅ 接受
-                      </button>
-                    )}
-                  </div>
+                  <QuoteCard
+                    key={quote.id}
+                    quote={quote}
+                    isMyQuote={isMyQuote}
+                    onAccept={handleAcceptQuote}
+                    onReject={handleRejectQuote}
+                    onCounter={handleCounterQuote}
+                    mode="NEGOTIATED"
+                  />
                 )
               })}
             </div>
@@ -931,6 +1005,23 @@ export default function ChatPage() {
           userRole={currentUser?.role as 'driver' | 'passenger'}
         />
       )}
+
+      {/* Counter Offer Modal */}
+      <CounterOfferModal
+        isOpen={showCounterModal}
+        originalQuote={
+          selectedQuote ? {
+            pricePerSeat: selectedQuote.pricePerSeat,
+            tunnelFee: selectedQuote.tunnelFee || 0,
+            freeWaitingMinutes: selectedQuote.freeWaitingMinutes || 10,
+          } : { pricePerSeat: 0, tunnelFee: 0, freeWaitingMinutes: 10 }
+        }
+        onSubmit={handleSubmitCounter}
+        onClose={() => {
+          setShowCounterModal(false)
+          setSelectedQuote(null)
+        }}
+      />
     </div>
   )
 }

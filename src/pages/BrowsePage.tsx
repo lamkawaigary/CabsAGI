@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom'
 import { tripService } from '../services/tripService'
 import { migrateListingsToTrips } from '../services/migrateToTrips'
 import { useAuth } from '../context/AuthContext'
+import { db } from '../firebaseConfig'
+import { collection, addDoc, getDocs } from 'firebase/firestore'
 
 export default function BrowsePage() {
   const navigate = useNavigate()
@@ -22,6 +24,20 @@ export default function BrowsePage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      
+      // DEBUG: Test Firestore directly
+      try {
+        console.log('[BrowsePage] Direct Firestore test...')
+        const testRef = await addDoc(collection(db, 'trips'), {
+          _debug_direct_write: true,
+          timestamp: new Date().toISOString()
+        })
+        console.log('[BrowsePage] Direct write success, ID:', testRef.id)
+        const snap = await getDocs(collection(db, 'trips'))
+        console.log('[BrowsePage] trips collection has', snap.size, 'docs')
+      } catch (e: any) {
+        console.error('[BrowsePage] Direct Firestore test failed:', e.code, e.message)
+      }
       
       // One-time migration: move old listings to trips
       if (viewMode === 'trips') {

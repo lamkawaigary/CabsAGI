@@ -135,6 +135,11 @@ export const tripService = {
         const data = doc.data() as Trip
         console.log('[tripService] Doc', doc.id, 'status:', data.status, 'mode:', data.pricingMode)
         if (data.status === 'OPEN' || data.status === 'CONFIRMED') {
+          // Backwards compatibility: if driver is null but initiatorRole=driver, use initiator fields
+          if (!data.driver && data.initiatorRole === 'driver') {
+            (data as any).driverId = data.initiatorId
+            ;(data as any).driverName = data.initiatorName
+          }
           trips.push({ id: doc.id, ...data })
         }
       })
